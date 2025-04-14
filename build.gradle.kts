@@ -13,6 +13,7 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven("https://mvnrepository.com/artifact/io.kubernetes/client-java")
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") // Репозиторій для Compose
     google()
 }
@@ -23,26 +24,19 @@ kotlin {
 }
 
 dependencies {
-    // Compose Desktop (надається плагіном org.jetbrains.compose)
     implementation(compose.desktop.currentOs)
-
-    // Fabric8 Kubernetes Client (вирішили спробувати цю версію)
-    implementation("io.fabric8:kubernetes-client:6.10.0")
-
-    // Logging
+    val clientJavaVersion = "20.0.1" // !!! ЗАМІНІТЬ НА АКТУАЛЬНУ СТАБІЛЬНУ ВЕРСІЮ !!!
+    implementation("io.kubernetes:client-java:${clientJavaVersion}")
+    //implementation("io.kubernetes:client-java-kubeconfig:${clientJavaVersion}")
+    //implementation("io.kubernetes:client-java-okhttp-helper:${clientJavaVersion}")
     implementation("ch.qos.logback:logback-classic:1.4.14")
-
-    // Kotlin Coroutines Core Library (версія, яку вимагає Compose 1.6.x)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-
-    // Інтеграція Coroutines з Swing/AWT для Dispatchers.Main
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0") // Версія має співпадати з -core
-
-    // Тестова залежність
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
+    implementation("org.slf4j:slf4j-api:2.0.17")
     testImplementation(kotlin("test"))
 }
 
-// Конфігурація Compose Desktop
+
 compose.desktop {
     application {
         mainClass = "MainKt" // Головний клас вашого додатку
