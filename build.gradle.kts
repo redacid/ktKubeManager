@@ -1,11 +1,11 @@
+// build.gradle.kts
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-//import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
+//import org.jetbrains.kotlin.gradle.tasks.KotlinCompile // Імпорт може бути не обов'язковим
 
 plugins {
-    kotlin("jvm") version "1.9.23" // Або 1.9.23
-    id("org.jetbrains.compose") version "1.7.3"
-    //id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
+    kotlin("jvm") version "2.0.0" // Використовуємо Kotlin 2.0.0
+    id("org.jetbrains.compose") version "1.6.10" // Використовуємо Compose, сумісний з Kotlin 2.0.0
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" // Додатковий плагін компілятора Compose для Kotlin 2.0.0+
 }
 
 group = "com.example.kubemanager"
@@ -13,42 +13,48 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
-    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-    maven("https://mvnrepository.com")
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") // Репозиторій для Compose
     google()
 }
 
+// Вказуємо Java Toolchain для узгодженості компіляції
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(11) // Компілюємо під Java 11
 }
 
 dependencies {
+    // Compose Desktop (надається плагіном org.jetbrains.compose)
     implementation(compose.desktop.currentOs)
-    //implementation("androidx.compose.foundation:foundation-android:1.7.8")
-    val fabric8Version = "6.13.5" // Ваша версія
-    implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
-    implementation("io.fabric8:kubernetes-client:${fabric8Version}")
-    implementation(compose.material3)
-    //implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.0")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3") //extract helm release
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.3") //extract helm release
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
-    implementation("br.com.devsrsouza.compose.icons:feather:1.1.1") // https://feathericons.com/
-    implementation("br.com.devsrsouza.compose.icons:simple-icons:1.1.1") // https://simpleicons.org/
 
+    // Fabric8 Kubernetes Client (вирішили спробувати цю версію)
+    implementation("io.fabric8:kubernetes-client:6.10.0")
+
+    // Logging
+    implementation("ch.qos.logback:logback-classic:1.4.14")
+
+    // Kotlin Coroutines Core Library (версія, яку вимагає Compose 1.6.x)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+
+    // Інтеграція Coroutines з Swing/AWT для Dispatchers.Main
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0") // Версія має співпадати з -core
+
+    // Тестова залежність
     testImplementation(kotlin("test"))
 }
 
+// Конфігурація Compose Desktop
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "MainKt" // Головний клас вашого додатку
+
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm) // Формати для різних ОС
             packageName = "KotlinKubeManager"
             packageVersion = "1.0.0"
+            // Налаштування для іконки, вендора тощо
+            // vendor = "YourCompany"
+            // description = "Simple Kubernetes Manager"
+            // copyright = "© 2025 YourCompany"
         }
     }
 }
