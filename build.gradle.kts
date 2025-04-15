@@ -1,10 +1,11 @@
+// build.gradle.kts (Без Fabric8 KubeConfig Helper)
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.9.23" // Або 1.9.23
-    id("org.jetbrains.compose") version "1.6.10" // Або інша сумісна з Kotlin версією
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" // Версія = версії Kotlin
+    kotlin("jvm") version "2.0.0" // Або 1.9.23
+    id("org.jetbrains.compose") version "1.6.10"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0"
 }
 
 group = "com.example.kubemanager"
@@ -22,9 +23,18 @@ kotlin {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("io.fabric8:kubernetes-client:6.13.5")
+
+    // --- Fabric8 Kubernetes Client (Без хелперів) ---
+    val fabric8Version = "6.13.5" // Ваша версія
+    // Явно додаємо API, бо Config і NamedContext там
+    implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
+    implementation("io.fabric8:kubernetes-client:${fabric8Version}")
+    // --- io.fabric8:kubernetes-client-kubeconfig ВИДАЛЕНО ---
+    // --- io.fabric8:kubernetes-client-okhttp-helper ВИДАЛЕНО ---
+    // ----------------------------------------------------
 
     implementation("ch.qos.logback:logback-classic:1.4.14")
+    // Повертаємо корутини, бо будемо їх використовувати для autoConfigure
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
     testImplementation(kotlin("test"))
