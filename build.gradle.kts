@@ -23,18 +23,10 @@ kotlin {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-
-    // --- Fabric8 Kubernetes Client (Без хелперів) ---
     val fabric8Version = "6.13.5" // Ваша версія
-    // Явно додаємо API, бо Config і NamedContext там
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
     implementation("io.fabric8:kubernetes-client:${fabric8Version}")
-    // --- io.fabric8:kubernetes-client-kubeconfig ВИДАЛЕНО ---
-    // --- io.fabric8:kubernetes-client-okhttp-helper ВИДАЛЕНО ---
-    // ----------------------------------------------------
-
     implementation("ch.qos.logback:logback-classic:1.4.14")
-    // Повертаємо корутини, бо будемо їх використовувати для autoConfigure
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
     testImplementation(kotlin("test"))
