@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -97,7 +98,7 @@ suspend fun <T> fetchK8sResource(
         }
         logger.info("Завантажено ${items.size} $resourceType.")
         try {
-            @Suppress("UNCHECKED_CAST")
+            //@Suppress("UNCHECKED_CAST")
             val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
             Result.success(sortedItems)
         } catch (e: ClassCastException) {
@@ -156,7 +157,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 
                 val client = KubernetesClientBuilder().withConfig(config).build()
                 logger.info("[IO] Fabric8 client created. Checking version...")
-                val ver = client.kubernetesVersion?.gitVersion ?: client.version?.gitVersion ?: "невідомо"
+                val ver = client.kubernetesVersion?.gitVersion ?: client.kubernetesVersion?.gitVersion ?: "невідомо"
                 logger.info("[IO] Версія сервера: $ver для '$contextNameToLog'")
                 Pair(client, ver)
             }
@@ -282,7 +283,7 @@ fun App() {
                     } // Кінець Box списку
                     Spacer(modifier = Modifier.height(16.dp)); Text("Ресурси Кластера:", style = MaterialTheme.typography.h6); Spacer(modifier = Modifier.height(8.dp))
                     Box(modifier = Modifier.weight(2f).border(1.dp, Color.Gray)) { // Дерево ресурсів
-                        ResourceTreeView(rootIds = resourceTreeData[""] ?: emptyList(), expandedNodes = expandedNodes, onNodeClick = { nodeId, isLeaf ->
+                        resourceTreeView(rootIds = resourceTreeData[""] ?: emptyList(), expandedNodes = expandedNodes, onNodeClick = { nodeId, isLeaf ->
                             logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
                             if (isLeaf) {
                                 if (activeClient != null && !isLoading) {
@@ -398,7 +399,7 @@ fun <T> ResourceListComposable(title: String, items: List<T>, itemToString: (T) 
 
 // --- Composable для дерева ресурсів ---
 @Composable
-fun ResourceTreeView(
+fun resourceTreeView(
     rootIds: List<String>,
     expandedNodes: MutableMap<String, Boolean>,
     onNodeClick: (id: String, isLeaf: Boolean) -> Unit,
@@ -407,7 +408,7 @@ fun ResourceTreeView(
     LazyColumn(modifier = modifier.fillMaxSize().padding(start = 8.dp)) {
         rootIds.forEach { nodeId ->
             item {
-                ResourceTreeNode(
+                resourceTreeNode(
                     nodeId = nodeId,
                     level = 0,
                     expandedNodes = expandedNodes,
@@ -419,7 +420,7 @@ fun ResourceTreeView(
 }
 
 @Composable
-fun ResourceTreeNode(
+fun resourceTreeNode(
     nodeId: String,
     level: Int,
     expandedNodes: MutableMap<String, Boolean>,
@@ -438,7 +439,7 @@ fun ResourceTreeNode(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val icon = when {
-            !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowRight
+            !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
             !isLeaf -> Icons.Filled.Place // Ваша іконка
             else -> Icons.Filled.Info     // Ваша іконка
         }
@@ -450,7 +451,7 @@ fun ResourceTreeNode(
     if (!isLeaf && isExpanded && children != null) {
         Column {
             children.sorted().forEach { childId ->
-                ResourceTreeNode(
+                resourceTreeNode(
                     nodeId = childId,
                     level = level + 1,
                     expandedNodes = expandedNodes,
