@@ -1,10 +1,3 @@
-// src/main/kotlin/Main.kt (На базі збереженої версії + всі ресурси)
-// --- Імпорти для Fabric8 ---
-// Моделі Kubernetes
-// Імпорти для Coroutines
-//import kotlinx.coroutines.withContext // Повне ім'я
-//import kotlinx.coroutines.CoroutineScope
-//import kotlinx.coroutines.delay
 // Імпорт для логера
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.border
@@ -69,7 +62,7 @@ val resourceLeafNodes: Set<String> = setOf(
 private val logger = LoggerFactory.getLogger("MainKtFabric8SavedBaseline")
 
 // --- Константи ---
-const val MAX_CONNECT_RETRIES = 3
+const val MAX_CONNECT_RETRIES = 1
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 10000
