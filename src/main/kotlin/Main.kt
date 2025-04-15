@@ -1,4 +1,3 @@
-// --- START OF FULL Main.kt ---
 // src/main/kotlin/Main.kt (Базовий код з GitHub + Ручна таблиця M2 БЕЗ stickyHeader)
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.background // Додано для таблиці
