@@ -1,68 +1,53 @@
-// src/main/kotlin/Main.kt (ВАШ КОД з GitHub + ТАБЛИЦЯ + Fabric8 API)
 import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background // Додано для таблиці
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.*
+import androidx.compose.material.* // ВИКОРИСТОВУЄМО Material 2
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.* // Використовуємо filled для стандартних
+import androidx.compose.material.icons.filled.* // Використовуємо M2 іконки
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight // Додано, якщо використовується
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight // Додано для таблиці
+import androidx.compose.ui.text.style.TextOverflow // Додано для таблиці
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp // Додано для таблиці
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-// --- Імпорти для Fabric8 ---
+// Імпорти Fabric8 ЯК У ВАШОМУ КОДІ + моделі для таблиці
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.KubernetesClientException
-// Моделі Fabric8
-import io.fabric8.kubernetes.api.model.Namespace
-import io.fabric8.kubernetes.api.model.Node
-import io.fabric8.kubernetes.api.model.Pod
-import io.fabric8.kubernetes.api.model.Service
-import io.fabric8.kubernetes.api.model.apps.Deployment
-import io.fabric8.kubernetes.api.model.apps.StatefulSet
-import io.fabric8.kubernetes.api.model.apps.DaemonSet
-import io.fabric8.kubernetes.api.model.apps.ReplicaSet
-import io.fabric8.kubernetes.api.model.batch.v1.Job
-import io.fabric8.kubernetes.api.model.batch.v1.CronJob
-import io.fabric8.kubernetes.api.model.networking.v1.Ingress
-import io.fabric8.kubernetes.api.model.PersistentVolume
-import io.fabric8.kubernetes.api.model.PersistentVolumeClaim
-import io.fabric8.kubernetes.api.model.storage.StorageClass
-import io.fabric8.kubernetes.api.model.ConfigMap
-import io.fabric8.kubernetes.api.model.Secret
-import io.fabric8.kubernetes.api.model.ServiceAccount
-import io.fabric8.kubernetes.api.model.rbac.Role
-import io.fabric8.kubernetes.api.model.rbac.RoleBinding
-import io.fabric8.kubernetes.api.model.rbac.ClusterRole
-import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
-import io.fabric8.kubernetes.api.model.HasMetadata // Для сортування та getCellData
-// --- Інші імпорти Fabric8 ---
+import io.fabric8.kubernetes.api.model.*
+import io.fabric8.kubernetes.api.model.apps.*
+import io.fabric8.kubernetes.api.model.batch.v1.*
+import io.fabric8.kubernetes.api.model.networking.v1.*
+import io.fabric8.kubernetes.api.model.rbac.*
+import io.fabric8.kubernetes.api.model.storage.*
 // НЕМАЄ імпорту KubeConfig або KubeConfigUtils
-// ---------------------------
-// Імпорти для Coroutines
+// Імпорти для Coroutines ЯК У ВАШОМУ КОДІ
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext // Повне ім'я
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-// Імпорт для логера
+// Логер ЯК У ВАШОМУ КОДІ
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+// Додано імпорти для форматування часу (ПОТРІБНІ для таблиці)
 import java.time.Duration
 import java.time.OffsetDateTime
-import java.time.format.DateTimeParseException // Для обробки помилок парсингу дати
+import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
+// Додаткові імпорти для форматерів
 import io.fabric8.kubernetes.api.model.OwnerReference
 import io.fabric8.kubernetes.api.model.NodeCondition
 import io.fabric8.kubernetes.api.model.NodeAddress
@@ -75,7 +60,6 @@ import io.fabric8.kubernetes.api.model.PersistentVolumeSpec
 import io.fabric8.kubernetes.api.model.PersistentVolumeClaimSpec
 import io.fabric8.kubernetes.api.model.batch.v1.JobStatus
 import io.fabric8.kubernetes.api.model.Taint
-
 
 // --- Дані для дерева ресурсів ---
 val resourceTreeData: Map<String, List<String>> = mapOf(
@@ -92,21 +76,23 @@ val resourceLeafNodes: Set<String> = setOf(
     "Services", "Ingresses", "PersistentVolumes", "PersistentVolumeClaims", "StorageClasses", "ConfigMaps", "Secrets",
     "ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"
 )
-// ------------------------------------------------
+// ---
 
 // Логер
-private val logger = LoggerFactory.getLogger("MainKtFabric8BaselineTable")
+private val logger = LoggerFactory.getLogger("MainKtManualTableM2")
+
 // --- Константи ---
-const val MAX_CONNECT_RETRIES = 1 // У вашому коді було 1
+const val MAX_CONNECT_RETRIES = 3 // Повернули 3 для тестів діалогу
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
-const val REQUEST_TIMEOUT_MS = 10000
+const val REQUEST_TIMEOUT_MS = 15000
+const val FABRIC8_VERSION = "6.13.5"
+// ---
 
-// --- Допоміжні функції форматування (знову для Fabric8 моделей) ---
+// --- Допоміжні функції форматування (для Fabric8 моделей) ---
 fun formatAge(creationTimestamp: String?): String {
     if (creationTimestamp.isNullOrBlank()) return "N/A"
     try {
-        // Fabric8 використовує рядок, який парситься OffsetDateTime
         val creationTime = OffsetDateTime.parse(creationTimestamp)
         val now = OffsetDateTime.now(creationTime.offset)
         val duration = Duration.between(creationTime, now)
@@ -116,13 +102,7 @@ fun formatAge(creationTimestamp: String?): String {
             duration.toMinutes() > 0 -> "${duration.toMinutes()}m"
             else -> "${duration.seconds}s"
         }
-    } catch (e: DateTimeParseException) {
-        logger.warn("Failed to parse timestamp '$creationTimestamp': ${e.message}")
-        return "Invalid"
-    } catch (e: Exception) {
-        logger.error("Error formatting age for '$creationTimestamp': ${e.message}")
-        return "Error"
-    }
+    } catch (e: Exception) { logger.warn("Failed to format timestamp '$creationTimestamp': ${e.message}"); return "Invalid" }
 }
 fun formatPodContainers(statuses: List<ContainerStatus>?): String { val total = statuses?.size ?: 0; val ready = statuses?.count { it.ready == true } ?: 0; return "$ready/$total" }
 fun formatPodRestarts(statuses: List<ContainerStatus>?): String { return statuses?.sumOf { it.restartCount ?: 0 }?.toString() ?: "0" }
@@ -151,7 +131,7 @@ fun formatJobDuration(status: JobStatus?): String {
 }
 // ---
 
-// --- Функція отримання заголовків (така ж)---
+// --- Функція отримання заголовків ---
 fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
         "Namespaces" -> listOf("Name", "Status", "Age")
@@ -184,7 +164,6 @@ fun getHeadersForType(resourceType: String): List<String> {
 fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
     val na = "N/A"
     try {
-        // Використовуємо 'is' для перевірки типу та властивості Fabric8 моделей
         return when (resourceType) {
             "Namespaces" -> if (resource is Namespace) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> resource.status?.phase ?: na; 2 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "Nodes" -> if (resource is Node) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> formatNodeStatus(resource.status?.conditions); 2 -> formatNodeRoles(resource.metadata?.labels); 3 -> resource.status?.nodeInfo?.kubeletVersion ?: na; 4 -> formatTaints(resource.spec?.taints); 5 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
@@ -207,7 +186,7 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
             "RoleBindings" -> if (resource is RoleBinding) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.roleRef?.kind ?: na; 3 -> resource.roleRef.name ?: na; 4 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "ClusterRoles" -> if (resource is ClusterRole) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> resource.roleRef?.kind ?: na; 2 -> resource.roleRef.name ?: na; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            else -> if (resource is HasMetadata) resource.metadata?.name ?: "?" else "?" // Запасний варіант для HasMetadata
+            else -> if (resource is HasMetadata) resource.metadata?.name ?: "?" else "?"
         }
     } catch (e: Exception) {
         val resourceName = if (resource is HasMetadata) resource.metadata?.name else "unknown"
@@ -217,16 +196,17 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 }
 // ---
 
-// --- Обгортка для завантаження ресурсів з Fabric8 ---
+// --- Функції завантаження ресурсів (fetchK8sResource та load...Fabric8) ---
 suspend fun <T> fetchK8sResource(
     client: KubernetesClient?,
     resourceType: String,
     apiCall: suspend (KubernetesClient) -> List<T>?
 ): Result<List<T>> {
-    if (client == null) return Result.failure(IllegalStateException("Клієнт не ініціалізовано"))
-    logger.info("Завантаження $resourceType...")
+    if (client == null) return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
+    logger.info("Завантаження списку $resourceType (Fabric8)...")
     return try {
-        val items = kotlinx.coroutines.withContext(Dispatchers.IO) { // Перевіряємо компіляцію
+        val items = kotlinx.coroutines.withContext(Dispatchers.IO) { // Використовуємо повне ім'я
+            logger.info("[IO] Виклик API для $resourceType...")
             apiCall(client) ?: emptyList()
         }
         logger.info("Завантажено ${items.size} $resourceType.")
@@ -238,11 +218,10 @@ suspend fun <T> fetchK8sResource(
             logger.warn("Не вдалося сортувати $resourceType: ${e.message}")
             Result.success(items)
         }
-    } catch (e: Exception) { logger.error("Помилка $resourceType: ${e.message}", e); Result.failure(e) }
+    } catch (e: KubernetesClientException) { logger.error("KubernetesClientException $resourceType: ${e.message}", e); Result.failure(e) }
+    catch (e: Exception) { logger.error("Загальна помилка $resourceType: ${e.message}", e); Result.failure(e) }
 }
-// ---
 
-// --- Специфічні функції завантаження (як у вашому коді) ---
 suspend fun loadNamespacesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Namespaces") { it.namespaces().list().items }
 suspend fun loadNodesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Nodes") { it.nodes().list().items }
 suspend fun loadPodsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Pods") { it.pods().inAnyNamespace().list().items }
@@ -277,16 +256,13 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
         try {
             val resultPair: Pair<KubernetesClient, String> = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 logger.info("[IO] Створення конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
-                val config = Config.autoConfigure(targetContext)
-                    ?: throw KubernetesClientException("Не вдалося автоматично налаштувати конфігурацію для '$contextNameToLog'")
+                val config = Config.autoConfigure(targetContext) ?: throw KubernetesClientException("Не вдалося налаштувати конфігурацію для '$contextNameToLog'")
                 config.connectionTimeout = CONNECTION_TIMEOUT_MS
                 config.requestTimeout = REQUEST_TIMEOUT_MS
                 logger.info("[IO] Config context: ${config.currentContext?.name ?: "(не вказано)"}. Namespace: ${config.namespace}")
-
                 val client = KubernetesClientBuilder().withConfig(config).build()
                 logger.info("[IO] Fabric8 client created. Checking version...")
-                // Виправлено дублювання
-                val ver = client.kubernetesVersion?.gitVersion ?: "невідомо"
+                val ver = client.kubernetesVersion?.gitVersion ?: "невідомо" // Спрощено отримання версії
                 logger.info("[IO] Версія сервера: $ver для '$contextNameToLog'")
                 Pair(client, ver)
             }
@@ -302,20 +278,89 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 }
 // ---
 
+// --- Composable для рядка заголовка таблиці (Адаптовано під M2) ---
+@Composable
+fun KubeTableHeaderRow(headers: List<String>) {
+    Surface(color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.disabled), modifier = Modifier.height(40.dp)) { // Зменшено висоту
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            headers.forEachIndexed { index, header ->
+                Box(
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = header,
+                        style = MaterialTheme.typography.subtitle2.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // Роздільник між колонками заголовків
+                if (index < headers.size - 1) {
+                    Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colors.background)
+                }
+            }
+        }
+    }
+}
+// ---
+
+// --- Composable для рядка даних таблиці (Адаптовано під M2) ---
+@Composable
+fun KubeTableRow(
+    cellValues: List<String>,
+    columnCount: Int,
+    onRowClick: () -> Unit // Додано обробник кліку
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min) // Дозволяє визначити висоту за вмістом, але може бути непередбачувано
+            .clickable(onClick = onRowClick) // Робимо рядок клікабельним
+            .padding(horizontal = 4.dp)
+            .padding(vertical = 4.dp), // Додано вертикальний паддінг
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        (0 until columnCount).forEach { index ->
+            val value = cellValues.getOrElse(index) { "" }
+            Box(
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.body2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // Роздільник між комірками даних
+            if (index < columnCount - 1) {
+                Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = Color.LightGray.copy(alpha = 0.3f))
+            }
+        }
+    }
+}
+// ---
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 @Preview
-fun App() { // Змінено на App з великої літери
-    // --- Стани (всі списки + інше) ---
+fun App() {
+    // --- Стани ---
     var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedContext by remember { mutableStateOf<String?>(null) }
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>() }
-    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) } // Змінено тип назад на KubernetesClient
+    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) }
     var connectionStatus by remember { mutableStateOf("Завантаження конфігурації...") }
-    var isLoading by remember { mutableStateOf(false) } // Загальний індикатор
+    var isLoading by remember { mutableStateOf(false) }
     var resourceLoadError by remember { mutableStateOf<String?>(null) }
-    // Стан для всіх типів ресурсів (Моделі Fabric8)
+    // Стани для всіх типів ресурсів (Моделі Fabric8)
     var namespacesList by remember { mutableStateOf<List<Namespace>>(emptyList()) }
     var nodesList by remember { mutableStateOf<List<Node>>(emptyList()) }
     var podsList by remember { mutableStateOf<List<Pod>>(emptyList()) }
@@ -357,25 +402,18 @@ fun App() { // Змінено на App з великої літери
         var loadError: Exception? = null
         var loadedContextNames: List<String> = emptyList()
         try {
-            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) { // Чи компілюється це?
+            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
                 val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
                 val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
                 logger.info("[IO] Знайдено контекстів: ${names.size}")
                 names
             }
-            contexts = loadedContextNames; errorMessage =
-                if (loadedContextNames.isEmpty()) "Контексти не знайдено" else null; connectionStatus =
-                if (loadedContextNames.isEmpty()) "Контексти не знайдено" else "Виберіть контекст"
-        } catch (e: Exception) {
-            loadError = e; logger.error("Помилка завантаження контекстів: ${e.message}", e)
-        } finally {
-            if (loadError != null) {
-                errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження"
-            }; isLoading = false
-        }
+            contexts = loadedContextNames; errorMessage = if (loadedContextNames.isEmpty()) "Контексти не знайдено" else null; connectionStatus = if (loadedContextNames.isEmpty()) "Контексти не знайдено" else "Виберіть контекст"
+        } catch (e: Exception) { loadError = e; logger.error("Помилка завантаження контекстів: ${e.message}", e) }
+        finally { if (loadError != null) { errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження" }; isLoading = false }
     }
-    // --- Кінець LaunchedEffect ---
+    // ---
 
     // --- Діалогове вікно помилки ---
     if (showErrorDialog.value) {
@@ -388,154 +426,167 @@ fun App() { // Змінено на App з великої літери
     }
     // ---
 
-    MaterialTheme {
+    MaterialTheme { // ВИКОРИСТОВУЄМО MATERIAL 2
         Column(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.weight(1f)) {
                 // --- Ліва панель ---
-                Column(modifier = Modifier.fillMaxHeight().width(300.dp).padding(8.dp)) {
-                    Text(
-                        "Контексти Kubernetes:",
-                        style = MaterialTheme.typography.h6
-                    ); Spacer(modifier = Modifier.height(8.dp))
+                Column( modifier = Modifier.fillMaxHeight().width(300.dp).padding(8.dp) ) {
+                    Text("Контексти Kubernetes:", style = MaterialTheme.typography.h6); Spacer(modifier = Modifier.height(8.dp))
                     Box(modifier = Modifier.weight(1f).border(1.dp, Color.Gray)) {
-                        if (isLoading && contexts.isEmpty()) {
-                            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                        } else if (!isLoading && contexts.isEmpty()) {
-                            Text(errorMessage ?: "Контексти не знайдено", modifier = Modifier.align(Alignment.Center))
-                        } else {
+                        if (isLoading && contexts.isEmpty()) { CircularProgressIndicator(modifier = Modifier.align(Alignment.Center)) }
+                        else if (!isLoading && contexts.isEmpty()) { Text(errorMessage ?: "Контексти не знайдено", modifier = Modifier.align(Alignment.Center)) }
+                        else {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
                                 items(contexts) { contextName ->
-                                    Text(
-                                        text = contextName,
-                                        modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
-                                            if (selectedContext != contextName) {
-                                                logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
-                                                coroutineScope.launch {
-                                                    isLoading = true; connectionStatus =
-                                                    "Підключення до '$contextName' (спроба 1/$MAX_CONNECT_RETRIES)..."; activeClient?.close(); activeClient =
-                                                    null; selectedResourceType =
-                                                    null; clearResourceLists(); resourceLoadError = null; errorMessage =
-                                                    null
-                                                    val connectionResult =
-                                                        connectWithRetries(contextName) // Викликаємо функцію
-                                                    isLoading = false
+                                    Text(text = contextName, modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
+                                        if (selectedContext != contextName) {
+                                            logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
+                                            coroutineScope.launch {
+                                                isLoading = true; connectionStatus = "Підключення до '$contextName'..."; activeClient?.close(); activeClient = null; selectedResourceType = null; clearResourceLists(); resourceLoadError = null; errorMessage = null;
+                                                val connectionResult = connectWithRetries(contextName)
+                                                isLoading = false
 
-                                                    connectionResult.onSuccess { (newClient, serverVersion) ->
-                                                        activeClient = newClient; selectedContext =
-                                                        contextName; connectionStatus =
-                                                        "Підключено до: $contextName (v$serverVersion)"; errorMessage =
-                                                        null; logger.info("UI State updated on Success for $contextName")
-                                                    }
-                                                        .onFailure { error ->
-                                                            connectionStatus =
-                                                                "Помилка підключення до '$contextName'"; errorMessage =
-                                                            error.localizedMessage
-                                                                ?: "Невід. помилка"; logger.info("Setting up error dialog for: $contextName. Error: ${error.message}"); dialogErrorMessage.value =
-                                                            "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"; showErrorDialog.value =
-                                                            true; activeClient = null; selectedContext = null
-                                                        }
-                                                    logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
-                                                }
+                                                connectionResult.onSuccess { (newClient, serverVersion) -> activeClient = newClient; selectedContext = contextName; connectionStatus = "Підключено до: $contextName (v$serverVersion)"; errorMessage = null; logger.info("UI State updated on Success for $contextName") }
+                                                    .onFailure { error -> connectionStatus = "Помилка підключення до '$contextName'"; errorMessage = error.localizedMessage ?: "Невід. помилка"; logger.info("Setting up error dialog for: $contextName. Error: ${error.message}"); dialogErrorMessage.value = "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"; showErrorDialog.value = true; activeClient = null; selectedContext = null }
+                                                logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
                                             }
-                                        }.padding(8.dp),
-                                        color = if (contextName == selectedContext) MaterialTheme.colors.primary else LocalContentColor.current
-                                    )
+                                        }
+                                    }.padding(8.dp), color = if (contextName == selectedContext) MaterialTheme.colors.primary else LocalContentColor.current)
                                 }
                             }
                         }
                     } // Кінець Box списку
-                    Spacer(modifier = Modifier.height(16.dp)); Text(
-                    "Ресурси Кластера:",
-                    style = MaterialTheme.typography.h6
-                ); Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(16.dp)); Text("Ресурси Кластера:", style = MaterialTheme.typography.h6); Spacer(modifier = Modifier.height(8.dp))
                     Box(modifier = Modifier.weight(2f).border(1.dp, Color.Gray)) { // Дерево ресурсів
-                        ResourceTreeView(
-                            rootIds = resourceTreeData[""] ?: emptyList(),
-                            expandedNodes = expandedNodes,
-                            onNodeClick = { nodeId, isLeaf ->
-                                logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
-                                if (isLeaf) {
-                                    if (activeClient != null && !isLoading) {
-                                        selectedResourceType = nodeId; resourceLoadError =
-                                            null; clearResourceLists() // Очищаємо перед завантаженням
-                                        connectionStatus = "Завантаження $nodeId..."; isLoading = true
-                                        coroutineScope.launch { // Запускаємо завантаження в корутині
-                                            var loadOk = false
-                                            var errorMsg: String? = null
-                                            // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
-                                            when (nodeId) {
-                                                "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Nodes" -> loadNodesFabric8(activeClient).onSuccess { nodesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Pods" -> loadPodsFabric8(activeClient).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Deployments" -> loadDeploymentsFabric8(activeClient).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "StatefulSets" -> loadStatefulSetsFabric8(activeClient).onSuccess { statefulSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "DaemonSets" -> loadDaemonSetsFabric8(activeClient).onSuccess { daemonSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ReplicaSets" -> loadReplicaSetsFabric8(activeClient).onSuccess { replicaSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Jobs" -> loadJobsFabric8(activeClient).onSuccess { jobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "CronJobs" -> loadCronJobsFabric8(activeClient).onSuccess { cronJobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Services" -> loadServicesFabric8(activeClient).onSuccess { servicesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Ingresses" -> loadIngressesFabric8(activeClient).onSuccess { ingressesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess { pvsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient).onSuccess { pvcsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "StorageClasses" -> loadStorageClassesFabric8(activeClient).onSuccess { storageClassesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ConfigMaps" -> loadConfigMapsFabric8(activeClient).onSuccess { configMapsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Secrets" -> loadSecretsFabric8(activeClient).onSuccess { secretsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ServiceAccounts" -> loadServiceAccountsFabric8(activeClient).onSuccess { serviceAccountsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Roles" -> loadRolesFabric8(activeClient).onSuccess { rolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "RoleBindings" -> loadRoleBindingsFabric8(activeClient).onSuccess { roleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ClusterRoles" -> loadClusterRolesFabric8(activeClient).onSuccess { clusterRolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess { clusterRoleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                else -> { logger.warn("Обробник '$nodeId' не реалізовано."); loadOk = false; errorMsg = "Не реалізовано" }
-                                            }
-                                            // Оновлюємо статус після завершення
-                                            if (loadOk) { connectionStatus = "Завантажено $nodeId" }
-                                            else { resourceLoadError = "Помилка завантаження $nodeId: ${errorMsg ?: "Невідома помилка"}"; connectionStatus = "Помилка завантаження $nodeId" }
-                                            isLoading = false
+                        ResourceTreeView(rootIds = resourceTreeData[""] ?: emptyList(), expandedNodes = expandedNodes, onNodeClick = { nodeId, isLeaf ->
+                            logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
+                            if (isLeaf) {
+                                if (activeClient != null && !isLoading) {
+                                    selectedResourceType = nodeId; resourceLoadError = null; clearResourceLists()
+                                    connectionStatus = "Завантаження $nodeId..."; isLoading = true
+                                    coroutineScope.launch {
+                                        var loadOk = false; var errorMsg: String? = null
+                                        // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
+                                        when (nodeId) {
+                                            "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Nodes" -> loadNodesFabric8(activeClient).onSuccess { nodesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Pods" -> loadPodsFabric8(activeClient).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Deployments" -> loadDeploymentsFabric8(activeClient).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "StatefulSets" -> loadStatefulSetsFabric8(activeClient).onSuccess { statefulSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "DaemonSets" -> loadDaemonSetsFabric8(activeClient).onSuccess { daemonSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "ReplicaSets" -> loadReplicaSetsFabric8(activeClient).onSuccess { replicaSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Jobs" -> loadJobsFabric8(activeClient).onSuccess { jobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "CronJobs" -> loadCronJobsFabric8(activeClient).onSuccess { cronJobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Services" -> loadServicesFabric8(activeClient).onSuccess { servicesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Ingresses" -> loadIngressesFabric8(activeClient).onSuccess { ingressesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess { pvsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient).onSuccess { pvcsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "StorageClasses" -> loadStorageClassesFabric8(activeClient).onSuccess { storageClassesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "ConfigMaps" -> loadConfigMapsFabric8(activeClient).onSuccess { configMapsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Secrets" -> loadSecretsFabric8(activeClient).onSuccess { secretsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "ServiceAccounts" -> loadServiceAccountsFabric8(activeClient).onSuccess { serviceAccountsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "Roles" -> loadRolesFabric8(activeClient).onSuccess { rolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "RoleBindings" -> loadRoleBindingsFabric8(activeClient).onSuccess { roleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "ClusterRoles" -> loadClusterRolesFabric8(activeClient).onSuccess { clusterRolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess { clusterRoleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                            else -> { logger.warn("Обробник '$nodeId' не реалізовано."); loadOk = false; errorMsg = "Не реалізовано" }
                                         }
-                                    } else if (activeClient == null) { logger.warn("Немає підключення."); connectionStatus = "Підключіться до кластера!"; selectedResourceType = null }
-                                } else { expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false) }
-                            })
+                                        if (loadOk) { connectionStatus = "Завантажено $nodeId" } else { resourceLoadError = "Помилка завантаження $nodeId: ${errorMsg ?: "Невід. помилка"}"; connectionStatus = "Помилка завантаження $nodeId" }
+                                        isLoading = false
+                                    }
+                                } else if (activeClient == null) { logger.warn("Немає підключення."); connectionStatus = "Підключіться до кластера!"; selectedResourceType = null }
+                            } else { expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false) }
+                        })
                     }
                 } // Кінець лівої панелі
 
                 Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = Color.LightGray)
 
-                // --- Права панель ---
-                Box(modifier = Modifier.fillMaxHeight().weight(1f).padding(start = 8.dp)) { // Додано padding зліва
-                    // --- ВИКОРИСТОВУЄМО ResourceTable ---
-                    when {
-                        isLoading && selectedResourceType != null -> { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) { CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text("Завантаження $selectedResourceType...") } }
-                        resourceLoadError != null -> { Text(resourceLoadError!!, color = MaterialTheme.colors.error, modifier = Modifier.align(Alignment.Center)) }
+                // --- Права панель (з РУЧНОЮ таблицею) ---
+                Column(modifier = Modifier.fillMaxHeight().weight(1f).padding(start = 8.dp)) { // Використовуємо Column
+                    // --- ВИЗНАЧЕННЯ, ЩО ПОКАЗУВАТИ ---
+                    val currentResourceType = selectedResourceType
+                    val currentErrorMessage = resourceLoadError ?: errorMessage
+                    val currentClient = activeClient
 
-                        // --- Відображення всіх ресурсів через ResourceTable ---
-                        selectedResourceType == "Namespaces" -> ResourceTable(selectedResourceType!!, namespacesList)
-                        selectedResourceType == "Nodes" -> ResourceTable(selectedResourceType!!, nodesList)
-                        selectedResourceType == "Pods" -> ResourceTable(selectedResourceType!!, podsList)
-                        selectedResourceType == "Deployments" -> ResourceTable(selectedResourceType!!, deploymentsList)
-                        selectedResourceType == "StatefulSets" -> ResourceTable(selectedResourceType!!, statefulSetsList)
-                        selectedResourceType == "DaemonSets" -> ResourceTable(selectedResourceType!!, daemonSetsList)
-                        selectedResourceType == "ReplicaSets" -> ResourceTable(selectedResourceType!!, replicaSetsList)
-                        selectedResourceType == "Jobs" -> ResourceTable(selectedResourceType!!, jobsList)
-                        selectedResourceType == "CronJobs" -> ResourceTable(selectedResourceType!!, cronJobsList)
-                        selectedResourceType == "Services" -> ResourceTable(selectedResourceType!!, servicesList)
-                        selectedResourceType == "Ingresses" -> ResourceTable(selectedResourceType!!, ingressesList)
-                        selectedResourceType == "PersistentVolumes" -> ResourceTable(selectedResourceType!!, pvsList)
-                        selectedResourceType == "PersistentVolumeClaims" -> ResourceTable(selectedResourceType!!, pvcsList)
-                        selectedResourceType == "StorageClasses" -> ResourceTable(selectedResourceType!!, storageClassesList)
-                        selectedResourceType == "ConfigMaps" -> ResourceTable(selectedResourceType!!, configMapsList)
-                        selectedResourceType == "Secrets" -> ResourceTable(selectedResourceType!!, secretsList)
-                        selectedResourceType == "ServiceAccounts" -> ResourceTable(selectedResourceType!!, serviceAccountsList)
-                        selectedResourceType == "Roles" -> ResourceTable(selectedResourceType!!, rolesList)
-                        selectedResourceType == "RoleBindings" -> ResourceTable(selectedResourceType!!, roleBindingsList)
-                        selectedResourceType == "ClusterRoles" -> ResourceTable(selectedResourceType!!, clusterRolesList)
-                        selectedResourceType == "ClusterRoleBindings" -> ResourceTable(selectedResourceType!!, clusterRoleBindingsList)
-                        // ---
-
-                        activeClient != null -> { Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
-                        isLoading && contexts.isEmpty() -> { Text("Завантаження конфігурації...", modifier = Modifier.align(Alignment.Center)) }
-                        else -> { Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
+                    // Заголовок правої панелі
+                    if (currentResourceType != null && currentClient != null && currentErrorMessage == null) {
+                        Text(text = "$currentResourceType у $selectedContext", style = MaterialTheme.typography.h6, modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
+                        Divider()
                     }
-                } // Кінець правої панелі
+
+                    // Основний вміст правої панелі
+                    Box(modifier = Modifier.weight(1f)) { // Box для центрування повідомлень та таблиці
+                        when {
+                            isLoading -> { /* Індикатор */ }
+                            currentErrorMessage != null -> { /* Помилка */ }
+                            currentClient != null && currentResourceType != null -> {
+                                // --- Відображення таблиці для вибраного типу ---
+                                val headers = remember(currentResourceType) { getHeadersForType(currentResourceType) }
+                                // Отримуємо потрібний список на основі типу
+                                val itemsToShow: List<Any> = remember(currentResourceType, namespacesList, nodesList, podsList, /*...інші списки...*/ ) {
+                                    when (currentResourceType) {
+                                        "Namespaces" -> namespacesList
+                                        "Nodes" -> nodesList
+                                        "Pods" -> podsList
+                                        "Deployments" -> deploymentsList
+                                        "StatefulSets" -> statefulSetsList
+                                        "DaemonSets" -> daemonSetsList
+                                        "ReplicaSets" -> replicaSetsList
+                                        "Jobs" -> jobsList
+                                        "CronJobs" -> cronJobsList
+                                        "Services" -> servicesList
+                                        "Ingresses" -> ingressesList
+                                        "PersistentVolumes" -> pvsList
+                                        "PersistentVolumeClaims" -> pvcsList
+                                        "StorageClasses" -> storageClassesList
+                                        "ConfigMaps" -> configMapsList
+                                        "Secrets" -> secretsList
+                                        "ServiceAccounts" -> serviceAccountsList
+                                        "Roles" -> rolesList
+                                        "RoleBindings" -> roleBindingsList
+                                        "ClusterRoles" -> clusterRolesList
+                                        "ClusterRoleBindings" -> clusterRoleBindingsList
+                                        else -> emptyList()
+                                    }
+                                }
+
+                                if (itemsToShow.isEmpty() && !isLoading) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Немає ресурсів типу '$currentResourceType'") }
+                                } else {
+                                    // --- Ручна таблиця з LazyColumn ---
+                                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                        stickyHeader {
+                                            KubeTableHeaderRow(headers = headers)
+                                            Divider() // Роздільник під заголовком
+                                        }
+                                        items(itemsToShow) { item ->
+                                            val cellValues = remember(item, currentResourceType) {
+                                                headers.indices.map { colIndex ->
+                                                    getCellData(item, colIndex, currentResourceType)
+                                                }
+                                            }
+                                            KubeTableRow(
+                                                cellValues = cellValues,
+                                                columnCount = headers.size,
+                                                onRowClick = {
+                                                    val name = if (item is HasMetadata) item.metadata?.name else "N/A"
+                                                    val namespace = if (item is HasMetadata) item.metadata?.namespace else null
+                                                    logger.info("Клікнуто на рядок таблиці: ${namespace?.let { "$it/" } ?: ""}$name")
+                                                    // TODO: Реалізувати показ деталей
+                                                }
+                                            )
+                                            Divider(color = Color.Gray, thickness = 0.5.dp) // Роздільник рядків
+                                        }
+                                    }
+                                    // --- Кінець ручної таблиці ---
+                                }
+                            }
+                            activeClient != null -> { Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
+                            else -> { Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
+                        }
+                    } // Кінець Box вмісту
+                } // Кінець Column правої панелі
             } // Кінець Row
             // --- Статус-бар ---
             Divider()
@@ -547,57 +598,6 @@ fun App() { // Змінено на App з великої літери
     } // Кінець MaterialTheme
 }
 
-// --- Універсальний Composable ResourceTable ---
-@Composable
-fun <T : HasMetadata> ResourceTable( // Використовуємо HasMetadata
-    resourceType: String,
-    items: List<T>,
-    modifier: Modifier = Modifier
-) {
-    val headers = remember(resourceType) { getHeadersForType(resourceType) }
-
-    Column(modifier = modifier) {
-        // --- Рядок Заголовків ---
-        Row(modifier = Modifier.fillMaxWidth()
-            .background(MaterialTheme.colors.onSurface.copy(alpha = 0.1f)).padding(vertical = 8.dp, horizontal = 4.dp)) {
-            headers.forEachIndexed { index, header ->
-                Box(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), contentAlignment = Alignment.CenterStart) {
-                    Text(header, style = MaterialTheme.typography.subtitle2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                if (index < headers.size - 1) { Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colors.background) }
-            }
-        }
-        Divider()
-
-        // --- Рядки Даних ---
-        if (items.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) { Text("Немає ресурсів типу '$resourceType'") }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(items) { item -> // item тепер має тип T (HasMetadata)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            val name = item.metadata?.name ?: "N/A"
-                            val namespace = item.metadata?.namespace // Може бути null для кластерних ресурсів
-                            logger.info("Клікнуто на рядок: ${namespace?.let { "$it/" } ?: ""}$name")
-                        }.padding(vertical = 4.dp, horizontal = 4.dp)
-                    ) {
-                        headers.indices.forEach { colIndex ->
-                            // Тепер item має тип T : HasMetadata, передаємо його
-                            val cellText = remember(item, colIndex, resourceType) { getCellData(item, colIndex, resourceType) }
-                            Box(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), contentAlignment = Alignment.CenterStart) {
-                                Text(cellText, style = MaterialTheme.typography.body2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            if (colIndex < headers.size - 1) { Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = Color.LightGray.copy(alpha = 0.5f)) }
-                        }
-                    }
-                    Divider()
-                }
-            }
-        }
-    }
-}
-// ---
 
 // --- Composable для дерева ресурсів ---
 @Composable
@@ -667,5 +667,5 @@ fun ResourceTreeNode(
 
 // --- Головна функція ---
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager - Baseline + Table") { App() }
+    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager - GitHub Baseline + Manual Table M2") { App() }
 }
