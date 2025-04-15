@@ -1,5 +1,5 @@
-// src/main/kotlin/Main.kt (Fabric8 БЕЗ KubeConfig Helper - ПОВНИЙ КОД)
-import androidx.compose.desktop.ui.tooling.preview.Preview // Для @Preview
+// src/main/kotlin/Main.kt (Fabric8 БЕЗ KubeConfig helper, завантаження контекстів через Config)
+import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,18 +21,16 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.KubernetesClientException
 import io.fabric8.kubernetes.api.model.Namespace // Модель Fabric8
-// import io.fabric8.kubernetes.client.util.KubeConfig // НЕ ВИКОРИСТОВУЄМО
+// --- НЕМАЄ імпорту KubeConfig або KubeConfigUtils ---
 // ---------------------------
-// Імпорти для Coroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext // Використовуємо повне ім'я
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-// Імпорт для логера
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.util.concurrent.TimeUnit // Для таймаутів у connectWithRetries
+import java.util.concurrent.TimeUnit
 
 // --- Дані для дерева ресурсів ---
 val resourceTreeData: Map<String, List<String>> = mapOf(
@@ -52,77 +50,64 @@ val resourceLeafNodes: Set<String> = setOf(
 // ------------------------------------------------
 
 // Логер
-private val logger = LoggerFactory.getLogger("MainKtFabric8NoKubeconfigHelperFull")
+private val logger = LoggerFactory.getLogger("MainKtFabric8NoHelpersFinal")
 
 // --- Константи для ретраїв ---
-const val MAX_CONNECT_RETRIES = 3
+const val MAX_CONNECT_RETRIES = 1
 const val RETRY_DELAY_MS = 1000L
+// --- Константи для таймаутів (у мілісекундах) ---
+const val CONNECTION_TIMEOUT_MS = 5000
+const val REQUEST_TIMEOUT_MS = 10000
 // ---
 
-// --- Функція завантаження Namespaces з Fabric8 ---
+// --- Функція завантаження Namespaces (залишається) ---
 suspend fun loadNamespacesFabric8(client: KubernetesClient?): Result<List<Namespace>> {
-    if (client == null) {
-        logger.warn("loadNamespacesFabric8: Спроба завантажити без активного клієнта.")
-        return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
-    }
-    logger.info("Завантаження списку Namespaces (Fabric8)...")
+    if (client == null) return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
+    logger.info("Завантаження Namespaces (Fabric8)...")
     return try {
-        val namespaces = kotlinx.coroutines.withContext(Dispatchers.IO) { // Сподіваємось, компілюється
+        val namespaces = kotlinx.coroutines.withContext(Dispatchers.IO) {
             logger.info("[IO] Виклик client.namespaces().list()...")
             client.namespaces().list().items ?: emptyList()
         }
         logger.info("Завантажено ${namespaces.size} Namespaces.")
         Result.success(namespaces.sortedBy { it.metadata?.name ?: "" })
-    } catch (e: KubernetesClientException) {
-        logger.error("KubernetesClientException під час завантаження Namespaces: ${e.message}", e)
-        Result.failure(e)
-    } catch (e: Exception) {
-        logger.error("Загальна помилка завантаження Namespaces: ${e.message}", e)
-        Result.failure(e)
-    }
+    } catch (e: Exception) { logger.error("Помилка завантаження Namespaces: ${e.message}", e); Result.failure(e) }
 }
 // ---
 
 // --- Функція підключення з ретраями (використовує Config.autoConfigure(contextName)) ---
-suspend fun connectWithRetries(contextName: String): Result<Pair<KubernetesClient, String>> {
+suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
+    val targetContext = if (contextName.isNullOrBlank()) null else contextName
     var lastError: Exception? = null
+    val contextNameToLog = targetContext ?: "(default)"
+
     for (attempt in 1..MAX_CONNECT_RETRIES) {
-        logger.info("Спроба підключення до '$contextName' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
+        logger.info("Спроба підключення до '$contextNameToLog' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
         try {
-            // Виконуємо IO операції в корутині
-            val resultPair: Pair<KubernetesClient, String> = kotlinx.coroutines.withContext(Dispatchers.IO) { // Сподіваємось, компілюється
-                logger.info("[IO] Створення конфігу та клієнта для '$contextName' через Config.autoConfigure...")
-                // Створюємо конфіг відразу для потрібного контексту
-                val config = Config.autoConfigure(contextName)
-                    ?: throw KubernetesClientException("Не вдалося автоматично налаштувати конфігурацію для контексту '$contextName'")
-                logger.info("[IO] Config context: ${config.currentContext?.name}. Namespace: ${config.namespace}")
+            val resultPair: Pair<KubernetesClient, String> = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                logger.info("[IO] Створення конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
+                val config = Config.autoConfigure(targetContext)
+                    ?: throw KubernetesClientException("Не вдалося налаштувати конфігурацію для '$contextNameToLog'")
+                config.connectionTimeout = CONNECTION_TIMEOUT_MS
+                config.requestTimeout = REQUEST_TIMEOUT_MS
+                logger.info("[IO] Config context: ${config.currentContext?.name ?: "(не вказано)"}. Namespace: ${config.namespace}")
 
-                // Налаштовуємо таймаути
-                config.requestTimeout = 30_000 // 30 секунд
-                config.connectionTimeout = 15_000 // 15 секунд
-
-                // Створюємо клієнт З ЦІЄЮ КОНКРЕТНОЮ КОНФІГУРАЦІЄЮ
                 val client = KubernetesClientBuilder().withConfig(config).build()
                 logger.info("[IO] Fabric8 client created. Checking version...")
-
-                // Перевірка версії
                 val ver = client.kubernetesVersion?.gitVersion ?: client.version?.gitVersion ?: "невідомо"
-                logger.info("[IO] Версія сервера: $ver для '$contextName'")
+                logger.info("[IO] Версія сервера: $ver для '$contextNameToLog'")
                 Pair(client, ver)
             }
-            logger.info("Підключення до '$contextName' успішне (спроба $attempt).")
-            return Result.success(resultPair) // Успіх - виходимо
-        } catch (e: Exception) { // Ловимо всі типи помилок тут
+            logger.info("Підключення до '$contextNameToLog' успішне (спроба $attempt).")
+            return Result.success(resultPair)
+        } catch (e: Exception) {
             lastError = e
-            logger.warn("Помилка підключення '$contextName' (спроба $attempt): ${e.message}")
-            if (attempt < MAX_CONNECT_RETRIES) {
-                logger.info("Повторна спроба через ${RETRY_DELAY_MS}ms...")
-                kotlinx.coroutines.delay(RETRY_DELAY_MS) // Затримка перед наступною спробою
-            }
+            logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
+            if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
         }
     }
-    logger.error("Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб.")
-    return Result.failure(lastError ?: IOException("Невідома помилка підключення після ретраїв"))
+    logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
+    return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
 }
 // ---
 
@@ -131,20 +116,18 @@ suspend fun connectWithRetries(contextName: String): Result<Pair<KubernetesClien
 fun App() {
     // --- Стани ---
     var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedContext by remember { mutableStateOf<String?>(null) }
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>() }
-    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) } // Тепер KubernetesClient
+    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) }
     var connectionStatus by remember { mutableStateOf("Завантаження конфігурації...") }
-    var isLoading by remember { mutableStateOf(false) } // Загальний індикатор
-    var resourceLoadError by remember { mutableStateOf<String?>(null) } // Помилка завантаження ресурсів
-    var namespacesList by remember { mutableStateOf<List<Namespace>>(emptyList()) } // Використовуємо модель Fabric8
-
-    // --- Стани для діалогу помилки ---
+    var isLoading by remember { mutableStateOf(false) }
+    var resourceLoadError by remember { mutableStateOf<String?>(null) }
+    var namespacesList by remember { mutableStateOf<List<Namespace>>(emptyList()) }
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
-    // -------------------------------------
+    // ------------------------------
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -154,10 +137,15 @@ fun App() {
         isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
         var loadError: Exception? = null; var loadedContextNames: List<String> = emptyList()
         try {
+            // Використовуємо повне ім'я withContext
             loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) { // <--- Чи компілюється це?
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
                 val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
-                val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
+                // Отримуємо імена контекстів з завантаженого об'єкта Config
+                val names = config.contexts // Доступ до списку NamedContext
+                    ?.mapNotNull { it.name } // Отримуємо імена
+                    ?.sorted()
+                    ?: emptyList()
                 logger.info("[IO] Знайдено контекстів: ${names.size}")
                 names
             }
@@ -173,11 +161,7 @@ fun App() {
             onDismissRequest = { showErrorDialog.value = false },
             title = { Text("Помилка Підключення") },
             text = { Text(dialogErrorMessage.value) },
-            confirmButton = {
-                Button(onClick = { showErrorDialog.value = false }) {
-                    Text("OK")
-                }
-            }
+            confirmButton = { Button(onClick = { showErrorDialog.value = false }) { Text("OK") } }
         )
     }
     // ---
@@ -201,12 +185,16 @@ fun App() {
                                             coroutineScope.launch {
                                                 isLoading = true; connectionStatus = "Підключення до '$contextName' (спроба 1/$MAX_CONNECT_RETRIES)..."; activeClient?.close(); activeClient = null; selectedResourceType = null; namespacesList = emptyList(); resourceLoadError = null; errorMessage = null;
                                                 val connectionResult = connectWithRetries(contextName) // Викликаємо функцію
-                                                isLoading = false // Завершили спроби
+                                                isLoading = false
 
                                                 connectionResult.onSuccess { (newClient, serverVersion) ->
                                                     activeClient = newClient; selectedContext = contextName; connectionStatus = "Підключено до: $contextName (v$serverVersion)"; errorMessage = null
+                                                    logger.info("UI State updated on Success for $contextName")
                                                 }.onFailure { error ->
-                                                    connectionStatus = "Помилка підключення до '$contextName'"; errorMessage = error.localizedMessage ?: "Невідома помилка"; dialogErrorMessage.value = "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"; showErrorDialog.value = true; activeClient = null; selectedContext = null
+                                                    connectionStatus = "Помилка підключення до '$contextName'"; errorMessage = error.localizedMessage ?: "Невідома помилка";
+                                                    logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
+                                                    dialogErrorMessage.value = "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"; showErrorDialog.value = true;
+                                                    activeClient = null; selectedContext = null
                                                 }
                                                 logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
                                             } // --- Кінець coroutineScope.launch ---
@@ -227,8 +215,7 @@ fun App() {
                                         "Namespaces" -> {
                                             connectionStatus = "Завантаження Namespaces..."; isLoading = true
                                             coroutineScope.launch {
-                                                val result = loadNamespacesFabric8(activeClient) // Викликаємо Fabric8 функцію
-                                                result.onSuccess { namespacesList = it; connectionStatus = "Завантажено Namespaces: ${it.size}"; resourceLoadError = null }.onFailure { resourceLoadError = "Помилка: ${it.message}"; connectionStatus = "Помилка завантаження" }; isLoading = false
+                                                val result = loadNamespacesFabric8(activeClient); result.onSuccess { namespacesList = it; connectionStatus = "Завантажено Namespaces: ${it.size}"; resourceLoadError = null }.onFailure { resourceLoadError = "Помилка: ${it.message}"; connectionStatus = "Помилка завантаження" }; isLoading = false
                                             }
                                         }
                                         else -> { logger.warn("Обробник '$nodeId' не реалізовано."); connectionStatus = "Вибрано '$nodeId' (не реалізовано)"; selectedResourceType = null }
@@ -344,8 +331,8 @@ fun ResourceTreeNode(
 
 // --- Головна функція ---
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager v1.8 - Fabric8 Final Attempt") { App() }
+    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager v1.11 - Fabric8 No Helpers Strict") { App() }
 }
 
-// --- Константа для версії Fabric8 (необов'язково, але корисно) ---
+// --- Константа для версії Fabric8 ---
 const val FABRIC8_VERSION = "6.13.5" // Версія, яку ми використовуємо
