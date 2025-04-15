@@ -83,7 +83,7 @@ val resourceLeafNodes: Set<String> = setOf(
 private val logger = LoggerFactory.getLogger("MainKtBaselineManualTable")
 
 // --- Константи ---
-const val MAX_CONNECT_RETRIES = 3
+const val MAX_CONNECT_RETRIES = 1
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
@@ -212,7 +212,7 @@ suspend fun <T> fetchK8sResource(
         }
         logger.info("Завантажено ${items.size} $resourceType.")
         try {
-            @Suppress("UNCHECKED_CAST")
+            //@Suppress("UNCHECKED_CAST")
             val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
             Result.success(sortedItems)
         } catch (e: Exception) {
@@ -400,7 +400,7 @@ fun App() {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
         isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
         var loadError: Exception? = null
-        var loadedContextNames: List<String> = emptyList()
+        var loadedContextNames: List<String>
         try {
             loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) { // Чи компілюється це?
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
