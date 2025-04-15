@@ -96,14 +96,11 @@ val resourceLeafNodes: Set<String> = setOf(
 
 // Логер
 private val logger = LoggerFactory.getLogger("MainKtFabric8BaselineTable")
-
 // --- Константи ---
 const val MAX_CONNECT_RETRIES = 1 // У вашому коді було 1
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 10000
-//const val FABRIC8_VERSION = "6.13.5" // Винесено, якщо потрібно
-// ---
 
 // --- Допоміжні функції форматування (знову для Fabric8 моделей) ---
 fun formatAge(creationTimestamp: String?): String {
@@ -354,7 +351,6 @@ fun App() { // Змінено на App з великої літери
     // ---
 
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
-    // Цей варіант працював у вас раніше БЕЗ -kubeconfig хелпера
     LaunchedEffect(Unit) {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
         isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
