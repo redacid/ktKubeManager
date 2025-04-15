@@ -43,8 +43,6 @@ import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.rbac.ClusterRole
 import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
 import io.fabric8.kubernetes.api.model.HasMetadata // Для сортування
-// --- НЕМАЄ імпорту KubeConfig або KubeConfigUtils ---
-// ---------------------------
 // Імпорти для Coroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -71,19 +69,14 @@ val resourceLeafNodes: Set<String> = setOf(
     "Services", "Ingresses", "PersistentVolumes", "PersistentVolumeClaims", "StorageClasses", "ConfigMaps", "Secrets",
     "ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"
 )
-// ------------------------------------------------
-
 // Логер
 private val logger = LoggerFactory.getLogger("MainKtFabric8SavedBaseline")
-
 // --- Константи ---
 const val MAX_CONNECT_RETRIES = 3
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 10000
 const val FABRIC8_VERSION = "6.13.5"
-// ---
-
 // --- Функції завантаження ресурсів ---
 
 // Обгортка для безпечного виклику API (БЕЗ inline)
