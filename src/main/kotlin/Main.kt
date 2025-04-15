@@ -1,125 +1,99 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
+// src/main/kotlin/Main.kt (Пряме відтворення ConfigGetContextsEquivalent)
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import io.fabric8.kubernetes.client.Config
+// --- Імпорти для Fabric8 ---
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientBuilder
-import java.io.File
+import io.fabric8.kubernetes.client.KubernetesClientException
+import io.fabric8.kubernetes.api.model.NamedContext
+// ---------------------------
+import org.slf4j.LoggerFactory
 
-fun getKubeConfigPath(): String {
-    val kubeConfigEnv = System.getenv("KUBECONFIG")
-    if (!kubeConfigEnv.isNullOrEmpty()) {
-        return kubeConfigEnv
-    }
-    val userHome = System.getProperty("user.home")
-    return File(userHome, ".kube/config").absolutePath
-}
-
-fun getContexts(): List<String> {
-    val kubeConfigPath = getKubeConfigPath()
-    val kubeConfigFile = File(kubeConfigPath)
-    if (!kubeConfigFile.exists()) {
-        println("Kubeconfig file not found at: $kubeConfigPath")
-        return emptyList()
-    }
-
-    val config = Config.fromKubeconfig(null, kubeConfigPath, null)
-    return config.contexts.keys.toList().sorted()
-}
-
-fun createKubernetesClient(contextName: String? = null): KubernetesClient? {
-    val kubeConfigPath = getKubeConfigPath()
-    val kubeConfigFile = File(kubeConfigPath)
-    if (!kubeConfigFile.exists()) {
-        println("Kubeconfig file not found at: $kubeConfigPath")
-        return null
-    }
-
-    val config = Config.fromKubeconfig(contextName, kubeConfigPath, null)
-    return KubernetesClientBuilder().withConfig(config).build()
-}
+// Логер
+private val logger = LoggerFactory.getLogger("MainKtGetContextsDirect")
 
 @Composable
-@Preview
 fun App() {
-    var selectedContext by remember { mutableStateOf<String?>(null) }
-    val contexts = remember { mutableStateListOf<String>() }
-    var expanded by remember { mutableStateOf(false) }
-    var connectionStatus by remember { mutableStateOf("") }
-    var client by remember { mutableStateOf<KubernetesClient?>(null) }
+    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
+    var statusMessage by remember { mutableStateOf<String?>("Завантаження контекстів...") }
+    var isLoading by remember { mutableStateOf(true) } // Починаємо із завантаження
 
+    // Виконуємо завантаження ОДИН РАЗ при старті.
+    // УВАГА: Це БЛОКУЮЧИЙ виклик у LaunchedEffect без Dispatchers.IO! UI може зависнути!
     LaunchedEffect(Unit) {
-        contexts.addAll(getContexts())
-    }
+        logger.info("LaunchedEffect: Getting context list directly...")
+        isLoading = true
+        statusMessage = "Завантаження..."
+        try {
+            // Створюємо дефолтний клієнт (блокуюча операція)
+            val k8s: KubernetesClient = KubernetesClientBuilder().build()
+            // Отримуємо конфігурацію і контексти (блокуюча операція)
+            val contextNames = k8s.configuration?.contexts // Доступ до конфігурації клієнта
+                ?.mapNotNull { it.name }
+                ?.sorted()
+                ?: emptyList()
 
-    LaunchedEffect(selectedContext) {
-        selectedContext?.let { context ->
-            connectionStatus = "Підключення до контексту: $context..."
-            client = try {
-                createKubernetesClient(context)
-            } catch (e: Exception) {
-                connectionStatus = "Помилка підключення до контексту: $context - ${e.message}"
-                null
-            }
-            if (client != null) {
-                connectionStatus = "Підключено до контексту: $context"
-            }
+            // Оновлюємо стан (це вже виконається після завершення блокуючих операцій)
+            contexts = contextNames
+            statusMessage = if (contextNames.isEmpty()) "Контексти не знайдено" else "Контексти завантажено"
+            logger.info("Contexts loaded: ${contextNames.size}")
+
+            // Важливо закрити клієнт, якщо він більше не потрібен тут
+            // У реальному додатку клієнт зберігався б у стані
+            k8s.close()
+
+        } catch (e: Exception) {
+            logger.error("Failed to get contexts: ${e.message}", e)
+            statusMessage = "Помилка завантаження контекстів: ${e.message}"
+            contexts = emptyList()
+        } finally {
+            isLoading = false
+            logger.info("LaunchedEffect finished.")
         }
     }
 
     MaterialTheme {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Оберіть контекст Kubernetes:")
-            Row {
-                OutlinedTextField(
-                    value = selectedContext ?: "Оберіть контекст",
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(0.8f),
-                    label = { Text("Контекст") },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                    },
-                    colors = ExposedDropdownMenuDefaults.textFieldColors()
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier.fillMaxWidth(0.8f)
-                ) {
-                    contexts.forEach { context ->
-                        DropdownMenuItem(onClick = {
-                            selectedContext = context
-                            expanded = false
-                        }) {
-                            Text(text = context)
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Text("Доступні Контексти:", style = MaterialTheme.typography.h6)
+            Spacer(Modifier.height(8.dp))
+
+            if (isLoading) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(statusMessage ?: "Завантаження...")
+                }
+            } else if (contexts.isNotEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().border(1.dp, Color.Gray)) {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(contexts) { contextName ->
+                            Text(
+                                text = contextName,
+                                modifier = Modifier.fillMaxWidth().padding(8.dp)
+                            )
                         }
                     }
                 }
-            }
-            Button(onClick = { expanded = !expanded }) {
-                Text(if (expanded) "Згорнути" else "Розгорнути")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(connectionStatus)
-            if (client != null) {
-                Text("Клієнт Kubernetes ініціалізовано (для контексту: ${selectedContext})")
-                // Подальша логіка для використання клієнта
-            } else if (connectionStatus.startsWith("Помилка")) {
-                // Можна відобразити більш детальну інформацію про помилку
+            } else {
+                Text(statusMessage ?: "Не вдалося завантажити контексти.")
             }
         }
     }
 }
 
+// --- Головна функція ---
 fun main() = application {
-    Window(title = "Kotlin Kube Manager", onCloseRequest = ::exitApplication) {
+    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Context Lister (Blocking)") {
         App()
     }
 }
