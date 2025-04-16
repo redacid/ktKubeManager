@@ -98,7 +98,7 @@ val resourceLeafNodes: Set<String> = setOf(
 private val logger = LoggerFactory.getLogger("MainKtMaterial3AmbiguityFixFull")
 
 // --- Константи ---
-const val MAX_CONNECT_RETRIES = 3
+const val MAX_CONNECT_RETRIES = 1
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
@@ -631,7 +631,6 @@ fun App() {
         } // Кінець Surface M3
     } // Кінець MaterialTheme M3
 }
-
 
 // --- Composable для дерева ресурсів (M3 Text/Icon) ---
 @Composable
