@@ -82,7 +82,7 @@ val resourceLeafNodes: Set<String> = setOf(
 private val logger = LoggerFactory.getLogger("MainKtM3Final")
 
 // --- Константи ---
-const val MAX_CONNECT_RETRIES = 3
+const val MAX_CONNECT_RETRIES = 1
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
@@ -128,6 +128,9 @@ fun formatJobDuration(status: JobStatus?): String {
     val start = status?.startTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     val end = status?.completionTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     return when { start == null -> "<pending>"; end == null -> Duration.between(start, OffsetDateTime.now(start.offset)).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s" }
+}
+fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
+    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
 }
 // ---
 
@@ -396,8 +399,119 @@ fun PodDetailsView(pod: Pod) { // Використовує Fabric8 Pod model
         // TODO: Додати показ Conditions, Volumes, Labels, Annotations і т.д.
     }
 }
+// === ДОДАНО НОВІ ФУНКЦІЇ ДЛЯ ДЕТАЛЕЙ ===
+@Composable
+fun NamespaceDetailsView(ns: Namespace) {
+    Column {
+        DetailRow("Name", ns.metadata?.name)
+        DetailRow("Status", ns.status?.phase)
+        DetailRow("Created", formatAge(ns.metadata?.creationTimestamp))
+        // TODO: Додати Labels/Annotations
+    }
+}
 
-// TODO: Додати Composable функції для інших типів ресурсів (NodeDetailsView, DeploymentDetailsView...)
+@Composable
+fun NodeDetailsView(node: Node) {
+    Column {
+        DetailRow("Name", node.metadata?.name)
+        DetailRow("Status", formatNodeStatus(node.status?.conditions))
+        DetailRow("Roles", formatNodeRoles(node.metadata?.labels))
+        DetailRow("Age", formatAge(node.metadata?.creationTimestamp))
+        DetailRow("Version", node.status?.nodeInfo?.kubeletVersion)
+        DetailRow("OS Image", node.status?.nodeInfo?.osImage)
+        DetailRow("Kernel Version", node.status?.nodeInfo?.kernelVersion)
+        DetailRow("Container Runtime", node.status?.nodeInfo?.containerRuntimeVersion)
+        DetailRow("Internal IP", node.status?.addresses?.find { it.type == "InternalIP" }?.address)
+        DetailRow("External IP", node.status?.addresses?.find { it.type == "ExternalIP" }?.address)
+        DetailRow("Taints", formatTaints(node.spec?.taints))
+        // TODO: Додати Capacity/Allocatable, Conditions
+    }
+}
+
+@Composable
+fun DeploymentDetailsView(dep: Deployment) {
+    Column {
+        DetailRow("Name", dep.metadata?.name)
+        DetailRow("Namespace", dep.metadata?.namespace)
+        DetailRow("Created", formatAge(dep.metadata?.creationTimestamp))
+        DetailRow("Replicas", "${dep.status?.readyReplicas ?: 0} / ${dep.spec?.replicas ?: 0} (Ready)")
+        DetailRow("Updated", dep.status?.updatedReplicas?.toString())
+        DetailRow("Available", dep.status?.availableReplicas?.toString())
+        DetailRow("Strategy", dep.spec?.strategy?.type)
+        // TODO: Conditions, Selector, Template info
+    }
+}
+
+@Composable
+fun ServiceDetailsView(svc: Service) {
+    Column {
+        DetailRow("Name", svc.metadata?.name)
+        DetailRow("Namespace", svc.metadata?.namespace)
+        DetailRow("Created", formatAge(svc.metadata?.creationTimestamp))
+        DetailRow("Type", svc.spec?.type)
+        DetailRow("ClusterIP(s)", svc.spec?.clusterIPs?.joinToString(", "))
+        DetailRow("External IP(s)", formatServiceExternalIP(svc))
+        DetailRow("Selector", svc.spec?.selector?.map { "${it.key}=${it.value}" }?.joinToString(", "))
+        DetailRow("Ports", formatPorts(svc.spec?.ports))
+    }
+}
+
+@Composable
+fun SecretDetailsView(secret: Secret) {
+    Column {
+        DetailRow("Name", secret.metadata?.name)
+        DetailRow("Namespace", secret.metadata?.namespace)
+        DetailRow("Created", formatAge(secret.metadata?.creationTimestamp))
+        DetailRow("Type", secret.type)
+        DetailRow("Data Keys", formatDataKeys(secret.data, secret.stringData))
+        // НЕ показуємо вміст секретів
+    }
+}
+
+@Composable
+fun ConfigMapDetailsView(cm: ConfigMap) {
+    Column {
+        DetailRow("Name", cm.metadata?.name)
+        DetailRow("Namespace", cm.metadata?.namespace)
+        DetailRow("Created", formatAge(cm.metadata?.creationTimestamp))
+        DetailRow("Data Keys", formatDataKeys(cm.data, cm.binaryData)) // Використовуємо binaryData
+        // TODO: Показати ключі? (але не значення, можуть бути великі)
+    }
+}
+
+@Composable
+fun PVDetailsView(pv: PersistentVolume) {
+    Column {
+        DetailRow("Name", pv.metadata?.name)
+        DetailRow("Created", formatAge(pv.metadata?.creationTimestamp))
+        DetailRow("Status", pv.status?.phase)
+        DetailRow("Claim", pv.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" })
+        DetailRow("Reclaim Policy", pv.spec?.persistentVolumeReclaimPolicy)
+        DetailRow("Access Modes", formatAccessModes(pv.spec?.accessModes))
+        DetailRow("Storage Class", pv.spec?.storageClassName)
+        DetailRow("Capacity", pv.spec?.capacity?.get("storage")?.toString())
+        DetailRow("Volume Mode", pv.spec?.volumeMode)
+        // TODO: Source details (NFS, HostPath, etc.)
+    }
+}
+
+@Composable
+fun PVCDetailsView(pvc: PersistentVolumeClaim) {
+    Column {
+        DetailRow("Name", pvc.metadata?.name)
+        DetailRow("Namespace", pvc.metadata?.namespace)
+        DetailRow("Created", formatAge(pvc.metadata?.creationTimestamp))
+        DetailRow("Status", pvc.status?.phase)
+        DetailRow("Volume", pvc.spec?.volumeName)
+        DetailRow("Access Modes", formatAccessModes(pvc.spec?.accessModes))
+        DetailRow("Storage Class", pvc.spec?.storageClassName)
+        DetailRow("Capacity Request", pvc.spec?.resources?.requests?.get("storage")?.toString())
+        DetailRow("Capacity Actual", pvc.status?.capacity?.get("storage")?.toString())
+        DetailRow("Volume Mode", pvc.spec?.volumeMode)
+    }
+}
+
+// ===
 
 @Composable
 fun ResourceDetailPanel(
@@ -409,26 +523,33 @@ fun ResourceDetailPanel(
 
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = onClose) { // M3 Button
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(Modifier.width(4.dp)); Text("Back to List") // M3 Icon, M3 Text
-            }
+            Button(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(Modifier.width(4.dp)); Text("Back to List") }
             Spacer(Modifier.weight(1f))
             val name = if (resource is HasMetadata) resource.metadata?.name else "Details"
-            Text(text = "$resourceType: $name", style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) // M3 Typography
+            Text(text = "$resourceType: $name", style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
         }
-        Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
+        Divider(color = MaterialTheme.colorScheme.outlineVariant)
 
         Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
+                // --- ОНОВЛЕНО: Додано виклики нових DetailsView ---
                 when(resourceType) {
-                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource) else Text("Invalid Pod data") // M3 Text
-                    // Додайте інші кейси тут
+                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource) else Text("Invalid Pod data")
+                    "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
+                    "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
+                    "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
+                    "Services" -> if (resource is Service) ServiceDetailsView(svc = resource) else Text("Invalid Service data")
+                    "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
+                    "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
+                    "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
+                    // TODO: Додати кейси для всіх інших типів ресурсів (StatefulSet, DaemonSet, Role, etc.)
                     else -> {
-                        Text("Detail view for '$resourceType' is not implemented yet.") // Явний M3 Text
+                        Text("Detail view for '$resourceType' is not implemented yet.")
                         if (resource is HasMetadata) {
                             Spacer(Modifier.height(16.dp))
-                            Text("Metadata:", style = MaterialTheme.typography.titleMedium) // Явний M3 Text
+                            Text("Basic Metadata:", style = MaterialTheme.typography.titleMedium)
                             DetailRow("Name", resource.metadata?.name)
                             DetailRow("Namespace", resource.metadata?.namespace)
                             DetailRow("Created", formatAge(resource.metadata?.creationTimestamp))
