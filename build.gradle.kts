@@ -4,9 +4,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 
 plugins {
-    kotlin("jvm") version "2.1.20" // Або 1.9.23
+    kotlin("jvm") version "1.9.23" // Або 1.9.23
     id("org.jetbrains.compose") version "1.7.3"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
+    //id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
 group = "com.example.kubemanager"
@@ -27,7 +27,8 @@ dependencies {
     val fabric8Version = "6.13.5" // Ваша версія
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
     implementation("io.fabric8:kubernetes-client:${fabric8Version}")
-    implementation("androidx.compose.material3:material3:1.3.2")
+    implementation(compose.material3)
+    //implementation("androidx.compose.material3:material3:1.3.2")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
