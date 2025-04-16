@@ -2,9 +2,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 //import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+
 plugins {
     kotlin("jvm") version "2.1.20" // Або 1.9.23
-    id("org.jetbrains.compose") version "1.6.10"
+    id("org.jetbrains.compose") version "1.7.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
