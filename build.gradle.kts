@@ -27,6 +27,7 @@ dependencies {
     val fabric8Version = "6.13.5" // Ваша версія
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
     implementation("io.fabric8:kubernetes-client:${fabric8Version}")
+    implementation("androidx.compose.material3:material3:1.3.2")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
