@@ -13,13 +13,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider // M3 Divider
+import androidx.compose.material3.HorizontalDivider as Divider // M3 Divider
 import androidx.compose.material3.Icon // M3 Icon
-import androidx.compose.material3.LocalContentColor // M3 LocalContentColor
+//import androidx.compose.material3.LocalContentColor // M3 LocalContentColor
 import androidx.compose.material3.MaterialTheme // M3 Theme
 import androidx.compose.material3.Surface // M3 Surface
 import androidx.compose.material3.Text // M3 Text
-import androidx.compose.material3.OutlinedTextField // M3 TextField
+//import androidx.compose.material3.OutlinedTextField // M3 TextField
 // ---------------------------------
 import androidx.compose.material.icons.Icons // Іконки залишаються ті ж
 import androidx.compose.material.icons.filled.*
@@ -28,11 +28,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color // Залишається Compose Color
+//import androidx.compose.ui.graphics.Color // Залишається Compose Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+//import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 // Fabric8
@@ -50,16 +50,16 @@ import io.fabric8.kubernetes.api.model.storage.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext // Повне ім'я
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+//import kotlinx.coroutines.CoroutineScope
+//import kotlinx.coroutines.delay
 // Логер та інше
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.util.concurrent.TimeUnit
+//import java.util.concurrent.TimeUnit
 import java.time.Duration
 import java.time.OffsetDateTime
-import java.time.format.DateTimeParseException
-import java.time.temporal.ChronoUnit
+//import java.time.format.DateTimeParseException
+//import java.time.temporal.ChronoUnit
 
 // --- Дані для дерева ресурсів ---
 val resourceTreeData: Map<String, List<String>> = mapOf(
@@ -86,7 +86,7 @@ const val MAX_CONNECT_RETRIES = 3
 const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
-const val FABRIC8_VERSION = "6.13.5"
+//const val FABRIC8_VERSION = "6.13.5"
 // ---
 
 // --- Допоміжні функції форматування ---
@@ -205,13 +205,13 @@ suspend fun <T> fetchK8sResource(
     if (client == null) return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
     logger.info("Завантаження списку $resourceType (Fabric8)...")
     return try {
-        val items = kotlinx.coroutines.withContext(Dispatchers.IO) { // Сподіваємось компілюється
+        val items = withContext(Dispatchers.IO) { // Сподіваємось компілюється
             logger.info("[IO] Виклик API для $resourceType...")
             apiCall(client) ?: emptyList()
         }
         logger.info("Завантажено ${items.size} $resourceType.")
         try {
-            @Suppress("UNCHECKED_CAST")
+            //@Suppress("UNCHECKED_CAST")
             val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
             Result.success(sortedItems)
         } catch (e: Exception) {
@@ -254,7 +254,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
     for (attempt in 1..MAX_CONNECT_RETRIES) {
         logger.info("Спроба підключення до '$contextNameToLog' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
         try {
-            val resultPair: Pair<KubernetesClient, String> = kotlinx.coroutines.withContext(Dispatchers.IO) { // Сподіваємось, компілюється
+            val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) { // Сподіваємось, компілюється
                 logger.info("[IO] Створення конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
                 val config = Config.autoConfigure(targetContext)
                     ?: throw KubernetesClientException("Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'")
@@ -425,10 +425,10 @@ fun ResourceDetailPanel(
                     "Pods" -> if (resource is Pod) PodDetailsView(pod = resource) else Text("Invalid Pod data") // M3 Text
                     // Додайте інші кейси тут
                     else -> {
-                        androidx.compose.material3.Text("Detail view for '$resourceType' is not implemented yet.") // Явний M3 Text
+                        Text("Detail view for '$resourceType' is not implemented yet.") // Явний M3 Text
                         if (resource is HasMetadata) {
                             Spacer(Modifier.height(16.dp))
-                            androidx.compose.material3.Text("Metadata:", style = MaterialTheme.typography.titleMedium) // Явний M3 Text
+                            Text("Metadata:", style = MaterialTheme.typography.titleMedium) // Явний M3 Text
                             DetailRow("Name", resource.metadata?.name)
                             DetailRow("Namespace", resource.metadata?.namespace)
                             DetailRow("Created", formatAge(resource.metadata?.creationTimestamp))
@@ -490,7 +490,7 @@ fun App() {
 
     // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
-        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList();
+        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList()
     }
     // ---
 
@@ -498,11 +498,11 @@ fun App() {
     // (Цей код використовує kotlinx.coroutines.withContext і працював раніше)
     LaunchedEffect(Unit) {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
-        isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
+        isLoading = true; connectionStatus = "Завантаження Kubeconfig..."
         var loadError: Exception? = null
-        var loadedContextNames: List<String> = emptyList()
+        var loadedContextNames: List<String>
         try {
-            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            loadedContextNames = withContext(Dispatchers.IO) {
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
                 val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
                 val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
@@ -626,7 +626,7 @@ fun App() {
                                 val currentClientForPanel = activeClient
                                 when {
                                     isLoading -> { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) { CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text(connectionStatus) } } // M3 Indicator, M3 Text
-                                    currentErrorMessageForPanel != null -> { androidx.compose.material3.Text( text = currentErrorMessageForPanel ?: "Невідома помилка", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
+                                    currentErrorMessageForPanel != null -> { Text( text = currentErrorMessageForPanel ?: "Невідома помилка", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
                                     currentClientForPanel != null && currentResourceType != null -> {
                                         val itemsToShow: List<HasMetadata> = remember(currentResourceType, namespacesList, nodesList, podsList, deploymentsList, statefulSetsList, daemonSetsList, replicaSetsList, jobsList, cronJobsList, servicesList, ingressesList, pvsList, pvcsList, storageClassesList, configMapsList, secretsList, serviceAccountsList, rolesList, roleBindingsList, clusterRolesList, clusterRoleBindingsList ) {
                                             when (currentResourceType) {
@@ -653,8 +653,8 @@ fun App() {
                                         } else { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Не вдалося визначити колонки для '$currentResourceType'") } } // M3 Text
                                     }
                                     // Стани за замовчуванням (M3 Text)
-                                    activeClient != null -> { androidx.compose.material3.Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
-                                    else -> { androidx.compose.material3.Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
+                                    activeClient != null -> { Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
+                                    else -> { Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
                                 }
                             } // Кінець Box вмісту
                         } // Кінець else showDetails
@@ -663,7 +663,7 @@ fun App() {
                 // --- Статус-бар ---
                 Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Text(text = connectionStatus, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall); if (isLoading) { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } // Явний M3 Text, M3 Indicator
+                    Text(text = connectionStatus, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall); if (isLoading) { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } // Явний M3 Text, M3 Indicator
                 }
                 // ---------------
             } // Кінець Column
