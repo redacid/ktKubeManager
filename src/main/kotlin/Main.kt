@@ -1,5 +1,3 @@
-// --- START OF FULL Main.kt (Material 3 Corrected) ---
-// src/main/kotlin/Main.kt (Повністю на Material 3)
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -11,17 +9,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.VerticalScrollbar // Для Scrollbar
-import androidx.compose.foundation.rememberScrollbarAdapter // Для Scrollbar
-// --- ТІЛЬКИ Імпорти MATERIAL 3 ---
-import androidx.compose.material3.HorizontalDivider as Divider // M3 Divider
-// ---------------------------------
-import androidx.compose.material.icons.Icons // Іконки залишаються ті ж
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.material3.HorizontalDivider as Divider
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
-//import androidx.compose.material3.Divider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,8 +43,8 @@ import io.fabric8.kubernetes.client.dsl.LogWatch
 // Логер та інше
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.io.BufferedReader // <-- Додано для логів
-import java.io.InputStreamReader // <-- Додано для логів
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.time.Duration
 import java.time.OffsetDateTime
 
@@ -81,7 +76,7 @@ const val REQUEST_TIMEOUT_MS = 15000
 //const val FABRIC8_VERSION = "6.13.5"
 const val LOG_LINES_TO_TAIL = 500
 // ---
-const val ALL_NAMESPACES_OPTION = "<All Namespaces>" // Опція для вибору всіх неймспейсів
+const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
 
 // --- Допоміжні функції форматування ---
 fun formatAge(creationTimestamp: String?): String {
@@ -126,9 +121,6 @@ fun formatJobDuration(status: JobStatus?): String {
 fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
     return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
 }
-// ---
-
-// --- Функція отримання заголовків ---
 fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
         "Namespaces" -> listOf("Name", "Status", "Age")
@@ -155,9 +147,6 @@ fun getHeadersForType(resourceType: String): List<String> {
         else -> listOf("Name")
     }
 }
-// ---
-
-// --- Функція отримання даних комірки (для Fabric8 моделей) ---
 fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
     val na = "N/A"
     try {
@@ -191,9 +180,6 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
         return "<error>"
     }
 }
-// ---
-
-// --- Функції завантаження ресурсів ---
 suspend fun <T> fetchK8sResource(
     client: KubernetesClient?,
     resourceType: String,
@@ -278,9 +264,6 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
     logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
     return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
 }
-// ---
-
-// --- Composable для рядка заголовка таблиці (M3) ---
 @Composable
 fun KubeTableHeaderRow(headers: List<String>) {
     Row(
@@ -310,9 +293,6 @@ fun KubeTableHeaderRow(headers: List<String>) {
         }
     }
 }
-// ---
-
-// --- Composable для рядка даних таблиці (M3) ---
 @Composable
 fun <T: HasMetadata> KubeTableRow(
     item: T,
@@ -353,9 +333,6 @@ fun <T: HasMetadata> KubeTableRow(
         }
     }
 }
-// ---
-
-// === Composable для Панелі Деталей (M3) ===
 @Composable
 fun DetailRow(label: String, value: String?) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -660,9 +637,6 @@ fun ResourceDetailPanel(
         }
     }
 }
-// ===
-
-// === Composable для Панелі Логів (M3) ===
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogViewerPanel(
@@ -787,9 +761,6 @@ fun LogViewerPanel(
         }
     }
 }
-// ===
-
-// --- START OF fun App() ---
 @OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
 @Composable
 @Preview
@@ -835,8 +806,6 @@ fun App() {
     // Діалог помилки
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
-    // ---
-    // --- НОВІ СТАНИ ДЛЯ ФІЛЬТРА ---
     var allNamespaces by remember { mutableStateOf<List<String>>(listOf(ALL_NAMESPACES_OPTION)) }
     var selectedNamespaceFilter by remember { mutableStateOf(ALL_NAMESPACES_OPTION) }
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
@@ -1244,5 +1213,3 @@ fun ResourceTreeNode(
 fun main() = application {
     Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager - Material 3 Fixed") { App() }
 }
-
-// --- END OF FULL Main.kt ---
