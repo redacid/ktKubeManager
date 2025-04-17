@@ -1,6 +1,7 @@
 // --- START OF FULL Main.kt (Material 3 Corrected) ---
 // src/main/kotlin/Main.kt (Повністю на Material 3)
 import androidx.compose.desktop.ui.tooling.preview.Preview
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,26 +9,24 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.VerticalScrollbar // Для Scrollbar
+import androidx.compose.foundation.rememberScrollbarAdapter // Для Scrollbar
 // --- ТІЛЬКИ Імпорти MATERIAL 3 ---
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider as Divider // M3 Divider
-import androidx.compose.material3.Icon // M3 Icon
 //import androidx.compose.material3.LocalContentColor // M3 LocalContentColor
-import androidx.compose.material3.MaterialTheme // M3 Theme
-import androidx.compose.material3.Surface // M3 Surface
-import androidx.compose.material3.Text // M3 Text
 //import androidx.compose.material3.OutlinedTextField // M3 TextField
 // ---------------------------------
 import androidx.compose.material.icons.Icons // Іконки залишаються ті ж
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 //import androidx.compose.ui.graphics.Color // Залишається Compose Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,19 +46,15 @@ import io.fabric8.kubernetes.api.model.networking.v1.*
 import io.fabric8.kubernetes.api.model.rbac.*
 import io.fabric8.kubernetes.api.model.storage.*
 // Coroutines
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext // Повне ім'я
-//import kotlinx.coroutines.CoroutineScope
-//import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
+import io.fabric8.kubernetes.client.dsl.LogWatch
 // Логер та інше
 import org.slf4j.LoggerFactory
 import java.io.IOException
-//import java.util.concurrent.TimeUnit
+import java.io.BufferedReader // <-- Додано для логів
+import java.io.InputStreamReader // <-- Додано для логів
 import java.time.Duration
 import java.time.OffsetDateTime
-//import java.time.format.DateTimeParseException
-//import java.time.temporal.ChronoUnit
 
 // --- Дані для дерева ресурсів ---
 val resourceTreeData: Map<String, List<String>> = mapOf(
@@ -87,6 +82,7 @@ const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
 //const val FABRIC8_VERSION = "6.13.5"
+const val LOG_LINES_TO_TAIL = 500
 // ---
 
 // --- Допоміжні функції форматування ---
@@ -175,7 +171,7 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
             "StatefulSets" -> if (resource is StatefulSet) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "DaemonSets" -> if (resource is DaemonSet) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.status?.desiredNumberScheduled?.toString() ?: "0"; 3 -> resource.status?.currentNumberScheduled?.toString() ?: "0"; 4 -> resource.status?.numberReady?.toString() ?: "0"; 5 -> resource.status?.updatedNumberScheduled?.toString() ?: "0"; 6 -> resource.status?.numberAvailable?.toString() ?: "0"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "ReplicaSets" -> if (resource is ReplicaSet) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.replicas?.toString() ?: "0"; 3 -> resource.status?.replicas?.toString() ?: "0"; 4 -> resource.status?.readyReplicas?.toString() ?: "0"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Jobs" -> if (resource is Job) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> "${resource.status?.succeeded ?: 0}/${resource.spec?.completions ?: '?'}" ; 3 -> formatJobDuration(resource.status); 4 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
+            "Jobs" -> if (resource is  io.fabric8.kubernetes.api.model.batch.v1.Job) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> "${resource.status?.succeeded ?: 0}/${resource.spec?.completions ?: '?'}" ; 3 -> formatJobDuration(resource.status); 4 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "CronJobs" -> if (resource is CronJob) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.schedule ?: na; 3 -> resource.spec?.suspend?.toString() ?: "false"; 4 -> resource.status?.active?.size?.toString() ?: "0"; 5 -> resource.status?.lastScheduleTime?.let { formatAge(it) } ?: "<never>"; 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "Services" -> if (resource is Service) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.type ?: na; 3 -> resource.spec?.clusterIPs?.joinToString(",") ?: na; 4 -> formatServiceExternalIP(resource); 5 -> formatPorts(resource.spec?.ports); 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
             "Ingresses" -> if (resource is Ingress) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.ingressClassName ?: "<none>"; 3 -> formatIngressHosts(resource.spec?.rules); 4 -> formatIngressAddress(resource.status?.loadBalancer?.ingress); 5 -> formatIngressPorts(resource.spec?.tls); 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
@@ -374,6 +370,33 @@ fun DetailRow(label: String, value: String?) {
         )
     }
 }
+// === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА (M3) ===
+@Composable
+fun ContainerSelectionDialog(
+    containers: List<String>,
+    onDismiss: () -> Unit,
+    onContainerSelected: (String) -> Unit
+) {
+    var selectedOption by remember { mutableStateOf(containers.firstOrNull() ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Container") },
+        text = {
+            Column {
+                containers.forEach { containerName ->
+                    Row( Modifier.fillMaxWidth().clickable { selectedOption = containerName }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically ) {
+                        RadioButton( selected = (containerName == selectedOption), onClick = { selectedOption = containerName } )
+                        Spacer(Modifier.width(8.dp))
+                        Text(containerName)
+                    }
+                }
+            }
+        },
+        confirmButton = { Button( onClick = { onContainerSelected(selectedOption) }, enabled = selectedOption.isNotEmpty() ) { Text("View Logs") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+// ===
 @Composable
 fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функція для базових метаданих
     Text("Basic Metadata:", style = MaterialTheme.typography.titleMedium)
@@ -386,27 +409,62 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
     DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
 }
 @Composable
-fun PodDetailsView(pod: Pod) { // Використовує Fabric8 Pod model
+fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) { // Додано onShowLogsRequest
+    val showContainerDialog = remember { mutableStateOf(false) }
+    val containers = remember(pod) { pod.spec?.containers ?: emptyList() }
+
     Column {
+        // --- Кнопка та Діалог логів ---
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(onClick = {
+                when (containers.size) {
+                    0 -> logger.warn("Под ${pod.metadata?.name} не має контейнерів.")
+                    1 -> onShowLogsRequest(containers.first().name)
+                    else -> showContainerDialog.value = true
+                }
+            }) {
+                Icon(Icons.Filled.Build, contentDescription = "View Logs")
+                Spacer(Modifier.width(4.dp))
+                Text("View Logs")
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        if (showContainerDialog.value) {
+            ContainerSelectionDialog(
+                containers = containers.mapNotNull { it.name },
+                onDismiss = { showContainerDialog.value = false },
+                onContainerSelected = { containerName ->
+                    showContainerDialog.value = false
+                    onShowLogsRequest(containerName)
+                }
+            )
+        }
+        // --- Кінець логіки логів ---
+
+        // --- Решта деталей пода ---
         DetailRow("Name", pod.metadata?.name)
         DetailRow("Namespace", pod.metadata?.namespace)
         DetailRow("Status", pod.status?.phase)
         DetailRow("Node", pod.spec?.nodeName)
         DetailRow("Pod IP", pod.status?.podIP)
-        // DetailRow("Controlled By", formatOwnerRefs(pod.metadata?.ownerReferences)) // Поки закоментовано
+        DetailRow("Service Account", pod.spec?.serviceAccountName ?: pod.spec?.serviceAccount)
         DetailRow("Created", formatAge(pod.metadata?.creationTimestamp))
-        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
-        Text("Containers:", style = MaterialTheme.typography.titleMedium) // M3 Typography
-        pod.spec?.containers?.forEach { container ->
-            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp)) {
-                DetailRow("  Name", container.name)
-                DetailRow("  Image", container.image)
-                DetailRow("  Ready", pod.status?.containerStatuses?.find { it.name == container.name }?.ready?.toString() ?: "false")
-                DetailRow("  Restarts", pod.status?.containerStatuses?.find { it.name == container.name }?.restartCount?.toString() ?: "0")
+        DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Containers:", style = MaterialTheme.typography.titleMedium)
+        pod.status?.containerStatuses?.forEach { cs ->
+            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)).padding(4.dp) ) {
+                DetailRow("  Name", cs.name)
+                DetailRow("  Image", cs.image)
+                DetailRow("  Ready", cs.ready?.toString())
+                DetailRow("  Restarts", cs.restartCount?.toString())
+                DetailRow("  State", cs.state?.let { when { it.running != null -> "Running"; it.waiting != null -> "Waiting (${it.waiting.reason})"; it.terminated != null -> "Terminated (${it.terminated.reason}, Exit: ${it.terminated.exitCode})"; else -> "?" } })
+                DetailRow("  Image ID", cs.imageID)
             }
-            Spacer(Modifier.height(4.dp))
         }
-        // TODO: Додати показ Conditions, Volumes, Labels, Annotations і т.д.
+        if (pod.status?.containerStatuses.isNullOrEmpty()) { Text("  (No container statuses)", modifier = Modifier.padding(start=8.dp)) }
+        // ---
     }
 }
 @Composable
@@ -555,11 +613,13 @@ fun IngressDetailsView(ing: Ingress) {
 fun ResourceDetailPanel(
     resource: Any?,
     resourceType: String?,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit // Додано callback
 ) {
     if (resource == null || resourceType == null) return
 
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+        // --- Верхня панель ---
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(Modifier.width(4.dp)); Text("Back to List") }
             Spacer(Modifier.weight(1f))
@@ -568,11 +628,15 @@ fun ResourceDetailPanel(
             Spacer(Modifier.weight(1f))
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
+        // ---
 
+        // --- Вміст деталей ---
         Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
+                // --- Виклик відповідного DetailsView ---
                 when(resourceType) {
-                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource) else Text("Invalid Pod data")
+                    // ВАЖЛИВО: Передаємо onShowLogsRequest в PodDetailsView
+                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName -> (resource as? HasMetadata)?.metadata?.let { meta -> onShowLogsRequest(meta.namespace, meta.name, containerName) } ?: logger.error("Metadata is null for Pod.") } ) else Text("Invalid Pod data")
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -597,21 +661,148 @@ fun ResourceDetailPanel(
 }
 // ===
 
+// === Composable для Панелі Логів (M3) ===
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LogViewerPanel(
+    namespace: String,
+    podName: String,
+    containerName: String,
+    client: KubernetesClient?,
+    onClose: () -> Unit
+) {
+    val logState = remember { mutableStateOf("Завантаження логів...") }
+    val scrollState = rememberScrollState()
+    val followLogs = remember { mutableStateOf(true) }
+    val coroutineScope = rememberCoroutineScope()
+    var logWatchRef by remember { mutableStateOf<LogWatch?>(null) }
+    var isLogLoading by remember { mutableStateOf(false) }
 
+    DisposableEffect(namespace, podName, containerName) {
+        logger.info("LogViewerPanel DisposableEffect: Starting for $namespace/$podName [$containerName]")
+        isLogLoading = true
+        logState.value = "Завантаження..."
+
+        val logLoadingJob: kotlinx.coroutines.Job = coroutineScope.launch {
+            var initialLogLoadError: Exception? = null
+            var watch: LogWatch? = null
+            var followJob: kotlinx.coroutines.Job? = null
+
+            try {
+                // 1. Початкові логи
+                val initialLogs = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    logger.info("[IO Log] Tailing initial logs for $namespace/$podName [$containerName]...")
+                    client?.pods()?.inNamespace(namespace)
+                        ?.withName(podName)
+                        ?.inContainer(containerName)
+                        ?.tailingLines(LOG_LINES_TO_TAIL)
+                        // ?.withTimestamps() // Прибрали через помилки
+                        ?.log
+                } ?: "Не вдалося завантажити початкові логи."
+
+                withContext(Dispatchers.Main) {
+                    logState.value = initialLogs + "\n"
+                    launch { delay(50); scrollState.animateScrollTo(scrollState.maxValue) }
+                }
+
+                // 2. Стрімінг
+                if (followLogs.value && isActive) {
+                    logger.info("Starting log watch...")
+                    watch = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                        client?.pods()?.inNamespace(namespace)
+                            ?.withName(podName)
+                            ?.inContainer(containerName)
+                            // ?.withTimestamps() // Прибрали через помилки
+                            ?.watchLog()
+                    }
+                    logWatchRef = watch
+
+                    if (watch == null) throw IOException("Не вдалося запустити watchLog")
+
+                    followJob = launch(Dispatchers.IO) {
+                        logger.info("Log watch reading coroutine started...")
+                        try {
+                            BufferedReader(InputStreamReader(watch.output)).use { localReader ->
+                                while (isActive) {
+                                    val line = localReader.readLine() ?: break
+                                    withContext(Dispatchers.Main) {
+                                        if (isActive) {
+                                            logState.value += line + "\n"
+                                            if (followLogs.value) { launch { scrollState.animateScrollTo(scrollState.maxValue) } }
+                                        } else { return@withContext }
+                                    }
+                                }
+                            }
+                        } catch (e: IOException) { if(isActive) logger.warn("Log stream ended: ${e.message}") else logger.info("Log stream cancelled.") }
+                        catch (e: Exception) { if(isActive) { logger.error("Error reading log stream", e); withContext(Dispatchers.Main) { if(isActive) { logState.value += "\nПОМИЛКА СТРІМІНГУ: ${e.message}\n" } } } else { logger.info("Error in cancelled scope") } }
+                        finally { logger.info("Log reading followJob finished.") }
+                    }
+                } // end if follow
+
+            } catch (e: Exception) {
+                initialLogLoadError = e
+                logger.error("Помилка завантаження/запуску логів: ${e.message}", e)
+                withContext(Dispatchers.Main) { if (isActive) { logState.value = "Помилка логів: ${e.message}\n" } }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    if (isActive) { isLogLoading = false } // Вимикаємо індикатор ТІЛЬКИ якщо корутина ще активна
+                }
+            }
+        } // end logLoadingJob launch
+
+        onDispose {
+            logger.info("LogViewerPanel DisposableEffect: Disposing for $namespace/$podName [$containerName].")
+            logLoadingJob.cancel()
+            runCatching { logWatchRef?.close() }.onFailure { logger.warn("Error closing log watch: ${it.message}") }
+            logWatchRef = null
+        }
+    }
+
+    // --- UI панелі логів ---
+    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(Modifier.width(4.dp)); Text("Back") }
+            Text(text = "Logs: $namespace/$podName [$containerName]", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = followLogs.value, onCheckedChange = { followLogs.value = it })
+                Text("Follow", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        Divider(color = MaterialTheme.colorScheme.outlineVariant)
+        Box(modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
+            val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+            // Індикатор завантаження логів
+            if (isLogLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            Row(modifier = Modifier.fillMaxSize()){
+                BasicTextField(
+                    value = logState.value, onValueChange = { }, readOnly = true,
+                    textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
+                    modifier = Modifier.weight(1f).verticalScroll(scrollState).padding(8.dp)
+                )
+                VerticalScrollbar( modifier = Modifier.fillMaxHeight(), adapter = rememberScrollbarAdapter(scrollState) )
+            }
+        }
+    }
+}
+// ===
+
+// --- START OF fun App() ---
 @Composable
 @Preview
 fun App() {
     // --- Стани ---
     var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
     var selectedContext by remember { mutableStateOf<String?>(null) }
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>() }
-    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) }
+    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) } // Fabric8 Client
     var connectionStatus by remember { mutableStateOf("Завантаження конфігурації...") }
-    var isLoading by remember { mutableStateOf(false) }
-    var resourceLoadError by remember { mutableStateOf<String?>(null) }
-    // Списки ресурсів
+    var isLoading by remember { mutableStateOf(false) } // Загальний індикатор
+    var resourceLoadError by remember { mutableStateOf<String?>(null) } // Помилка завантаження ресурсів
+    // Стан для всіх типів ресурсів (Моделі Fabric8)
     var namespacesList by remember { mutableStateOf<List<Namespace>>(emptyList()) }
     var nodesList by remember { mutableStateOf<List<Node>>(emptyList()) }
     var podsList by remember { mutableStateOf<List<Pod>>(emptyList()) }
@@ -619,7 +810,7 @@ fun App() {
     var statefulSetsList by remember { mutableStateOf<List<StatefulSet>>(emptyList()) }
     var daemonSetsList by remember { mutableStateOf<List<DaemonSet>>(emptyList()) }
     var replicaSetsList by remember { mutableStateOf<List<ReplicaSet>>(emptyList()) }
-    var jobsList by remember { mutableStateOf<List<Job>>(emptyList()) }
+    var jobsList by remember { mutableStateOf<List<io.fabric8.kubernetes.api.model.batch.v1.Job>>(emptyList()) }
     var cronJobsList by remember { mutableStateOf<List<CronJob>>(emptyList()) }
     var servicesList by remember { mutableStateOf<List<Service>>(emptyList()) }
     var ingressesList by remember { mutableStateOf<List<Ingress>>(emptyList()) }
@@ -636,7 +827,10 @@ fun App() {
     // Стани для деталей
     var detailedResource by remember { mutableStateOf<Any?>(null) }
     var detailedResourceType by remember { mutableStateOf<String?>(null) }
-    // Діалог
+    // Стани для лог вікна
+    val showLogViewer = remember { mutableStateOf(false) } // Прапорець видимості
+    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
+    // Діалог помилки
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
     // ---
@@ -645,19 +839,18 @@ fun App() {
 
     // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
-        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList()
+        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList();
     }
     // ---
 
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
-    // (Цей код використовує kotlinx.coroutines.withContext і працював раніше)
     LaunchedEffect(Unit) {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
-        isLoading = true; connectionStatus = "Завантаження Kubeconfig..."
+        isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
         var loadError: Exception? = null
-        var loadedContextNames: List<String>
+        var loadedContextNames: List<String> = emptyList()
         try {
-            loadedContextNames = withContext(Dispatchers.IO) {
+            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) { // Чи компілюється це?
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
                 val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
                 val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
@@ -668,9 +861,9 @@ fun App() {
         } catch (e: Exception) { loadError = e; logger.error("Помилка завантаження контекстів: ${e.message}", e) }
         finally { if (loadError != null) { errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження" }; isLoading = false }
     }
-    // ---
+    // --- Кінець LaunchedEffect ---
 
-    // --- Діалогове вікно помилки (M3 AlertDialog) ---
+    // --- Діалогове вікно помилки (M3) ---
     if (showErrorDialog.value) {
         AlertDialog( // M3 AlertDialog
             onDismissRequest = { showErrorDialog.value = false },
@@ -681,8 +874,8 @@ fun App() {
     }
     // ---
 
-    MaterialTheme { // <<<--- ВИКОРИСТОВУЄМО MATERIAL 3 THEME
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { // M3 Surface + M3 Color
+    MaterialTheme { // M3 Theme
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { // M3 Surface
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(modifier = Modifier.weight(1f)) {
                     // --- Ліва панель ---
@@ -698,7 +891,7 @@ fun App() {
                                             if (selectedContext != contextName) {
                                                 logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
                                                 coroutineScope.launch {
-                                                    isLoading = true; connectionStatus = "Підключення до '$contextName'..."; activeClient?.close(); activeClient = null; selectedResourceType = null; clearResourceLists(); resourceLoadError = null; errorMessage = null; detailedResource = null; detailedResourceType = null // Скидаємо деталі
+                                                    isLoading = true; connectionStatus = "Підключення до '$contextName'..."; activeClient?.close(); activeClient = null; selectedResourceType = null; clearResourceLists(); resourceLoadError = null; errorMessage = null; detailedResource = null; detailedResourceType = null; showLogViewer.value = false; logViewerParams.value = null; // Скидаємо все
                                                     val connectionResult = connectWithRetries(contextName)
                                                     isLoading = false
 
@@ -711,18 +904,20 @@ fun App() {
                                     }
                                 }
                             }
-                        }
+                        } // Кінець Box списку
                         Spacer(modifier = Modifier.height(16.dp)); Text("Ресурси Кластера:", style = MaterialTheme.typography.titleMedium); Spacer(modifier = Modifier.height(8.dp)) // M3 Text
                         Box(modifier = Modifier.weight(2f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)) { // M3 колір
                             ResourceTreeView(rootIds = resourceTreeData[""] ?: emptyList(), expandedNodes = expandedNodes, onNodeClick = { nodeId, isLeaf ->
                                 logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
                                 if (isLeaf) {
                                     if (activeClient != null && !isLoading) {
-                                        detailedResource = null; detailedResourceType = null // Скидаємо деталі
+                                        // Скидаємо показ деталей/логів при виборі нового типу ресурсу
+                                        detailedResource = null; detailedResourceType = null; showLogViewer.value = false; logViewerParams.value = null;
                                         selectedResourceType = nodeId; resourceLoadError = null; clearResourceLists()
                                         connectionStatus = "Завантаження $nodeId..."; isLoading = true
                                         coroutineScope.launch {
                                             var loadOk = false; var errorMsg: String? = null
+                                            // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
                                             when (nodeId) {
                                                 "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 "Nodes" -> loadNodesFabric8(activeClient).onSuccess { nodesList = it; loadOk = true }.onFailure { errorMsg = it.message }
@@ -747,7 +942,9 @@ fun App() {
                                                 "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess { clusterRoleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 else -> { logger.warn("Обробник '$nodeId' не реалізовано."); loadOk = false; errorMsg = "Не реалізовано" }
                                             }
-                                            if (loadOk) { connectionStatus = "Завантажено $nodeId" } else { resourceLoadError = "Помилка завантаження $nodeId: ${errorMsg ?: "Невід. помилка"}"; connectionStatus = "Помилка завантаження $nodeId" }
+                                            // Оновлюємо статус після завершення
+                                            if (loadOk) { connectionStatus = "Завантажено $nodeId" }
+                                            else { resourceLoadError = "Помилка завантаження $nodeId: ${errorMsg ?: "Невід. помилка"}"; connectionStatus = "Помилка завантаження $nodeId" }
                                             isLoading = false
                                         }
                                     } else if (activeClient == null) { logger.warn("Немає підключення."); connectionStatus = "Підключіться до кластера!"; selectedResourceType = null }
@@ -758,73 +955,125 @@ fun App() {
 
                     Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
 
-                    // --- Права панель (АБО Таблиця АБО Деталі) ---
+                    // --- Права панель (АБО Таблиця АБО Деталі АБО Логи) ---
                     Column(modifier = Modifier.fillMaxHeight().weight(1f).padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
                         val resourceToShowDetails = detailedResource
                         val typeForDetails = detailedResourceType
-                        val showDetails = resourceToShowDetails != null && typeForDetails != null
+                        val paramsForLogs = logViewerParams.value
+                        val showLogs = showLogViewer.value // Читаємо значення стану
+
+                        // Визначаємо поточний режим відображення
+                        val currentView = remember(showLogs, resourceToShowDetails, paramsForLogs) {
+                            when {
+                                showLogs && paramsForLogs != null -> "logs"
+                                resourceToShowDetails != null -> "details"
+                                else -> "table"
+                            }
+                        }
 
                         val currentResourceType = selectedResourceType
-                        val headerTitle = if (!showDetails && currentResourceType != null && activeClient != null && resourceLoadError == null && errorMessage == null) { "$currentResourceType у $selectedContext" } else { null }
+                        // Заголовок для таблиці та логів (для деталей він всередині ResourceDetailPanel)
+                        val headerTitle = when {
+                            currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
+                            currentView == "table" && currentResourceType != null && activeClient != null && resourceLoadError == null && errorMessage == null -> "$currentResourceType у $selectedContext"
+                            else -> null
+                        }
                         if (headerTitle != null) {
                             Text(text = headerTitle, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp)) // M3 Text
                             Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
-                        } else if (!showDetails) {
-                            Spacer(modifier = Modifier.height(48.dp)) // Залишаємо для вирівнювання
+                        } else if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
+                            Spacer(modifier = Modifier.height(48.dp)) // Висота імітує заголовок
                         }
 
-                        Box(modifier = Modifier.weight(1f).padding(top = if (headerTitle != null) 8.dp else 0.dp)) {
-                            if (showDetails) {
-                                ResourceDetailPanel( resource = resourceToShowDetails, resourceType = typeForDetails!!, onClose = { detailedResource = null; detailedResourceType = null } )
-                            } else {
-                                val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
-                                val currentClientForPanel = activeClient
-                                when {
-                                    isLoading -> { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) { CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text(connectionStatus) } } // M3 Indicator, M3 Text
-                                    currentErrorMessageForPanel != null -> { Text( text = currentErrorMessageForPanel ?: "Невідома помилка", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
-                                    currentClientForPanel != null && currentResourceType != null -> {
-                                        val itemsToShow: List<HasMetadata> = remember(currentResourceType, namespacesList, nodesList, podsList, deploymentsList, statefulSetsList, daemonSetsList, replicaSetsList, jobsList, cronJobsList, servicesList, ingressesList, pvsList, pvcsList, storageClassesList, configMapsList, secretsList, serviceAccountsList, rolesList, roleBindingsList, clusterRolesList, clusterRoleBindingsList ) {
-                                            when (currentResourceType) {
-                                                "Namespaces" -> namespacesList; "Nodes" -> nodesList; "Pods" -> podsList; "Deployments" -> deploymentsList; "StatefulSets" -> statefulSetsList; "DaemonSets" -> daemonSetsList; "ReplicaSets" -> replicaSetsList; "Jobs" -> jobsList; "CronJobs" -> cronJobsList; "Services" -> servicesList; "Ingresses" -> ingressesList; "PersistentVolumes" -> pvsList; "PersistentVolumeClaims" -> pvcsList; "StorageClasses" -> storageClassesList; "ConfigMaps" -> configMapsList; "Secrets" -> secretsList; "ServiceAccounts" -> serviceAccountsList; "Roles" -> rolesList; "RoleBindings" -> roleBindingsList; "ClusterRoles" -> clusterRolesList; "ClusterRoleBindings" -> clusterRoleBindingsList
-                                                else -> emptyList()
-                                            }
+                        // --- Основний вміст правої панелі ---
+                        Box(modifier = Modifier.weight(1f).padding(top = if (headerTitle != null && currentView != "details") 8.dp else 0.dp)) {
+                            when(currentView) {
+                                "logs" -> {
+                                    if (paramsForLogs != null) {
+                                        LogViewerPanel(
+                                            namespace = paramsForLogs.first, podName = paramsForLogs.second, containerName = paramsForLogs.third,
+                                            client = activeClient, // Передаємо активний клієнт
+                                            onClose = { showLogViewer.value = false; logViewerParams.value = null } // Закриття панелі логів
+                                        )
+                                    } else {
+                                        // Стан коли прапорець showLogViewer ще true, але параметри вже скинуті
+                                        Text("Завантаження параметрів логів...", modifier = Modifier.align(Alignment.Center))
+                                        LaunchedEffect(Unit){ showLogViewer.value = false } // Скидаємо прапорець
+                                    }
+                                }
+                                "details" -> {
+                                    ResourceDetailPanel(
+                                        resource = resourceToShowDetails,
+                                        resourceType = typeForDetails,
+                                        onClose = { detailedResource = null; detailedResourceType = null },
+                                        // Передаємо лямбду для запуску лог вікна
+                                        onShowLogsRequest = { ns, pod, container ->
+                                            logViewerParams.value = Triple(ns, pod, container)
+                                            detailedResource = null // Закриваємо деталі
+                                            detailedResourceType = null
+                                            showLogViewer.value = true // Показуємо лог вьювер
                                         }
-                                        val headers = remember(currentResourceType) { getHeadersForType(currentResourceType) }
-
-                                        if (itemsToShow.isEmpty() && !isLoading) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Немає ресурсів типу '$currentResourceType'") } } // M3 Text
-                                        else if (headers.isNotEmpty()) {
-                                            // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
-                                            Column(modifier = Modifier.fillMaxSize()) {
-                                                KubeTableHeaderRow(headers = headers) // Використовуємо M3 хедер
-                                                Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
-
-                                                LazyColumn(modifier = Modifier.weight(1f)) {
-                                                    items(itemsToShow) { item ->
-                                                        KubeTableRow( item = item, headers = headers, resourceType = currentResourceType, onRowClick = { clickedItem -> detailedResource = clickedItem; detailedResourceType = currentResourceType } )
-                                                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) // M3 Divider
-                                                    }
+                                    )
+                                }
+                                "table" -> {
+                                    // --- Таблиця або Статус/Помилка ---
+                                    val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
+                                    val currentClientForPanel = activeClient
+                                    when {
+                                        isLoading -> { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) { CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text(connectionStatus) } } // M3 Indicator, M3 Text
+                                        currentErrorMessageForPanel != null -> { androidx.compose.material3.Text( text = currentErrorMessageForPanel ?: "Unknown Error", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
+                                        currentClientForPanel != null && currentResourceType != null -> {
+                                            // Отримуємо список та заголовки
+                                            val itemsToShow: List<HasMetadata> = remember(currentResourceType, namespacesList, nodesList, podsList, deploymentsList, statefulSetsList, daemonSetsList, replicaSetsList, jobsList, cronJobsList, servicesList, ingressesList, pvsList, pvcsList, storageClassesList, configMapsList, secretsList, serviceAccountsList, rolesList, roleBindingsList, clusterRolesList, clusterRoleBindingsList ) {
+                                                when (currentResourceType) {
+                                                    "Namespaces" -> namespacesList; "Nodes" -> nodesList; "Pods" -> podsList; "Deployments" -> deploymentsList; "StatefulSets" -> statefulSetsList; "DaemonSets" -> daemonSetsList; "ReplicaSets" -> replicaSetsList; "Jobs" -> jobsList; "CronJobs" -> cronJobsList; "Services" -> servicesList; "Ingresses" -> ingressesList; "PersistentVolumes" -> pvsList; "PersistentVolumeClaims" -> pvcsList; "StorageClasses" -> storageClassesList; "ConfigMaps" -> configMapsList; "Secrets" -> secretsList; "ServiceAccounts" -> serviceAccountsList; "Roles" -> rolesList; "RoleBindings" -> roleBindingsList; "ClusterRoles" -> clusterRolesList; "ClusterRoleBindings" -> clusterRoleBindingsList
+                                                    else -> emptyList()
                                                 }
                                             }
-                                        } else { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Не вдалося визначити колонки для '$currentResourceType'") } } // M3 Text
+                                            val headers = remember(currentResourceType) { getHeadersForType(currentResourceType) }
+
+                                            if (itemsToShow.isEmpty() && !isLoading) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Немає ресурсів типу '$currentResourceType'") } } // M3 Text
+                                            else if (headers.isNotEmpty()) {
+                                                // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
+                                                Column(modifier = Modifier.fillMaxSize()) {
+                                                    KubeTableHeaderRow(headers = headers) // Використовуємо M3 хедер
+                                                    Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
+
+                                                    LazyColumn(modifier = Modifier.weight(1f)) {
+                                                        items(itemsToShow) { item ->
+                                                            KubeTableRow(
+                                                                item = item, headers = headers, resourceType = currentResourceType,
+                                                                onRowClick = { clickedItem ->
+                                                                    detailedResource = clickedItem; detailedResourceType = currentResourceType;
+                                                                    showLogViewer.value = false; logViewerParams.value = null // Скидаємо логи
+                                                                }
+                                                            )
+                                                            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) // M3 Divider
+                                                        }
+                                                    }
+                                                }
+                                            } else { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Немає колонок для '$currentResourceType'") } } // M3 Text
+                                        }
+                                        // --- Стани за замовчуванням (M3 Text) ---
+                                        activeClient != null -> { androidx.compose.material3.Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
+                                        else -> { androidx.compose.material3.Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
                                     }
-                                    // Стани за замовчуванням (M3 Text)
-                                    activeClient != null -> { Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
-                                    else -> { Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
-                                }
-                            } // Кінець Box вмісту
-                        } // Кінець else showDetails
+                                } // Кінець table case
+                            } // Кінець when(currentView)
+                        } // Кінець Box вмісту
                     } // Кінець Column правої панелі
                 } // Кінець Row
                 // --- Статус-бар ---
                 Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = connectionStatus, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall); if (isLoading) { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } // Явний M3 Text, M3 Indicator
+                    androidx.compose.material3.Text(text = connectionStatus, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall); if (isLoading) { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } // Явний M3 Text, M3 Indicator
                 }
                 // ---------------
             } // Кінець Column
         } // Кінець Surface M3
     } // Кінець MaterialTheme M3
 }
+// --- END OF fun App() ---
 
 
 // --- Composable для дерева ресурсів (M3 Text/Icon) ---
