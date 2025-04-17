@@ -1397,10 +1397,7 @@ fun App() {
         } // Кінець Surface M3
     } // Кінець MaterialTheme M3
 }
-// --- END OF fun App() ---
 
-
-// --- Composable для дерева ресурсів (M3 Text/Icon) ---
 @Composable
 fun ResourceTreeView(
     rootIds: List<String>,
@@ -1464,9 +1461,7 @@ fun ResourceTreeNode(
         }
     }
 }
-// ---
 
-// --- Головна функція ---
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager - Material 3 Fixed") { App() }
+    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager") { App() }
 }
