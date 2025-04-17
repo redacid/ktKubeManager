@@ -419,7 +419,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Button(onClick = {
                 when (containers.size) {
-                    0 -> logger.warn("Под ${pod.metadata?.name} не має контейнерів.")
+                    0 -> logger.warn("Под ${pod.metadata?.name} немає контейнерів.")
                     1 -> onShowLogsRequest(containers.first().name)
                     else -> showContainerDialog.value = true
                 }
@@ -561,7 +561,7 @@ fun SecretDetailsView(secret: Secret) {
 
                     // Значення (закодоване або декодоване)
                     Text(
-                        text = if (isDecoded) decodedValue else "Encoded value (click icons to decode/copy)",
+                        text = if (isDecoded) decodedValue else encodedValue,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
