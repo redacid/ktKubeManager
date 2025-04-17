@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
+//import androidx.compose.material3.ExposedDropdownMenuBoxScope.menuAnchor
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,8 +25,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.Copy
+import compose.icons.feathericons.Eye
+import compose.icons.feathericons.EyeOff
 // Fabric8
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
@@ -516,15 +522,196 @@ fun ServiceDetailsView(svc: Service) {
 }
 @Composable
 fun SecretDetailsView(secret: Secret) {
-    Column {
-        DetailRow("Name", secret.metadata?.name)
-        DetailRow("Namespace", secret.metadata?.namespace)
-        DetailRow("Created", formatAge(secret.metadata?.creationTimestamp))
-        DetailRow("Type", secret.type)
-        DetailRow("Data Keys", formatDataKeys(secret.data, secret.stringData))
-        // НЕ показуємо вміст секретів
+    // Для відображення сповіщення про копіювання
+    val snackbarHostState = remember { SnackbarHostState() }
+    // Корутин скоуп для показу снекбара
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            DetailRow("Name", secret.metadata?.name)
+            DetailRow("Namespace", secret.metadata?.namespace)
+            DetailRow("Created", formatAge(secret.metadata?.creationTimestamp))
+            DetailRow("Type", secret.type)
+
+            // Заголовок секції Data
+            Text(
+                text = "Secret Data:",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            // Відображення ключів та їх значень
+            secret.data?.forEach { (key, encodedValue) ->
+                var isDecoded by remember { mutableStateOf(false) }
+                var decodedValue by remember { mutableStateOf("") }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Ключ
+                    Text(
+                        text = "$key:",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.width(150.dp)
+                    )
+
+                    // Значення (закодоване або декодоване)
+                    Text(
+                        text = if (isDecoded) decodedValue else "Encoded value (click icons to decode/copy)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Іконка для копіювання
+                    IconButton(
+                        onClick = {
+                            val textToCopy = if (isDecoded) decodedValue else encodedValue
+                            try {
+                                // Копіюємо текст в буфер обміну
+                                val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                val selection = java.awt.datatransfer.StringSelection(textToCopy)
+                                clipboard.setContents(selection, null)
+
+                                // Показуємо сповіщення про успішне копіювання
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Value for '$key' copied to clipboard",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                // Сповіщаємо про помилку
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Error copying: ${e.message}",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Copy,
+                            contentDescription = "Copy value",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Іконка для декодування/кодування
+                    IconButton(
+                        onClick = {
+                            if (!isDecoded) {
+                                try {
+                                    // Декодуємо з Base64
+                                    decodedValue = String(java.util.Base64.getDecoder().decode(encodedValue))
+                                    isDecoded = true
+                                } catch (e: Exception) {
+                                    decodedValue = "Error decoding: ${e.message}"
+                                    isDecoded = true
+                                }
+                            } else {
+                                // Повертаємося в закодований вигляд
+                                isDecoded = false
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isDecoded) FeatherIcons.EyeOff else FeatherIcons.Eye,
+                            contentDescription = if (isDecoded) "Hide decoded value" else "Decode value",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            // Відображення stringData (незакодовані значення)
+            secret.stringData?.let { stringData ->
+                if (stringData.isNotEmpty()) {
+                    Text(
+                        text = "String Data (not encoded):",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                    )
+
+                    stringData.forEach { (key, value) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "$key:",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.width(150.dp)
+                            )
+
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            // Іконка для копіювання stringData
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                        val selection = java.awt.datatransfer.StringSelection(value)
+                                        clipboard.setContents(selection, null)
+
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Value for '$key' copied to clipboard",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Error copying: ${e.message}",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                        }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Copy,
+                                    contentDescription = "Copy value",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Якщо немає даних в секреті
+            if ((secret.data == null || secret.data!!.isEmpty()) &&
+                (secret.stringData == null || secret.stringData!!.isEmpty())) {
+                Text(
+                    text = "No data in this Secret",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+        }
+
+        // Snackbar для відображення сповіщень
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
+
 @Composable
 fun ConfigMapDetailsView(cm: ConfigMap) {
     Column {
@@ -677,7 +864,7 @@ fun LogViewerPanel(
 
         val logLoadingJob: kotlinx.coroutines.Job = coroutineScope.launch {
             var initialLogLoadError: Exception? = null
-            var watch: LogWatch? = null
+            var watch: LogWatch?
             var followJob: kotlinx.coroutines.Job? = null
 
             try {
@@ -902,21 +1089,74 @@ fun App() {
                             else if (!isLoading && contexts.isEmpty()) { Text(errorMessage ?: "Контексти не знайдено", modifier = Modifier.align(Alignment.Center)) } // M3 Text
                             else {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(contexts) { contextName ->
-                                        Text(text = formatContextNameForDisplay(contextName), modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
-                                            if (selectedContext != contextName) {
-                                                logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
-                                                coroutineScope.launch {
-                                                    isLoading = true; connectionStatus = "Підключення до '$contextName'..."; activeClient?.close(); activeClient = null; selectedResourceType = null; clearResourceLists(); resourceLoadError = null; errorMessage = null; detailedResource = null; detailedResourceType = null; showLogViewer.value = false; logViewerParams.value = null; // Скидаємо все
-                                                    val connectionResult = connectWithRetries(contextName)
-                                                    isLoading = false
-
-                                                    connectionResult.onSuccess { (newClient, serverVersion) -> activeClient = newClient; selectedContext = contextName; connectionStatus = "Підключено до: $contextName (v$serverVersion)"; errorMessage = null; logger.info("UI State updated on Success for $contextName") }
-                                                        .onFailure { error -> connectionStatus = "Помилка підключення до '$contextName'"; errorMessage = error.localizedMessage ?: "Невід. помилка"; logger.info("Setting up error dialog for: $contextName. Error: ${error.message}"); dialogErrorMessage.value = "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"; showErrorDialog.value = true; activeClient = null; selectedContext = null }
-                                                    logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
+                                    items(contexts) { contextName -> 
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable(enabled = !isLoading) {
+                                                    if (selectedContext != contextName) {
+                                                        logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
+                                                        coroutineScope.launch {
+                                                            isLoading = true
+                                                            connectionStatus = "Підключення до '$contextName'..."
+                                                            activeClient?.close()
+                                                            activeClient = null
+                                                            selectedResourceType = null
+                                                            clearResourceLists()
+                                                            resourceLoadError = null
+                                                            errorMessage = null
+                                                            detailedResource = null
+                                                            detailedResourceType = null
+                                                            showLogViewer.value = false
+                                                            logViewerParams.value = null // Скидаємо все
+                                                            
+                                                            val connectionResult = connectWithRetries(contextName)
+                                                            isLoading = false
+                                
+                                                            connectionResult.onSuccess { (newClient, serverVersion) -> 
+                                                                    activeClient = newClient
+                                                                    selectedContext = contextName
+                                                                    connectionStatus = "Підключено до: $contextName (v$serverVersion)"
+                                                                    errorMessage = null
+                                                                    logger.info("UI State updated on Success for $contextName") 
+                                                                }
+                                                                .onFailure { error -> 
+                                                                    connectionStatus = "Помилка підключення до '$contextName'"
+                                                                    errorMessage = error.localizedMessage ?: "Невід. помилка"
+                                                                    logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
+                                                                    dialogErrorMessage.value = "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"
+                                                                    showErrorDialog.value = true
+                                                                    activeClient = null
+                                                                    selectedContext = null 
+                                                                }
+                                                            logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
+                                                        }
+                                                    }
                                                 }
-                                            }
-                                        }.padding(8.dp), color = if (contextName == selectedContext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) // M3 Text, M3 colorScheme
+                                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                        ) {
+                                            // Додаємо іконку
+                                            Icon(
+                                                imageVector = Icons.Default.Home, // Ви можете змінити цю іконку на іншу
+                                                contentDescription = "Kubernetes Context",
+                                                tint = if (contextName == selectedContext) 
+                                                    MaterialTheme.colorScheme.primary 
+                                                else 
+                                                    MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(20.dp).padding(end = 8.dp)
+                                            )
+                                            
+                                            // Текст після іконки
+                                            Text(
+                                                text = formatContextNameForDisplay(contextName),
+                                                fontSize = 14.sp,
+                                                color = if (contextName == selectedContext) 
+                                                    MaterialTheme.colorScheme.primary 
+                                                else 
+                                                    MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -964,7 +1204,7 @@ fun App() {
                                             }
                                             // Оновлюємо статус після завершення
                                             if (loadOk) { connectionStatus = "Завантажено $nodeId ${ if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else "" }" }
-                                            else { resourceLoadError = "Помилка $nodeId: ${errorMsg}"; connectionStatus = "Помилка $nodeId" }
+                                            else { resourceLoadError = "Помилка $nodeId: $errorMsg"; connectionStatus = "Помилка $nodeId" }
                                             isLoading = false
                                         }
                                     } else if (activeClient == null) { logger.warn("Немає підключення."); connectionStatus = "Підключіться до кластера!"; selectedResourceType = null }
@@ -1047,7 +1287,7 @@ fun App() {
                                                                 else -> { loadOk = false; errorMsg = "Фільтр не застосовується" }
                                                             }
                                                             if (loadOk) { connectionStatus = "Завантажено $selectedResourceType ${ if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else "" }" }
-                                                            else { resourceLoadError = "Помилка $selectedResourceType: ${errorMsg}"; connectionStatus = "Помилка $selectedResourceType" }
+                                                            else { resourceLoadError = "Помилка $selectedResourceType: $errorMsg"; connectionStatus = "Помилка $selectedResourceType" }
                                                             isLoading = false
                                                         }
                                                     }
@@ -1105,7 +1345,7 @@ fun App() {
                                     val currentClientForPanel = activeClient
                                     when {
                                         isLoading -> { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) { CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text(connectionStatus) } } // M3 Indicator, M3 Text
-                                        currentErrorMessageForPanel != null -> { androidx.compose.material3.Text( text = currentErrorMessageForPanel ?: "Unknown Error", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
+                                        currentErrorMessageForPanel != null -> { androidx.compose.material3.Text( text = currentErrorMessageForPanel, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
                                         currentClientForPanel != null && currentResourceType != null -> {
                                             // Отримуємо список та заголовки
                                             val itemsToShow: List<HasMetadata> = remember(currentResourceType, namespacesList, nodesList, podsList, deploymentsList, statefulSetsList, daemonSetsList, replicaSetsList, jobsList, cronJobsList, servicesList, ingressesList, pvsList, pvcsList, storageClassesList, configMapsList, secretsList, serviceAccountsList, rolesList, roleBindingsList, clusterRolesList, clusterRoleBindingsList ) {
