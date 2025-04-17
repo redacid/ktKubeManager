@@ -79,6 +79,23 @@ const val LOG_LINES_TO_TAIL = 500
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
 
 // --- Допоміжні функції форматування ---
+fun formatContextNameForDisplay(contextName: String): String {
+    // Регулярний вираз для AWS EKS ARN
+    val eksArnPattern = "arn:aws:eks:[a-z0-9-]+:([0-9]+):cluster/([a-zA-Z0-9-]+)".toRegex()
+
+    val matchResult = eksArnPattern.find(contextName)
+
+    return if (matchResult != null) {
+        // Групи: 1 - account ID, 2 - cluster name
+        val accountId = matchResult.groupValues[1]
+        val clusterName = matchResult.groupValues[2]
+        "$accountId:$clusterName"
+    } else {
+        // Повертаємо оригінальне ім'я, якщо не відповідає формату AWS EKS ARN
+        contextName
+    }
+}
+
 fun formatAge(creationTimestamp: String?): String {
     if (creationTimestamp.isNullOrBlank()) return "N/A"
     try {
@@ -824,7 +841,7 @@ fun App() {
         var loadError: Exception? = null
         var loadedContextNames: List<String> = emptyList()
         try {
-            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) { // Чи компілюється це?
+            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
                 val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
                 val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
@@ -886,7 +903,7 @@ fun App() {
                             else {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                                     items(contexts) { contextName ->
-                                        Text(text = contextName, modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
+                                        Text(text = formatContextNameForDisplay(contextName), modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
                                             if (selectedContext != contextName) {
                                                 logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
                                                 coroutineScope.launch {
