@@ -15,23 +15,20 @@ import androidx.compose.foundation.VerticalScrollbar // Для Scrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter // Для Scrollbar
 // --- ТІЛЬКИ Імпорти MATERIAL 3 ---
 import androidx.compose.material3.HorizontalDivider as Divider // M3 Divider
-//import androidx.compose.material3.LocalContentColor // M3 LocalContentColor
-//import androidx.compose.material3.OutlinedTextField // M3 TextField
 // ---------------------------------
 import androidx.compose.material.icons.Icons // Іконки залишаються ті ж
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
+//import androidx.compose.material3.Divider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-//import androidx.compose.ui.graphics.Color // Залишається Compose Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-//import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 // Fabric8
@@ -71,10 +68,10 @@ val resourceLeafNodes: Set<String> = setOf(
     "Services", "Ingresses", "PersistentVolumes", "PersistentVolumeClaims", "StorageClasses", "ConfigMaps", "Secrets",
     "ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"
 )
-// ------------------------------------------------
-
+// Мапа для визначення, чи є ресурс неймспейсним (спрощено)
+val namespacedResources: Set<String> = resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings")
 // Логер
-private val logger = LoggerFactory.getLogger("MainKtM3Final")
+private val logger = LoggerFactory.getLogger("MainKtNamespaceFilter")
 
 // --- Константи ---
 const val MAX_CONNECT_RETRIES = 1
@@ -84,6 +81,7 @@ const val REQUEST_TIMEOUT_MS = 15000
 //const val FABRIC8_VERSION = "6.13.5"
 const val LOG_LINES_TO_TAIL = 500
 // ---
+const val ALL_NAMESPACES_OPTION = "<All Namespaces>" // Опція для вибору всіх неймспейсів
 
 // --- Допоміжні функції форматування ---
 fun formatAge(creationTimestamp: String?): String {
@@ -199,50 +197,53 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 suspend fun <T> fetchK8sResource(
     client: KubernetesClient?,
     resourceType: String,
-    apiCall: suspend (KubernetesClient) -> List<T>?
+    namespace: String?, // Додано параметр неймспейсу
+    apiCall: (KubernetesClient, String?) -> List<T>? // Лямбда тепер приймає клієнт і неймспейс
 ): Result<List<T>> {
     if (client == null) return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
-    logger.info("Завантаження списку $resourceType (Fabric8)...")
+    val targetNamespace = if (namespace == ALL_NAMESPACES_OPTION) null else namespace
+    val nsLog = targetNamespace ?: "all"
+    logger.info("Завантаження списку $resourceType (Namespace: $nsLog)...")
     return try {
-        val items = withContext(Dispatchers.IO) { // Сподіваємось компілюється
-            logger.info("[IO] Виклик API для $resourceType...")
-            apiCall(client) ?: emptyList()
+        val items = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            logger.info("[IO] Виклик API для $resourceType (Namespace: $nsLog)...")
+            apiCall(client, targetNamespace) ?: emptyList() // Передаємо неймспейс у лямбду
         }
-        logger.info("Завантажено ${items.size} $resourceType.")
+        logger.info("Завантажено ${items.size} $resourceType (Namespace: $nsLog).")
         try {
-            //@Suppress("UNCHECKED_CAST")
+            @Suppress("UNCHECKED_CAST")
             val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
             Result.success(sortedItems)
         } catch (e: Exception) {
             logger.warn("Не вдалося сортувати $resourceType: ${e.message}")
             Result.success(items)
         }
-    } catch (e: KubernetesClientException) { logger.error("KubernetesClientException $resourceType: ${e.message}", e); Result.failure(e) }
-    catch (e: Exception) { logger.error("Загальна помилка $resourceType: ${e.message}", e); Result.failure(e) }
+    } catch (e: KubernetesClientException) { logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e) }
+    catch (e: Exception) { logger.error("Помилка $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e) }
 }
 
-suspend fun loadNamespacesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Namespaces") { it.namespaces().list().items }
-suspend fun loadNodesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Nodes") { it.nodes().list().items }
-suspend fun loadPodsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Pods") { it.pods().inAnyNamespace().list().items }
-suspend fun loadDeploymentsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Deployments") { it.apps().deployments().inAnyNamespace().list().items }
-suspend fun loadStatefulSetsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "StatefulSets") { it.apps().statefulSets().inAnyNamespace().list().items }
-suspend fun loadDaemonSetsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "DaemonSets") { it.apps().daemonSets().inAnyNamespace().list().items }
-suspend fun loadReplicaSetsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ReplicaSets") { it.apps().replicaSets().inAnyNamespace().list().items }
-suspend fun loadJobsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Jobs") { it.batch().v1().jobs().inAnyNamespace().list().items }
-suspend fun loadCronJobsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "CronJobs") { it.batch().v1().cronjobs().inAnyNamespace().list().items }
-suspend fun loadServicesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Services") { it.services().inAnyNamespace().list().items }
-suspend fun loadIngressesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Ingresses") { it.network().v1().ingresses().inAnyNamespace().list().items }
-suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumes") { it.persistentVolumes().list().items }
-suspend fun loadPVCsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumeClaims") { it.persistentVolumeClaims().inAnyNamespace().list().items }
-suspend fun loadStorageClassesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "StorageClasses") { it.storage().v1().storageClasses().list().items }
-suspend fun loadConfigMapsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ConfigMaps") { it.configMaps().inAnyNamespace().list().items }
-suspend fun loadSecretsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Secrets") { it.secrets().inAnyNamespace().list().items }
-suspend fun loadServiceAccountsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ServiceAccounts") { it.serviceAccounts().inAnyNamespace().list().items }
-suspend fun loadRolesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Roles") { it.rbac().roles().inAnyNamespace().list().items }
-suspend fun loadRoleBindingsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "RoleBindings") { it.rbac().roleBindings().inAnyNamespace().list().items }
-suspend fun loadClusterRolesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoles") { it.rbac().clusterRoles().list().items }
-suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoleBindings") { it.rbac().clusterRoleBindings().list().items }
-// ---
+suspend fun loadNamespacesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Namespaces", null) { cl, _ -> cl.namespaces().list().items } // Namespaces не фільтруються
+suspend fun loadNodesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Nodes", null) { cl, _ -> cl.nodes().list().items } // Nodes не фільтруються
+suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Pods", namespace) { cl, ns -> if (ns == null) cl.pods().inAnyNamespace().list().items else cl.pods().inNamespace(ns).list().items }
+suspend fun loadDeploymentsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Deployments", namespace) { cl, ns -> if (ns == null) cl.apps().deployments().inAnyNamespace().list().items else cl.apps().deployments().inNamespace(ns).list().items }
+// ... і так далі для всіх інших типів ресурсів ...
+suspend fun loadStatefulSetsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "StatefulSets", namespace) { cl, ns -> if(ns == null) cl.apps().statefulSets().inAnyNamespace().list().items else cl.apps().statefulSets().inNamespace(ns).list().items }
+suspend fun loadDaemonSetsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "DaemonSets", namespace) { cl, ns -> if(ns == null) cl.apps().daemonSets().inAnyNamespace().list().items else cl.apps().daemonSets().inNamespace(ns).list().items }
+suspend fun loadReplicaSetsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "ReplicaSets", namespace) { cl, ns -> if(ns == null) cl.apps().replicaSets().inAnyNamespace().list().items else cl.apps().replicaSets().inNamespace(ns).list().items }
+suspend fun loadJobsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Jobs", namespace) { cl, ns -> if(ns == null) cl.batch().v1().jobs().inAnyNamespace().list().items else cl.batch().v1().jobs().inNamespace(ns).list().items }
+suspend fun loadCronJobsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "CronJobs", namespace) { cl, ns -> if(ns == null) cl.batch().v1().cronjobs().inAnyNamespace().list().items else cl.batch().v1().cronjobs().inNamespace(ns).list().items }
+suspend fun loadServicesFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Services", namespace) { cl, ns -> if(ns == null) cl.services().inAnyNamespace().list().items else cl.services().inNamespace(ns).list().items }
+suspend fun loadIngressesFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Ingresses", namespace) { cl, ns -> if(ns == null) cl.network().v1().ingresses().inAnyNamespace().list().items else cl.network().v1().ingresses().inNamespace(ns).list().items }
+suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumes", null) { cl, _ -> cl.persistentVolumes().list().items } // Cluster-scoped
+suspend fun loadPVCsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "PersistentVolumeClaims", namespace) { cl, ns -> if(ns == null) cl.persistentVolumeClaims().inAnyNamespace().list().items else cl.persistentVolumeClaims().inNamespace(ns).list().items }
+suspend fun loadStorageClassesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "StorageClasses", null) { cl, _ -> cl.storage().v1().storageClasses().list().items } // Cluster-scoped
+suspend fun loadConfigMapsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "ConfigMaps", namespace) { cl, ns -> if(ns == null) cl.configMaps().inAnyNamespace().list().items else cl.configMaps().inNamespace(ns).list().items }
+suspend fun loadSecretsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Secrets", namespace) { cl, ns -> if(ns == null) cl.secrets().inAnyNamespace().list().items else cl.secrets().inNamespace(ns).list().items }
+suspend fun loadServiceAccountsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "ServiceAccounts", namespace) { cl, ns -> if(ns == null) cl.serviceAccounts().inAnyNamespace().list().items else cl.serviceAccounts().inNamespace(ns).list().items }
+suspend fun loadRolesFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Roles", namespace) { cl, ns -> if(ns == null) cl.rbac().roles().inAnyNamespace().list().items else cl.rbac().roles().inNamespace(ns).list().items }
+suspend fun loadRoleBindingsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "RoleBindings", namespace) { cl, ns -> if(ns == null) cl.rbac().roleBindings().inAnyNamespace().list().items else cl.rbac().roleBindings().inNamespace(ns).list().items }
+suspend fun loadClusterRolesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoles", null) { cl, _ -> cl.rbac().clusterRoles().list().items } // Cluster-scoped
+suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoleBindings", null) { cl, _ -> cl.rbac().clusterRoleBindings().list().items } // Cluster-scoped
 
 // --- Функція підключення з ретраями (використовує Config.autoConfigure(contextName)) ---
 suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
@@ -789,6 +790,7 @@ fun LogViewerPanel(
 // ===
 
 // --- START OF fun App() ---
+@OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
 @Composable
 @Preview
 fun App() {
@@ -834,7 +836,10 @@ fun App() {
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
     // ---
-
+    // --- НОВІ СТАНИ ДЛЯ ФІЛЬТРА ---
+    var allNamespaces by remember { mutableStateOf<List<String>>(listOf(ALL_NAMESPACES_OPTION)) }
+    var selectedNamespaceFilter by remember { mutableStateOf(ALL_NAMESPACES_OPTION) }
+    var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     // --- Функція для очищення всіх списків ресурсів ---
@@ -862,7 +867,32 @@ fun App() {
         finally { if (loadError != null) { errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження" }; isLoading = false }
     }
     // --- Кінець LaunchedEffect ---
-
+    // --- Завантаження неймспейсів ПІСЛЯ успішного підключення ---
+    LaunchedEffect(activeClient) {
+        if (activeClient != null) {
+            logger.info("Client connected, fetching all namespaces for filter...")
+            isLoading = true // Можна використовувати інший індикатор або оновити статус
+            connectionStatus = "Завантаження просторів імен..."
+            val nsResult = loadNamespacesFabric8(activeClient) // Викликаємо завантаження
+            nsResult.onSuccess { loadedNs ->
+                // Додаємо опцію "All" і сортуємо
+                allNamespaces = (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(
+                    compareBy { it != ALL_NAMESPACES_OPTION } // "<All>" завжди зверху
+                )
+                connectionStatus = "Підключено до: $selectedContext" // Повертаємо статус
+                logger.info("Loaded ${allNamespaces.size - 1} namespaces for filter.")
+            }.onFailure {
+                logger.error("Failed to load namespaces for filter: ${it.message}")
+                connectionStatus = "Помилка завантаження неймспейсів"
+                // Не скидаємо allNamespaces, щоб залишилась хоча б опція "All"
+            }
+            isLoading = false
+        } else {
+            // Якщо клієнт відключився, скидаємо список неймспейсів (крім All) і фільтр
+            allNamespaces = listOf(ALL_NAMESPACES_OPTION)
+            selectedNamespaceFilter = ALL_NAMESPACES_OPTION
+        }
+    }
     // --- Діалогове вікно помилки (M3) ---
     if (showErrorDialog.value) {
         AlertDialog( // M3 AlertDialog
@@ -917,34 +947,38 @@ fun App() {
                                         connectionStatus = "Завантаження $nodeId..."; isLoading = true
                                         coroutineScope.launch {
                                             var loadOk = false; var errorMsg: String? = null
+                                            val currentFilter = selectedNamespaceFilter // Беремо поточне значення фільтра
+
+                                            // Визначаємо, чи ресурс неймспейсний, щоб знати, чи передавати фільтр
+                                            val namespaceToUse = if (namespacedResources.contains(nodeId)) currentFilter else null
                                             // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
                                             when (nodeId) {
                                                 "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 "Nodes" -> loadNodesFabric8(activeClient).onSuccess { nodesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Pods" -> loadPodsFabric8(activeClient).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Deployments" -> loadDeploymentsFabric8(activeClient).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "StatefulSets" -> loadStatefulSetsFabric8(activeClient).onSuccess { statefulSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "DaemonSets" -> loadDaemonSetsFabric8(activeClient).onSuccess { daemonSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ReplicaSets" -> loadReplicaSetsFabric8(activeClient).onSuccess { replicaSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Jobs" -> loadJobsFabric8(activeClient).onSuccess { jobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "CronJobs" -> loadCronJobsFabric8(activeClient).onSuccess { cronJobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Services" -> loadServicesFabric8(activeClient).onSuccess { servicesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Ingresses" -> loadIngressesFabric8(activeClient).onSuccess { ingressesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Deployments" -> loadDeploymentsFabric8(activeClient, namespaceToUse).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "StatefulSets" -> loadStatefulSetsFabric8(activeClient, namespaceToUse).onSuccess { statefulSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "DaemonSets" -> loadDaemonSetsFabric8(activeClient, namespaceToUse).onSuccess { daemonSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "ReplicaSets" -> loadReplicaSetsFabric8(activeClient, namespaceToUse).onSuccess { replicaSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Jobs" -> loadJobsFabric8(activeClient, namespaceToUse).onSuccess { jobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "CronJobs" -> loadCronJobsFabric8(activeClient, namespaceToUse).onSuccess { cronJobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Services" -> loadServicesFabric8(activeClient, namespaceToUse).onSuccess { servicesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Ingresses" -> loadIngressesFabric8(activeClient, namespaceToUse).onSuccess { ingressesList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess { pvsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient).onSuccess { pvcsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient, namespaceToUse).onSuccess { pvcsList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 "StorageClasses" -> loadStorageClassesFabric8(activeClient).onSuccess { storageClassesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ConfigMaps" -> loadConfigMapsFabric8(activeClient).onSuccess { configMapsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Secrets" -> loadSecretsFabric8(activeClient).onSuccess { secretsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ServiceAccounts" -> loadServiceAccountsFabric8(activeClient).onSuccess { serviceAccountsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Roles" -> loadRolesFabric8(activeClient).onSuccess { rolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "RoleBindings" -> loadRoleBindingsFabric8(activeClient).onSuccess { roleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "ConfigMaps" -> loadConfigMapsFabric8(activeClient, namespaceToUse).onSuccess { configMapsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Secrets" -> loadSecretsFabric8(activeClient, namespaceToUse).onSuccess { secretsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "ServiceAccounts" -> loadServiceAccountsFabric8(activeClient, namespaceToUse).onSuccess { serviceAccountsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "Roles" -> loadRolesFabric8(activeClient, namespaceToUse).onSuccess { rolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                "RoleBindings" -> loadRoleBindingsFabric8(activeClient, namespaceToUse).onSuccess { roleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 "ClusterRoles" -> loadClusterRolesFabric8(activeClient).onSuccess { clusterRolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess { clusterRoleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
                                                 else -> { logger.warn("Обробник '$nodeId' не реалізовано."); loadOk = false; errorMsg = "Не реалізовано" }
                                             }
                                             // Оновлюємо статус після завершення
-                                            if (loadOk) { connectionStatus = "Завантажено $nodeId" }
-                                            else { resourceLoadError = "Помилка завантаження $nodeId: ${errorMsg ?: "Невід. помилка"}"; connectionStatus = "Помилка завантаження $nodeId" }
+                                            if (loadOk) { connectionStatus = "Завантажено $nodeId ${ if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else "" }" }
+                                            else { resourceLoadError = "Помилка $nodeId: ${errorMsg}"; connectionStatus = "Помилка $nodeId" }
                                             isLoading = false
                                         }
                                     } else if (activeClient == null) { logger.warn("Немає підключення."); connectionStatus = "Підключіться до кластера!"; selectedResourceType = null }
@@ -978,7 +1012,71 @@ fun App() {
                             currentView == "table" && currentResourceType != null && activeClient != null && resourceLoadError == null && errorMessage == null -> "$currentResourceType у $selectedContext"
                             else -> null
                         }
-                        if (headerTitle != null) {
+
+                        // --- ДОДАНО ФІЛЬТР НЕЙМСПЕЙСІВ (якщо є клієнт і це не деталі/логи) ---
+                        if (currentView == "table" && activeClient != null) {
+                            val isFilterEnabled = namespacedResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                            ExposedDropdownMenuBox(
+                                expanded = isNamespaceDropdownExpanded,
+                                onExpandedChange = { if (isFilterEnabled) isNamespaceDropdownExpanded = it },
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                            ) {
+                                TextField( // M3 TextField
+                                    value = selectedNamespaceFilter,
+                                    onValueChange = {}, // ReadOnly
+                                    readOnly = true,
+                                    label = { Text("Namespace Filter") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
+                                    modifier = Modifier.menuAnchor().fillMaxWidth(), // menuAnchor для M3
+                                    enabled = isFilterEnabled, // Вимикаємо для кластерних ресурсів
+                                    colors = ExposedDropdownMenuDefaults.textFieldColors() // M3 кольори
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = isNamespaceDropdownExpanded,
+                                    onDismissRequest = { isNamespaceDropdownExpanded = false }
+                                ) {
+                                    allNamespaces.forEach { nsName ->
+                                        DropdownMenuItem(
+                                            text = { Text(nsName) },
+                                            onClick = {
+                                                if (selectedNamespaceFilter != nsName) {
+                                                    selectedNamespaceFilter = nsName
+                                                    isNamespaceDropdownExpanded = false
+                                                    // Перезавантаження даних спрацює через LaunchedEffect в onNodeClick,
+                                                    // але нам треба його "тригернути", якщо тип ресурсу вже вибрано.
+                                                    // Найпростіше - знову викликати логіку завантаження поточного ресурсу
+                                                    if (selectedResourceType != null) {
+                                                        // Повторно викликаємо ту саму логіку, що й у onNodeClick
+                                                        resourceLoadError = null; clearResourceLists()
+                                                        connectionStatus = "Завантаження $selectedResourceType (фільтр)..."; isLoading = true
+                                                        coroutineScope.launch {
+                                                            var loadOk = false; var errorMsg: String? = null
+                                                            val namespaceToUse = if (namespacedResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                            when (selectedResourceType) { // Повторний виклик з новим фільтром
+                                                                "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                                "Deployments" -> loadDeploymentsFabric8(activeClient, namespaceToUse).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                                // ... додати ВСІ неймспейсні ресурси ...
+                                                                "Namespaces" -> { loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message } } // Namespaces не фільтруємо
+                                                                // ... решта ...
+                                                                else -> { loadOk = false; errorMsg = "Фільтр не застосовується" }
+                                                            }
+                                                            if (loadOk) { connectionStatus = "Завантажено $selectedResourceType ${ if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else "" }" }
+                                                            else { resourceLoadError = "Помилка $selectedResourceType: ${errorMsg}"; connectionStatus = "Помилка $selectedResourceType" }
+                                                            isLoading = false
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        // --- КІНЕЦЬ ФІЛЬТРА ---
+
+                        if (headerTitle != null && currentView != "details") {
                             Text(text = headerTitle, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp)) // M3 Text
                             Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
                         } else if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
