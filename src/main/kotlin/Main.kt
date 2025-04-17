@@ -374,7 +374,17 @@ fun DetailRow(label: String, value: String?) {
         )
     }
 }
-
+@Composable
+fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функція для базових метаданих
+    Text("Basic Metadata:", style = MaterialTheme.typography.titleMedium)
+    DetailRow("Name", resource.metadata?.name)
+    DetailRow("Namespace", resource.metadata?.namespace) // Буде null для кластерних ресурсів
+    DetailRow("Created", formatAge(resource.metadata?.creationTimestamp))
+    DetailRow("UID", resource.metadata?.uid)
+    // Можна додати Labels / Annotations за бажанням
+    DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
+    DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
+}
 @Composable
 fun PodDetailsView(pod: Pod) { // Використовує Fabric8 Pod model
     Column {
@@ -502,6 +512,44 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
         DetailRow("Volume Mode", pvc.spec?.volumeMode)
     }
 }
+@Composable
+fun IngressDetailsView(ing: Ingress) {
+    Column {
+        DetailRow("Name", ing.metadata?.name)
+        DetailRow("Namespace", ing.metadata?.namespace)
+        DetailRow("Created", formatAge(ing.metadata?.creationTimestamp))
+        DetailRow("Class", ing.spec?.ingressClassName ?: "<none>")
+        DetailRow("Address", formatIngressAddress(ing.status?.loadBalancer?.ingress))
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Rules:", style = MaterialTheme.typography.titleMedium)
+        ing.spec?.rules?.forEachIndexed { index, rule ->
+            Text("  Rule ${index + 1}: Host: ${rule.host ?: "*"}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+            rule.http?.paths?.forEach { path ->
+                Column(modifier = Modifier.padding(start = 16.dp)) {
+                    DetailRow("    Path", path.path ?: "/")
+                    DetailRow("    Path Type", path.pathType)
+                    DetailRow("    Backend Service", path.backend?.service?.name)
+                    DetailRow("    Backend Port", path.backend?.service?.port?.let { it.name ?: it.number?.toString() })
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+        if (ing.spec?.rules.isNullOrEmpty()) {
+            Text("  <No rules defined>", modifier = Modifier.padding(start = 8.dp))
+        }
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("TLS:", style = MaterialTheme.typography.titleMedium)
+        ing.spec?.tls?.forEach { tls ->
+            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)).padding(4.dp) ) {
+                DetailRow("  Hosts", tls.hosts?.joinToString(", "))
+                DetailRow("  Secret Name", tls.secretName)
+            }
+        }
+        if (ing.spec?.tls.isNullOrEmpty()) {
+            Text("  <No TLS defined>", modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
 
 @Composable
 fun ResourceDetailPanel(
@@ -533,16 +581,13 @@ fun ResourceDetailPanel(
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
                     "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
+                    "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     // TODO: Додати кейси для всіх інших типів ресурсів (StatefulSet, DaemonSet, Role, etc.)
                     else -> {
-                        Text("Detail view for '$resourceType' is not implemented yet.")
+                        Text("Simple detail view for '$resourceType'")
                         if (resource is HasMetadata) {
                             Spacer(Modifier.height(16.dp))
-                            Text("Basic Metadata:", style = MaterialTheme.typography.titleMedium)
-                            DetailRow("Name", resource.metadata?.name)
-                            DetailRow("Namespace", resource.metadata?.namespace)
-                            DetailRow("Created", formatAge(resource.metadata?.creationTimestamp))
-                            DetailRow("UID", resource.metadata?.uid)
+                            BasicMetadataDetails(resource)
                         }
                     }
                 }
