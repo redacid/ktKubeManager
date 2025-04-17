@@ -1,4 +1,3 @@
-// build.gradle.kts (Без Fabric8 KubeConfig Helper)
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 //import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -15,6 +14,7 @@ version = "1.0-SNAPSHOT"
 repositories {
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    maven("https://mvnrepository.com")
     google()
 }
 
@@ -33,6 +33,9 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
+    implementation("br.com.devsrsouza.compose.icons:feather:1.1.1") // https://feathericons.com/
+    implementation("br.com.devsrsouza.compose.icons:simple-icons:1.1.1") // https://simpleicons.org/
+
     testImplementation(kotlin("test"))
 }
 
