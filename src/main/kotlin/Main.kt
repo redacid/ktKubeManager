@@ -399,7 +399,6 @@ fun PodDetailsView(pod: Pod) { // Використовує Fabric8 Pod model
         // TODO: Додати показ Conditions, Volumes, Labels, Annotations і т.д.
     }
 }
-// === ДОДАНО НОВІ ФУНКЦІЇ ДЛЯ ДЕТАЛЕЙ ===
 @Composable
 fun NamespaceDetailsView(ns: Namespace) {
     Column {
@@ -409,7 +408,6 @@ fun NamespaceDetailsView(ns: Namespace) {
         // TODO: Додати Labels/Annotations
     }
 }
-
 @Composable
 fun NodeDetailsView(node: Node) {
     Column {
@@ -427,7 +425,6 @@ fun NodeDetailsView(node: Node) {
         // TODO: Додати Capacity/Allocatable, Conditions
     }
 }
-
 @Composable
 fun DeploymentDetailsView(dep: Deployment) {
     Column {
@@ -441,7 +438,6 @@ fun DeploymentDetailsView(dep: Deployment) {
         // TODO: Conditions, Selector, Template info
     }
 }
-
 @Composable
 fun ServiceDetailsView(svc: Service) {
     Column {
@@ -455,7 +451,6 @@ fun ServiceDetailsView(svc: Service) {
         DetailRow("Ports", formatPorts(svc.spec?.ports))
     }
 }
-
 @Composable
 fun SecretDetailsView(secret: Secret) {
     Column {
@@ -467,7 +462,6 @@ fun SecretDetailsView(secret: Secret) {
         // НЕ показуємо вміст секретів
     }
 }
-
 @Composable
 fun ConfigMapDetailsView(cm: ConfigMap) {
     Column {
@@ -478,7 +472,6 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
         // TODO: Показати ключі? (але не значення, можуть бути великі)
     }
 }
-
 @Composable
 fun PVDetailsView(pv: PersistentVolume) {
     Column {
@@ -494,7 +487,6 @@ fun PVDetailsView(pv: PersistentVolume) {
         // TODO: Source details (NFS, HostPath, etc.)
     }
 }
-
 @Composable
 fun PVCDetailsView(pvc: PersistentVolumeClaim) {
     Column {
@@ -510,8 +502,6 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
         DetailRow("Volume Mode", pvc.spec?.volumeMode)
     }
 }
-
-// ===
 
 @Composable
 fun ResourceDetailPanel(
@@ -533,7 +523,6 @@ fun ResourceDetailPanel(
 
         Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
-                // --- ОНОВЛЕНО: Додано виклики нових DetailsView ---
                 when(resourceType) {
                     "Pods" -> if (resource is Pod) PodDetailsView(pod = resource) else Text("Invalid Pod data")
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
