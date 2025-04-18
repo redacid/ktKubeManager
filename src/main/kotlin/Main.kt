@@ -30,6 +30,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
+import compose.icons.feathericons.Circle
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
@@ -55,6 +56,9 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.time.Duration
 import java.time.OffsetDateTime
+
+
+// TODO: check NS filter for all resources (e.g. Pods)
 
 // --- Дані для дерева ресурсів ---
 val resourceTreeData: Map<String, List<String>> = mapOf(
@@ -713,7 +717,6 @@ fun SecretDetailsView(secret: Secret) {
         )
     }
 }
-
 @Composable
 fun ConfigMapDetailsView(cm: ConfigMap) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -1509,8 +1512,8 @@ fun ResourceTreeNode(
     ) {
         val icon = when {
             !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
-            !isLeaf -> Icons.Filled.Place // Ваша іконка
-            else -> Icons.Filled.Info     // Ваша іконка
+            !isLeaf -> Icons.Filled.Place
+            else -> FeatherIcons.Circle
         }
         Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp)) // M3 Icon
         Spacer(modifier = Modifier.width(4.dp))
