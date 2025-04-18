@@ -578,7 +578,7 @@ fun SecretDetailsView(secret: Secret) {
                         onClick = {
                             val textToCopy = if (isDecoded) decodedValue else encodedValue
                             try {
-                                // Копіюємо текст в буфер обміну
+                                // Копіюємо текст у буфер обміну
                                 val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
                                 val selection = java.awt.datatransfer.StringSelection(textToCopy)
                                 clipboard.setContents(selection, null)
@@ -698,7 +698,7 @@ fun SecretDetailsView(secret: Secret) {
                 }
             }
 
-            // Якщо немає даних в секреті
+            // Якщо немає даних у секреті
             if ((secret.data == null || secret.data!!.isEmpty()) &&
                 (secret.stringData == null || secret.stringData!!.isEmpty())) {
                 Text(
@@ -885,7 +885,7 @@ fun ResourceDetailPanel(
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
         // ---
 
-        // --- Вміст деталей ---
+        // --- Уміст деталей ---
         Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 // --- Виклик відповідного DetailsView ---
@@ -1247,7 +1247,7 @@ fun App() {
             }.onFailure {
                 logger.error("Failed to load namespaces for filter: ${it.message}")
                 connectionStatus = "Помилка завантаження неймспейсів"
-                // Не скидаємо allNamespaces, щоб залишилась хоча б опція "All"
+                // Не скидаємо allNamespaces, щоб залишилася хоча б опція "All"
             }
             isLoading = false
         } else {
@@ -1422,7 +1422,7 @@ fun App() {
                         }
 
                         val currentResourceType = selectedResourceType
-                        // Заголовок для таблиці та логів (для деталей він всередині ResourceDetailPanel)
+                        // Заголовок для таблиці та логів (для деталей він усередині ResourceDetailPanel)
                         val headerTitle = when {
                             currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
                             currentView == "table" && currentResourceType != null && activeClient != null && resourceLoadError == null && errorMessage == null -> "$currentResourceType у $selectedContext"
@@ -1463,7 +1463,7 @@ fun App() {
                                                     // але нам треба його "тригернути", якщо тип ресурсу вже вибрано.
                                                     // Найпростіше - знову викликати логіку завантаження поточного ресурсу
                                                     if (selectedResourceType != null) {
-                                                        // Повторно викликаємо ту саму логіку, що й у onNodeClick
+                                                        // Повторно викликаємо ту саму логіку, що й в onNodeClick
                                                         resourceLoadError = null; clearResourceLists()
                                                         connectionStatus = "Завантаження $selectedResourceType (фільтр)..."; isLoading = true
                                                         coroutineScope.launch {
@@ -1500,7 +1500,7 @@ fun App() {
                             Spacer(modifier = Modifier.height(48.dp)) // Висота імітує заголовок
                         }
 
-                        // --- Основний вміст правої панелі ---
+                        // --- Основний уміст правої панелі ---
                         Box(modifier = Modifier.weight(1f).padding(top = if (headerTitle != null && currentView != "details") 8.dp else 0.dp)) {
                             when(currentView) {
                                 "logs" -> {
