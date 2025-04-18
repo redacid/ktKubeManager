@@ -2534,6 +2534,7 @@ fun LogViewerPanel(
                             ?.inContainer(containerName)
                             ?.sinceSeconds(sinceSeconds)
                             ?.tailingLines(100)
+                            ?.withPrettyOutput()
                             ?.log
                         
                         // Debug log to verify if we're getting logs from Kubernetes
@@ -2553,7 +2554,8 @@ fun LogViewerPanel(
                                 val currentText = logState.value
                                 // Додаємо нові логи до існуючих
                                 val textToAppend = if (currentText.endsWith("\n") || currentText.isEmpty()) newLogs else "\n$newLogs"
-                                val newText = currentText + textToAppend
+                                val separator = "--------------------------------------------------------------------------------------------\n"
+                                val newText = currentText + separator + textToAppend
                                 
                                 // Debug log to track text appending
                                 logger.info("Appending logs - current: ${currentText.length} chars, new: ${newText.length} chars")
@@ -2603,6 +2605,7 @@ fun LogViewerPanel(
                         ?.withName(podName)
                         ?.inContainer(containerName)
                         ?.tailingLines(LOG_LINES_TO_TAIL)
+                        ?.withPrettyOutput()
                         ?.log
                 } ?: "Failed to load logs."
                 
