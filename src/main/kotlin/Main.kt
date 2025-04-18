@@ -511,7 +511,163 @@ fun DeploymentDetailsView(dep: Deployment) {
         DetailRow("Updated", dep.status?.updatedReplicas?.toString())
         DetailRow("Available", dep.status?.availableReplicas?.toString())
         DetailRow("Strategy", dep.spec?.strategy?.type)
-        // TODO: Conditions, Selector, Template info
+
+        // Selector information
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Selector:", style = MaterialTheme.typography.titleMedium)
+        dep.spec?.selector?.matchLabels?.forEach { (key, value) ->
+            DetailRow("  $key", value)
+        }
+        if (dep.spec?.selector?.matchLabels.isNullOrEmpty()) {
+            Text("  (No selector labels)", modifier = Modifier.padding(start = 8.dp))
+        }
+
+        // Conditions
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Conditions:", style = MaterialTheme.typography.titleMedium)
+        dep.status?.conditions?.forEach { condition ->
+            Column(
+                modifier = Modifier
+                    .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    .padding(4.dp)
+            ) {
+                DetailRow("  Type", condition.type)
+                DetailRow("  Status", condition.status)
+                DetailRow("  Reason", condition.reason)
+                DetailRow("  Message", condition.message)
+                DetailRow("  Last Update", formatAge(condition.lastUpdateTime))
+                DetailRow("  Last Transition", formatAge(condition.lastTransitionTime))
+            }
+        }
+        if (dep.status?.conditions.isNullOrEmpty()) {
+            Text("  (No conditions)", modifier = Modifier.padding(start = 8.dp))
+        }
+
+        // Template information
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Pod Template:", style = MaterialTheme.typography.titleMedium)
+
+        // Template labels
+        Text("  Labels:", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 8.dp, top = 4.dp))
+        dep.spec?.template?.metadata?.labels?.forEach { (key, value) ->
+            DetailRow("    $key", value)
+        }
+        if (dep.spec?.template?.metadata?.labels.isNullOrEmpty()) {
+            Text("    (No labels)", modifier = Modifier.padding(start = 16.dp))
+        }
+
+        // Template containers
+        Text("  Containers:", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 8.dp, top = 4.dp))
+        dep.spec?.template?.spec?.containers?.forEach { container ->
+            Column(
+                modifier = Modifier
+                    .padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    .padding(4.dp)
+            ) {
+                DetailRow("Name", container.name)
+                DetailRow("Image", container.image)
+                DetailRow("Pull Policy", container.imagePullPolicy)
+
+                // Container ports
+                if (!container.ports.isNullOrEmpty()) {
+                    Text("Ports:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp))
+                    container.ports.forEach { port ->
+                        DetailRow("  ${port.name ?: port.containerPort}",
+                            "${port.containerPort}/${port.protocol ?: "TCP"}")
+                    }
+                }
+
+                // Resource requirements
+                container.resources?.let { resources ->
+                    Text("Resources:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp))
+                    resources.limits?.forEach { (key, value) ->
+                        DetailRow("  Limit $key", value.toString())
+                    }
+                    resources.requests?.forEach { (key, value) ->
+                        DetailRow("  Request $key", value.toString())
+                    }
+                }
+
+                // Environment variables
+                if (!container.env.isNullOrEmpty()) {
+                    Text("Environment:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp))
+                    container.env.forEach { env ->
+                        val valueText = when {
+                            env.value != null -> env.value
+                            env.valueFrom?.configMapKeyRef != null ->
+                                "ConfigMap: ${env.valueFrom?.configMapKeyRef?.name}.${env.valueFrom?.configMapKeyRef?.key}"
+                            env.valueFrom?.secretKeyRef != null ->
+                                "Secret: ${env.valueFrom?.secretKeyRef?.name}.${env.valueFrom?.secretKeyRef?.key}"
+                            env.valueFrom?.fieldRef != null ->
+                                "Field: ${env.valueFrom?.fieldRef?.fieldPath}"
+                            else -> "<complex>"
+                        }
+                        DetailRow("  ${env.name}", valueText)
+                    }
+                }
+
+                // Volume mounts
+                if (!container.volumeMounts.isNullOrEmpty()) {
+                    Text("Volume Mounts:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp))
+                    container.volumeMounts.forEach { mount ->
+                        DetailRow("  ${mount.name}", "${mount.mountPath}${if (mount.readOnly == true) " (ro)" else ""}")
+                    }
+                }
+            }
+        }
+        if (dep.spec?.template?.spec?.containers.isNullOrEmpty()) {
+            Text("    (No containers)", modifier = Modifier.padding(start = 16.dp))
+        }
+
+        // Volumes
+        if (!dep.spec?.template?.spec?.volumes.isNullOrEmpty()) {
+            Text("  Volumes:", style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp))
+            dep.spec?.template?.spec?.volumes?.forEach { volume ->
+                Column(
+                    modifier = Modifier
+                        .padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .padding(4.dp)
+                ) {
+                    DetailRow("Name", volume.name)
+                    // Determine volume type and details
+                    when {
+                        volume.configMap != null -> {
+                            DetailRow("Type", "ConfigMap")
+                            DetailRow("ConfigMap Name", volume.configMap.name)
+                        }
+                        volume.secret != null -> {
+                            DetailRow("Type", "Secret")
+                            DetailRow("Secret Name", volume.secret.secretName)
+                        }
+                        volume.persistentVolumeClaim != null -> {
+                            DetailRow("Type", "PVC")
+                            DetailRow("Claim Name", volume.persistentVolumeClaim.claimName)
+                            DetailRow("Read Only", volume.persistentVolumeClaim.readOnly?.toString() ?: "false")
+                        }
+                        volume.emptyDir != null -> {
+                            DetailRow("Type", "EmptyDir")
+                            DetailRow("Medium", volume.emptyDir.medium ?: "")
+                        }
+                        volume.hostPath != null -> {
+                            DetailRow("Type", "HostPath")
+                            DetailRow("Path", volume.hostPath.path)
+                            DetailRow("Type", volume.hostPath.type ?: "")
+                        }
+                        else -> DetailRow("Type", "<complex>")
+                    }
+                }
+            }
+        }
     }
 }
 @Composable
@@ -796,6 +952,20 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
     }
 }
 @Composable
+//fun PVDetailsView(pv: PersistentVolume) {
+//    Column {
+//        DetailRow("Name", pv.metadata?.name)
+//        DetailRow("Created", formatAge(pv.metadata?.creationTimestamp))
+//        DetailRow("Status", pv.status?.phase)
+//        DetailRow("Claim", pv.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" })
+//        DetailRow("Reclaim Policy", pv.spec?.persistentVolumeReclaimPolicy)
+//        DetailRow("Access Modes", formatAccessModes(pv.spec?.accessModes))
+//        DetailRow("Storage Class", pv.spec?.storageClassName)
+//        DetailRow("Capacity", pv.spec?.capacity?.get("storage")?.toString())
+//        DetailRow("Volume Mode", pv.spec?.volumeMode)
+//        // TODO: Source details (NFS, HostPath, etc.)
+//    }
+//}
 fun PVDetailsView(pv: PersistentVolume) {
     Column {
         DetailRow("Name", pv.metadata?.name)
@@ -807,9 +977,153 @@ fun PVDetailsView(pv: PersistentVolume) {
         DetailRow("Storage Class", pv.spec?.storageClassName)
         DetailRow("Capacity", pv.spec?.capacity?.get("storage")?.toString())
         DetailRow("Volume Mode", pv.spec?.volumeMode)
-        // TODO: Source details (NFS, HostPath, etc.)
+
+        // Source details implementation
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Volume Source:", style = MaterialTheme.typography.titleMedium)
+
+        Column(
+            modifier = Modifier
+                .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                .padding(4.dp)
+        ) {
+            pv.spec?.let { spec ->
+                when {
+                    // NFS volume source
+                    spec.nfs != null -> {
+                        DetailRow("Type", "NFS")
+                        DetailRow("Server", spec.nfs.server)
+                        DetailRow("Path", spec.nfs.path)
+                        DetailRow("Read Only", spec.nfs.readOnly?.toString() ?: "false")
+                    }
+
+                    // HostPath volume source
+                    spec.hostPath != null -> {
+                        DetailRow("Type", "HostPath")
+                        DetailRow("Path", spec.hostPath.path)
+                        DetailRow("Type", spec.hostPath.type ?: "<not specified>")
+                    }
+
+                    // GCE Persistent Disk
+                    spec.gcePersistentDisk != null -> {
+                        DetailRow("Type", "GCE Persistent Disk")
+                        DetailRow("PD Name", spec.gcePersistentDisk.pdName)
+                        DetailRow("FS Type", spec.gcePersistentDisk.fsType ?: "<not specified>")
+                        DetailRow("Partition", spec.gcePersistentDisk.partition?.toString() ?: "0")
+                        DetailRow("Read Only", spec.gcePersistentDisk.readOnly?.toString() ?: "false")
+                    }
+
+                    // AWS Elastic Block Store
+                    spec.awsElasticBlockStore != null -> {
+                        DetailRow("Type", "AWS EBS")
+                        DetailRow("Volume ID", spec.awsElasticBlockStore.volumeID)
+                        DetailRow("FS Type", spec.awsElasticBlockStore.fsType ?: "<not specified>")
+                        DetailRow("Partition", spec.awsElasticBlockStore.partition?.toString() ?: "0")
+                        DetailRow("Read Only", spec.awsElasticBlockStore.readOnly?.toString() ?: "false")
+                    }
+
+                    // Azure Disk
+                    spec.azureDisk != null -> {
+                        DetailRow("Type", "Azure Disk")
+                        DetailRow("Disk Name", spec.azureDisk.diskName)
+                        DetailRow("Disk URI", spec.azureDisk.diskURI)
+                        DetailRow("Kind", spec.azureDisk.kind ?: "<not specified>")
+                        DetailRow("FS Type", spec.azureDisk.fsType ?: "<not specified>")
+                        DetailRow("Caching Mode", spec.azureDisk.cachingMode ?: "<not specified>")
+                        DetailRow("Read Only", spec.azureDisk.readOnly?.toString() ?: "false")
+                    }
+
+                    // Azure File
+                    spec.azureFile != null -> {
+                        DetailRow("Type", "Azure File")
+                        DetailRow("Secret Name", spec.azureFile.secretName)
+                        DetailRow("Share Name", spec.azureFile.shareName)
+                        DetailRow("Read Only", spec.azureFile.readOnly?.toString() ?: "false")
+                    }
+
+                    // Ceph RBD
+                    spec.rbd != null -> {
+                        DetailRow("Type", "Ceph RBD")
+                        DetailRow("Monitors", spec.rbd.monitors.joinToString(", "))
+                        DetailRow("Image", spec.rbd.image)
+                        DetailRow("Pool", spec.rbd.pool ?: "rbd")
+                        DetailRow("User", spec.rbd.user ?: "admin")
+                        DetailRow("FS Type", spec.rbd.fsType ?: "<not specified>")
+                        DetailRow("Read Only", spec.rbd.readOnly?.toString() ?: "false")
+                    }
+
+                    // CephFS
+                    spec.cephfs != null -> {
+                        DetailRow("Type", "CephFS")
+                        DetailRow("Monitors", spec.cephfs.monitors.joinToString(", "))
+                        DetailRow("Path", spec.cephfs.path ?: "/")
+                        DetailRow("User", spec.cephfs.user ?: "admin")
+                        DetailRow("Read Only", spec.cephfs.readOnly?.toString() ?: "false")
+                    }
+
+                    // iSCSI
+                    spec.iscsi != null -> {
+                        DetailRow("Type", "iSCSI")
+                        DetailRow("Target Portal", spec.iscsi.targetPortal)
+                        DetailRow("IQN", spec.iscsi.iqn)
+                        DetailRow("Lun", spec.iscsi.lun.toString())
+                        DetailRow("FS Type", spec.iscsi.fsType ?: "<not specified>")
+                        DetailRow("Read Only", spec.iscsi.readOnly?.toString() ?: "false")
+                    }
+
+                    // FC (Fibre Channel)
+                    spec.fc != null -> {
+                        DetailRow("Type", "Fibre Channel")
+                        DetailRow("WWNs", spec.fc.wwids?.joinToString(", ") ?: "<not specified>")
+                        DetailRow("Lun", spec.fc.lun?.toString() ?: "<not specified>")
+                        DetailRow("FS Type", spec.fc.fsType ?: "<not specified>")
+                        DetailRow("Read Only", spec.fc.readOnly?.toString() ?: "false")
+                    }
+
+                    // Local
+                    spec.local != null -> {
+                        DetailRow("Type", "Local")
+                        DetailRow("Path", spec.local.path)
+                    }
+
+                    // CSI (Container Storage Interface)
+                    spec.csi != null -> {
+                        DetailRow("Type", "CSI Volume")
+                        DetailRow("Driver", spec.csi.driver)
+                        DetailRow("Volume Handle", spec.csi.volumeHandle)
+                        DetailRow("Read Only", spec.csi.readOnly?.toString() ?: "false")
+                        DetailRow("FS Type", spec.csi.fsType ?: "<not specified>")
+
+                        if (!spec.csi.volumeAttributes.isNullOrEmpty()) {
+                            Text("Volume Attributes:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(top = 2.dp))
+                            spec.csi.volumeAttributes.forEach { (key, value) ->
+                                DetailRow("  $key", value)
+                            }
+                        }
+                    }
+
+                    // Glusterfs
+                    spec.glusterfs != null -> {
+                        DetailRow("Type", "GlusterFS")
+                        DetailRow("Endpoints", spec.glusterfs.endpoints)
+                        DetailRow("Path", spec.glusterfs.path)
+                        DetailRow("Read Only", spec.glusterfs.readOnly?.toString() ?: "false")
+                    }
+
+                    // Empty - no source provided
+                    else -> {
+                        DetailRow("Type", "<unknown>")
+                        Text("No volume source details available", style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                }
+            }
+        }
     }
 }
+
 @Composable
 fun PVCDetailsView(pvc: PersistentVolumeClaim) {
     Column {
@@ -823,8 +1137,182 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
         DetailRow("Capacity Request", pvc.spec?.resources?.requests?.get("storage")?.toString())
         DetailRow("Capacity Actual", pvc.status?.capacity?.get("storage")?.toString())
         DetailRow("Volume Mode", pvc.spec?.volumeMode)
+
+        // Additional information: Labels
+        if (!pvc.metadata?.labels.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Labels:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                pvc.metadata?.labels?.forEach { (key, value) ->
+                    DetailRow(key, value)
+                }
+            }
+        }
+
+        // Additional information: Annotations
+        if (!pvc.metadata?.annotations.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Annotations:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                pvc.metadata?.annotations?.forEach { (key, value) ->
+                    DetailRow(key, value)
+                }
+            }
+        }
+
+        // Additional information: Finalizers
+        if (!pvc.metadata?.finalizers.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Finalizers:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                pvc.metadata?.finalizers?.forEach { finalizer ->
+                    DetailRow("Finalizer", finalizer)
+                }
+            }
+        }
+
+        // Additional information: Selector
+        pvc.spec?.selector?.let { selector ->
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Selector:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                // Match Labels
+                if (!selector.matchLabels.isNullOrEmpty()) {
+                    Text("Match Labels:", style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 4.dp))
+                    selector.matchLabels.forEach { (key, value) ->
+                        DetailRow("  $key", value)
+                    }
+                }
+
+                // Match Expressions
+                if (!selector.matchExpressions.isNullOrEmpty()) {
+                    Text("Match Expressions:", style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 4.dp))
+                    selector.matchExpressions.forEach { expr ->
+                        val values = if (expr.values.isNullOrEmpty()) "<none>" else expr.values.joinToString(", ")
+                        DetailRow("  ${expr.key} ${expr.operator}", values)
+                    }
+                }
+            }
+        }
+
+        // Additional information: Data Source
+        pvc.spec?.dataSource?.let { dataSource ->
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Data Source:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                DetailRow("Kind", dataSource.kind)
+                DetailRow("Name", dataSource.name)
+                DetailRow("API Group", dataSource.apiGroup ?: "<core>")
+            }
+        }
+
+        // Additional information: Data Source Ref (newer API)
+        pvc.spec?.dataSourceRef?.let { dataSourceRef ->
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Data Source Reference:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                DetailRow("Kind", dataSourceRef.kind)
+                DetailRow("Name", dataSourceRef.name)
+                DetailRow("API Group", dataSourceRef.apiGroup ?: "<core>")
+                DetailRow("Namespace", dataSourceRef.namespace ?: "<same namespace>")
+            }
+        }
+
+        // Additional information: Conditions
+        if (!pvc.status?.conditions.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Conditions:", style = MaterialTheme.typography.titleMedium)
+
+            pvc.status?.conditions?.forEach { condition ->
+                Column(
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .padding(4.dp)
+                ) {
+                    DetailRow("Type", condition.type)
+                    DetailRow("Status", condition.status)
+                    DetailRow("Last Probe Time", formatAge(condition.lastProbeTime))
+                    DetailRow("Last Transition Time", formatAge(condition.lastTransitionTime))
+                    DetailRow("Reason", condition.reason)
+                    DetailRow("Message", condition.message)
+                }
+            }
+        }
+
+        // Additional information: Owner References
+        if (!pvc.metadata?.ownerReferences.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Owner References:", style = MaterialTheme.typography.titleMedium)
+
+            pvc.metadata?.ownerReferences?.forEach { owner ->
+                Column(
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .padding(4.dp)
+                ) {
+                    DetailRow("Kind", owner.kind)
+                    DetailRow("Name", owner.name)
+                    DetailRow("UID", owner.uid)
+                    DetailRow("Controller", owner.controller?.toString() ?: "false")
+                    DetailRow("Block Owner Deletion", owner.blockOwnerDeletion?.toString() ?: "false")
+                }
+            }
+        }
+
+        // Additional information: Resource Version and UID
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Additional Metadata:", style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            DetailRow("UID", pvc.metadata?.uid)
+            DetailRow("Resource Version", pvc.metadata?.resourceVersion)
+            DetailRow("Generation", pvc.metadata?.generation?.toString())
+        }
     }
 }
+
+//@Composable
+//fun IngressDetailsView(ing: Ingress) {
+//    Column {
+//        DetailRow("Name", ing.metadata?.name)
+//        DetailRow("Namespace", ing.metadata?.namespace)
+//        DetailRow("Created", formatAge(ing.metadata?.creationTimestamp))
+//        DetailRow("Class", ing.spec?.ingressClassName ?: "<none>")
+//        DetailRow("Address", formatIngressAddress(ing.status?.loadBalancer?.ingress))
+//        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+//        Text("Rules:", style = MaterialTheme.typography.titleMedium)
+//        ing.spec?.rules?.forEachIndexed { index, rule ->
+//            Text("  Rule ${index + 1}: Host: ${rule.host ?: "*"}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+//            rule.http?.paths?.forEach { path ->
+//                Column(modifier = Modifier.padding(start = 16.dp)) {
+//                    DetailRow("    Path", path.path ?: "/")
+//                    DetailRow("    Path Type", path.pathType)
+//                    DetailRow("    Backend Service", path.backend?.service?.name)
+//                    DetailRow("    Backend Port", path.backend?.service?.port?.let { it.name ?: it.number?.toString() })
+//                }
+//            }
+//            Spacer(Modifier.height(4.dp))
+//        }
+//        if (ing.spec?.rules.isNullOrEmpty()) {
+//            Text("  <No rules defined>", modifier = Modifier.padding(start = 8.dp))
+//        }
+//        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+//        Text("TLS:", style = MaterialTheme.typography.titleMedium)
+//        ing.spec?.tls?.forEach { tls ->
+//            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)).padding(4.dp) ) {
+//                DetailRow("  Hosts", tls.hosts?.joinToString(", "))
+//                DetailRow("  Secret Name", tls.secretName)
+//            }
+//        }
+//        if (ing.spec?.tls.isNullOrEmpty()) {
+//            Text("  <No TLS defined>", modifier = Modifier.padding(start = 8.dp))
+//        }
+//    }
+//}
+
 @Composable
 fun IngressDetailsView(ing: Ingress) {
     Column {
@@ -833,6 +1321,39 @@ fun IngressDetailsView(ing: Ingress) {
         DetailRow("Created", formatAge(ing.metadata?.creationTimestamp))
         DetailRow("Class", ing.spec?.ingressClassName ?: "<none>")
         DetailRow("Address", formatIngressAddress(ing.status?.loadBalancer?.ingress))
+
+        // Additional information: Annotations
+        if (!ing.metadata?.annotations.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Annotations:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                ing.metadata?.annotations?.forEach { (key, value) ->
+                    // Group important ingress controller annotations
+                    val displayKey = when {
+                        key.startsWith("nginx.ingress") -> "NGINX: ${key.substringAfter("nginx.ingress.kubernetes.io/")}"
+                        key.startsWith("alb.ingress") -> "ALB: ${key.substringAfter("alb.ingress.kubernetes.io/")}"
+                        key.startsWith("kubernetes.io/ingress") -> "K8s: ${key.substringAfter("kubernetes.io/ingress.")}"
+                        key.startsWith("traefik.") -> "Traefik: ${key.substringAfter("traefik.")}"
+                        key.startsWith("haproxy.") -> "HAProxy: ${key.substringAfter("haproxy.")}"
+                        key.startsWith("cert-manager.io") -> "Cert-Manager: ${key.substringAfter("cert-manager.io/")}"
+                        else -> key
+                    }
+                    DetailRow(displayKey, value)
+                }
+            }
+        }
+
+        // Labels section
+        if (!ing.metadata?.labels.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Labels:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                ing.metadata?.labels?.forEach { (key, value) ->
+                    DetailRow(key, value)
+                }
+            }
+        }
+
         Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Text("Rules:", style = MaterialTheme.typography.titleMedium)
         ing.spec?.rules?.forEachIndexed { index, rule ->
@@ -850,6 +1371,27 @@ fun IngressDetailsView(ing: Ingress) {
         if (ing.spec?.rules.isNullOrEmpty()) {
             Text("  <No rules defined>", modifier = Modifier.padding(start = 8.dp))
         }
+
+        // Default backend
+        ing.spec?.defaultBackend?.let { backend ->
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Default Backend:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                backend.service?.let { service ->
+                    DetailRow("Service Name", service.name)
+                    DetailRow("Service Port", service.port?.let { it.name ?: it.number?.toString() })
+                }
+                backend.resource?.let { resource ->
+                    DetailRow("API Group", resource.apiGroup ?: "<core>")
+                    DetailRow("Kind", resource.kind)
+                    DetailRow("Name", resource.name)
+                }
+                if (backend.service == null && backend.resource == null) {
+                    Text("<No default backend specified>", modifier = Modifier.padding(vertical = 4.dp))
+                }
+            }
+        }
+
         Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Text("TLS:", style = MaterialTheme.typography.titleMedium)
         ing.spec?.tls?.forEach { tls ->
@@ -860,6 +1402,110 @@ fun IngressDetailsView(ing: Ingress) {
         }
         if (ing.spec?.tls.isNullOrEmpty()) {
             Text("  <No TLS defined>", modifier = Modifier.padding(start = 8.dp))
+        }
+
+        // Status section
+        if (!ing.status?.loadBalancer?.ingress.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Load Balancer Status:", style = MaterialTheme.typography.titleMedium)
+            ing.status?.loadBalancer?.ingress?.forEachIndexed { index, ingress ->
+                Column(
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f))
+                        .padding(4.dp)
+                ) {
+                    DetailRow("  IP", ingress.ip)
+                    DetailRow("  Hostname", ingress.hostname)
+
+                    // Ports (in newer API versions)
+                    if (!ingress.ports.isNullOrEmpty()) {
+                        Text("  Ports:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(top = 4.dp))
+                        ingress.ports.forEach { port ->
+                            DetailRow("    ${port.port}", port.protocol ?: "TCP")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Conditions section (newer API versions may include this)
+        val conditions = ing.status?.let { 
+            try {
+                it::class.members.find { member -> member.name == "conditions" }?.call(it) as? List<*>
+            } catch (e: Exception) {
+                null
+            }
+        }
+        
+        if (!conditions.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Conditions:", style = MaterialTheme.typography.titleMedium)
+        
+            conditions.forEach { condition ->
+                Column(
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .padding(4.dp)
+                ) {
+                    // Use safe access or set default values
+                    val type = condition?.let { if (it is Map<*, *>) it["type"] as? String else null }
+                    val status = condition?.let { if (it is Map<*, *>) it["status"] as? String else null }
+                    val reason = condition?.let { if (it is Map<*, *>) it["reason"] as? String else null }
+                    val message = condition?.let { if (it is Map<*, *>) it["message"] as? String else null }
+                    val lastTransitionTime = condition?.let { if (it is Map<*, *>) it["lastTransitionTime"] as? String else null }
+                    val observedGeneration = condition?.let { if (it is Map<*, *>) it["observedGeneration"]?.toString() else null }
+        
+                    DetailRow("Type", type)
+                    DetailRow("Status", status)
+                    DetailRow("Reason", reason)
+                    DetailRow("Message", message)
+                    DetailRow("Last Transition", formatAge(lastTransitionTime))
+                    DetailRow("Observed Generation", observedGeneration)
+                }
+            }
+        }
+
+        // Owner References
+        if (!ing.metadata?.ownerReferences.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Owner References:", style = MaterialTheme.typography.titleMedium)
+
+            ing.metadata?.ownerReferences?.forEach { owner ->
+                Column(
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .padding(4.dp)
+                ) {
+                    DetailRow("Kind", owner.kind)
+                    DetailRow("Name", owner.name)
+                    DetailRow("UID", owner.uid)
+                    DetailRow("Controller", owner.controller?.toString() ?: "false")
+                }
+            }
+        }
+
+        // Additional information: Finalizers
+        if (!ing.metadata?.finalizers.isNullOrEmpty()) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Finalizers:", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                ing.metadata?.finalizers?.forEach { finalizer ->
+                    DetailRow("Finalizer", finalizer)
+                }
+            }
+        }
+
+        // Additional Metadata
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Additional Metadata:", style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            DetailRow("UID", ing.metadata?.uid)
+            DetailRow("Resource Version", ing.metadata?.resourceVersion)
+            DetailRow("Generation", ing.metadata?.generation?.toString())
         }
     }
 }
