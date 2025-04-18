@@ -41,7 +41,6 @@ import compose.icons.SimpleIcons
 import compose.icons.feathericons.ArrowDown
 import compose.icons.feathericons.ArrowUp
 import compose.icons.feathericons.Circle
-import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.simpleicons.Kubernetes
@@ -63,8 +62,13 @@ import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper //extract helm release
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule //extract helm release
+import compose.icons.feathericons.Aperture
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.ArrowRight
 import compose.icons.feathericons.CheckCircle
+import compose.icons.feathericons.Copy
 import compose.icons.feathericons.HelpCircle
+import compose.icons.feathericons.List
 import compose.icons.feathericons.XCircle
 import java.util.zip.GZIPInputStream  //extract helm release
 //import java.io.BufferedReader
@@ -110,6 +114,22 @@ const val LOG_LINES_TO_TAIL = 50
 
 // ---
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
+
+
+var ICON_UP = FeatherIcons.ArrowUp
+var ICON_DOWN = FeatherIcons.ArrowDown
+var ICON_RIGHT = FeatherIcons.ArrowRight
+var ICON_LEFT = FeatherIcons.ArrowLeft
+var ICON_LOGS = FeatherIcons.List
+var ICON_HELP = FeatherIcons.HelpCircle
+var ICON_SUCCESS = FeatherIcons.CheckCircle
+var ICON_ERROR = FeatherIcons.XCircle
+var ICON_COPY = FeatherIcons.Copy
+var ICON_EYE = FeatherIcons.Eye
+var ICON_EYEOFF = FeatherIcons.EyeOff
+var ICON_CONTEXT = SimpleIcons.Kubernetes
+var ICON_RESOURCE = FeatherIcons.Aperture
+var ICON_NF = Icons.Filled.Place
 
 // Calculate optimal column widths based on content
 @Composable
@@ -879,7 +899,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                     else -> showContainerDialog.value = true
                 }
             }) {
-                Icon(Icons.Filled.Build, contentDescription = "View Logs")
+                Icon(ICON_LOGS, contentDescription = "View Logs")
                 Spacer(Modifier.width(4.dp))
                 Text("View Logs")
             }
@@ -955,7 +975,7 @@ fun NamespaceDetailsView(ns: Namespace) {
             )
             Spacer(Modifier.weight(1f))
             Icon(
-                if (labelsExpanded.value) FeatherIcons.ArrowUp else FeatherIcons.ArrowDown,
+                if (labelsExpanded.value) ICON_UP else ICON_DOWN,
                 contentDescription = if (labelsExpanded.value) "Collapse" else "Expand"
             )
         }
@@ -995,7 +1015,7 @@ fun NamespaceDetailsView(ns: Namespace) {
             )
             Spacer(Modifier.weight(1f))
             Icon(
-                if (annotationsExpanded.value) FeatherIcons.ArrowUp else FeatherIcons.ArrowDown,
+                if (annotationsExpanded.value) ICON_UP else ICON_DOWN,
                 contentDescription = if (annotationsExpanded.value) "Collapse" else "Expand"
             )
         }
@@ -1032,7 +1052,7 @@ fun NamespaceDetailsView(ns: Namespace) {
 
 @Composable
 fun NodeDetailsView(node: Node) {
-    val scrollState = rememberScrollState()
+    //val scrollState = rememberScrollState()
     val showCapacity = remember { mutableStateOf(false) }
     val showConditions = remember { mutableStateOf(false) }
     val showLabels = remember { mutableStateOf(false) }
@@ -1073,7 +1093,7 @@ fun NodeDetailsView(node: Node) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (showCapacity.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Capacity"
             )
             Text(
@@ -1164,7 +1184,7 @@ fun NodeDetailsView(node: Node) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (showConditions.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (showConditions.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Conditions"
             )
             Text(
@@ -1201,9 +1221,9 @@ fun NodeDetailsView(node: Node) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = when (condition.status) {
-                                            "True" -> FeatherIcons.CheckCircle
-                                            "False" -> FeatherIcons.XCircle
-                                            else -> FeatherIcons.HelpCircle
+                                            "True" -> ICON_SUCCESS
+                                            "False" -> ICON_ERROR
+                                            else -> ICON_HELP
                                         },
                                         contentDescription = "Condition Status",
                                         tint = statusColor,
@@ -1249,7 +1269,7 @@ fun NodeDetailsView(node: Node) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (showLabels.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Labels"
             )
             Text(
@@ -1523,7 +1543,7 @@ fun DeploymentDetailsView(dep: Deployment) {
 fun ServiceDetailsView(svc: Service) {
     //val scrollState = rememberScrollState()
     val showPorts = remember { mutableStateOf(false) }
-    val showEndpoints = remember { mutableStateOf(false) }
+    //val showEndpoints = remember { mutableStateOf(false) }
     val showLabels = remember { mutableStateOf(false) }
     val showAnnotations = remember { mutableStateOf(false) }
 
@@ -1573,7 +1593,7 @@ fun ServiceDetailsView(svc: Service) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (showPorts.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (showPorts.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Ports"
             )
             Text(
@@ -1671,7 +1691,7 @@ fun ServiceDetailsView(svc: Service) {
 //            verticalAlignment = Alignment.CenterVertically
 //        ) {
 //            Icon(
-//                imageVector = if (showEndpoints.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+//                imageVector = if (showEndpoints.value) ICON_DOWN else ICON_RIGHT,
 //                contentDescription = "Expand Endpoints"
 //            )
 //            Text(
@@ -1744,7 +1764,7 @@ fun ServiceDetailsView(svc: Service) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (showLabels.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Labels"
             )
             Text(
@@ -1802,7 +1822,7 @@ fun ServiceDetailsView(svc: Service) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (showAnnotations.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (showAnnotations.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Annotations"
             )
             Text(
@@ -1980,7 +2000,7 @@ fun SecretDetailsView(secret: Secret) {
                             }
                         ) {
                             Icon(
-                                imageVector = FeatherIcons.Copy,
+                                imageVector = ICON_COPY,
                                 contentDescription = "Copy values",
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -2051,7 +2071,7 @@ fun SecretDetailsView(secret: Secret) {
                             }
                         ) {
                             Icon(
-                                imageVector = FeatherIcons.Copy,
+                                imageVector = ICON_COPY,
                                 contentDescription = "Copy valuesGlobal",
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -2162,7 +2182,7 @@ fun SecretDetailsView(secret: Secret) {
                             }
                         ) {
                             Icon(
-                                imageVector = FeatherIcons.Copy,
+                                imageVector = ICON_COPY,
                                 contentDescription = "Copy value",
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -2189,7 +2209,7 @@ fun SecretDetailsView(secret: Secret) {
                             }
                         ) {
                             Icon(
-                                imageVector = if (isDecoded) FeatherIcons.EyeOff else FeatherIcons.Eye,
+                                imageVector = if (isDecoded) ICON_EYEOFF else ICON_EYE,
                                 contentDescription = if (isDecoded) "Hide decoded value" else "Decode value",
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -2250,7 +2270,7 @@ fun SecretDetailsView(secret: Secret) {
                                     }
                                 ) {
                                     Icon(
-                                        imageVector = FeatherIcons.Copy,
+                                        imageVector = ICON_COPY,
                                         contentDescription = "Copy value",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
@@ -2345,7 +2365,7 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
                         }
                     ) {
                         Icon(
-                            imageVector = FeatherIcons.Copy,
+                            imageVector = ICON_COPY,
                             contentDescription = "Copy value",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -2902,7 +2922,7 @@ fun ResourceDetailPanel(
         // --- Верхня панель ---
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(
+                Icon(ICON_LEFT, contentDescription = "Back"); Spacer(
                 Modifier.width(4.dp)
             ); Text("Back")
             }
@@ -3164,7 +3184,7 @@ fun LogViewerPanel(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(ICON_LEFT, contentDescription = "Back")
                 Spacer(Modifier.width(4.dp))
                 Text("Back")
             }
@@ -3425,7 +3445,7 @@ fun App() {
                                         ) {
                                             // Додаємо іконку
                                             Icon(
-                                                imageVector = SimpleIcons.Kubernetes, // Ви можете змінити цю іконку на іншу
+                                                imageVector = ICON_CONTEXT, // Ви можете змінити цю іконку на іншу
                                                 contentDescription = "Kubernetes Context",
                                                 tint = if (contextName == selectedContext)
                                                     MaterialTheme.colorScheme.primary
@@ -3992,9 +4012,9 @@ fun ResourceTreeNode(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val icon = when {
-            !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight
-            !isLeaf -> Icons.Filled.Place
-            else -> FeatherIcons.Circle
+            !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) ICON_DOWN else ICON_RIGHT
+            !isLeaf -> ICON_NF
+            else -> ICON_RESOURCE
         }
         Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp)) // M3 Icon
         Spacer(modifier = Modifier.width(4.dp))
