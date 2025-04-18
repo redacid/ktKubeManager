@@ -29,9 +29,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import compose.icons.FeatherIcons
+import compose.icons.SimpleIcons
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
+import compose.icons.simpleicons.Kubernetes
 // Fabric8
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
@@ -714,12 +716,95 @@ fun SecretDetailsView(secret: Secret) {
 
 @Composable
 fun ConfigMapDetailsView(cm: ConfigMap) {
-    Column {
-        DetailRow("Name", cm.metadata?.name)
-        DetailRow("Namespace", cm.metadata?.namespace)
-        DetailRow("Created", formatAge(cm.metadata?.creationTimestamp))
-        DetailRow("Data Keys", formatDataKeys(cm.data, cm.binaryData)) // Використовуємо binaryData
-        // TODO: Показати ключі? (але не значення, можуть бути великі)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            DetailRow("Name", cm.metadata?.name)
+            DetailRow("Namespace", cm.metadata?.namespace)
+            DetailRow("Created", formatAge(cm.metadata?.creationTimestamp))
+
+            // Заголовок секції Data
+            Text(
+                text = "ConfigMap Data:",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            // Відображення ключів та їх значень
+            cm.data?.forEach { (key, cmValue) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "$key:",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.width(150.dp)
+                    )
+                    Text(
+                        text = cmValue,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            val textToCopy = cmValue
+                            try {
+                                val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                val selection = java.awt.datatransfer.StringSelection(textToCopy)
+                                clipboard.setContents(selection, null)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Value for '$key' copied to clipboard",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Error copying: ${e.message}",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Copy,
+                            contentDescription = "Copy value",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            cm.data?.let { data ->
+                if (data.isNotEmpty()) {
+                    Text(
+                        text = "String Data (not encoded):",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                    )
+
+                    if (cm.data == null || cm.data!!.isEmpty()) {
+                        Text(
+                            text = "No data in this ConfigMap.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        //.align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                )
+            }
+        }
     }
 }
 @Composable
@@ -1138,13 +1223,13 @@ fun App() {
                                         ) {
                                             // Додаємо іконку
                                             Icon(
-                                                imageVector = Icons.Default.Home, // Ви можете змінити цю іконку на іншу
+                                                imageVector = SimpleIcons.Kubernetes , // Ви можете змінити цю іконку на іншу
                                                 contentDescription = "Kubernetes Context",
                                                 tint = if (contextName == selectedContext) 
                                                     MaterialTheme.colorScheme.primary 
                                                 else 
                                                     MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(20.dp).padding(end = 8.dp)
+                                                modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
                                             
                                             // Текст після іконки
