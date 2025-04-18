@@ -2309,7 +2309,7 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     Text(
                         text = "$key:",
@@ -3164,9 +3164,9 @@ fun LogViewerPanel(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 Spacer(Modifier.width(4.dp))
-                Text("Назад")
+                Text("Back")
             }
             Text(
                 text = "Logs: $namespace/$podName [$containerName] (${if (debugCounter > 0) "Active" else "Inactive"})",
@@ -3176,7 +3176,7 @@ fun LogViewerPanel(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = followLogs.value, onCheckedChange = { followLogs.value = it })
-                Text("Слідкувати", style = MaterialTheme.typography.bodyMedium)
+                Text("Follow", style = MaterialTheme.typography.bodyMedium)
             }
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -3192,7 +3192,7 @@ fun LogViewerPanel(
             }
 
             // Add a debug message to indicate if no logs are being displayed
-            if (logState.value.isEmpty() || logState.value == "Завантаження логів..." || logState.value == "Loading last $LOG_LINES_TO_TAIL lines...\n") {
+            if (logState.value.isEmpty() || logState.value == "Download logs..." || logState.value == "Loading last $LOG_LINES_TO_TAIL lines...\n") {
                 Text(
                     "No logs to display yet (poll count: $debugCounter)",
                     modifier = Modifier.align(Alignment.Center),
