@@ -48,7 +48,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "KotlinKubeManager"
-            packageVersion = "1.0.0"
+            packageVersion = "0.0.1"
         }
     }
 }
