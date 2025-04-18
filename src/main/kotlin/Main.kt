@@ -1273,46 +1273,6 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
         }
     }
 }
-
-//@Composable
-//fun IngressDetailsView(ing: Ingress) {
-//    Column {
-//        DetailRow("Name", ing.metadata?.name)
-//        DetailRow("Namespace", ing.metadata?.namespace)
-//        DetailRow("Created", formatAge(ing.metadata?.creationTimestamp))
-//        DetailRow("Class", ing.spec?.ingressClassName ?: "<none>")
-//        DetailRow("Address", formatIngressAddress(ing.status?.loadBalancer?.ingress))
-//        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-//        Text("Rules:", style = MaterialTheme.typography.titleMedium)
-//        ing.spec?.rules?.forEachIndexed { index, rule ->
-//            Text("  Rule ${index + 1}: Host: ${rule.host ?: "*"}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
-//            rule.http?.paths?.forEach { path ->
-//                Column(modifier = Modifier.padding(start = 16.dp)) {
-//                    DetailRow("    Path", path.path ?: "/")
-//                    DetailRow("    Path Type", path.pathType)
-//                    DetailRow("    Backend Service", path.backend?.service?.name)
-//                    DetailRow("    Backend Port", path.backend?.service?.port?.let { it.name ?: it.number?.toString() })
-//                }
-//            }
-//            Spacer(Modifier.height(4.dp))
-//        }
-//        if (ing.spec?.rules.isNullOrEmpty()) {
-//            Text("  <No rules defined>", modifier = Modifier.padding(start = 8.dp))
-//        }
-//        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-//        Text("TLS:", style = MaterialTheme.typography.titleMedium)
-//        ing.spec?.tls?.forEach { tls ->
-//            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)).padding(4.dp) ) {
-//                DetailRow("  Hosts", tls.hosts?.joinToString(", "))
-//                DetailRow("  Secret Name", tls.secretName)
-//            }
-//        }
-//        if (ing.spec?.tls.isNullOrEmpty()) {
-//            Text("  <No TLS defined>", modifier = Modifier.padding(start = 8.dp))
-//        }
-//    }
-//}
-
 @Composable
 fun IngressDetailsView(ing: Ingress) {
     Column {
