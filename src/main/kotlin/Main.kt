@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 //import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.HorizontalDivider as Divider
 import androidx.compose.material.icons.Icons
@@ -30,6 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.dp
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
 import compose.icons.feathericons.ArrowDown
@@ -97,6 +102,64 @@ const val REQUEST_TIMEOUT_MS = 15000
 const val LOG_LINES_TO_TAIL = 50
 // ---
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
+
+// Calculate optimal column widths based on content
+@Composable
+fun calculateColumnWidths(
+    headers: List<String>,
+    items: List<HasMetadata>,
+    resourceType: String,
+    minColumnWidth: Int = 60,
+    maxColumnWidth: Int = 500,
+    padding: Int = 16
+): List<Int> {
+    // Text measurer to calculate text dimensions
+    val textMeasurer = rememberTextMeasurer()
+    val headerStyle = MaterialTheme.typography.titleSmall
+    val cellStyle = MaterialTheme.typography.bodyMedium
+
+    return remember(headers, items, resourceType) {
+        // Initialize with minimum widths
+        val widths = MutableList(headers.size) { minColumnWidth }
+
+        // Measure header widths
+        headers.forEachIndexed { index, header ->
+            val textWidth = measureTextWidth(textMeasurer, header, headerStyle)
+            widths[index] = maxOf(
+                widths[index],
+                (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
+            )
+        }
+
+        // Measure data widths (sample up to 100 items for performance)
+        val sampleItems = if (items.size > 100) items.take(100) else items
+        sampleItems.forEach { item ->
+            headers.forEachIndexed { colIndex, _ ->
+                val cellData = getCellData(item, colIndex, resourceType)
+                val textWidth = measureTextWidth(textMeasurer, cellData, cellStyle)
+                widths[colIndex] = maxOf(
+                    widths[colIndex],
+                    (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
+                )
+            }
+        }
+
+        widths
+    }
+}
+
+// Helper function to measure text width
+private fun measureTextWidth(
+    textMeasurer: TextMeasurer,
+    text: String,
+    style: TextStyle
+): Int {
+    val textLayoutResult = textMeasurer.measure(
+        text = text,
+        style = style
+    )
+    return textLayoutResult.size.width
+}
 
 // --- Допоміжні функції форматування ---
 fun formatContextNameForDisplay(contextName: String): String {
@@ -299,31 +362,29 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
     return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
 }
 @Composable
-fun KubeTableHeaderRow(headers: List<String>) {
+fun KubeTableHeaderRow(
+    headers: List<String>,
+    columnWidths: List<Int> // Add column widths parameter
+) {
     Row(
         modifier = Modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .fillMaxWidth()
-            .height(48.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant) // M3 колір
-            .padding(horizontal = 8.dp), // Змінено паддінг
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         headers.forEachIndexed { index, header ->
-            Box(
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Text( // M3 Text
-                    text = header,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), // Типографія M3
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant // Колір тексту M3
-                )
-            }
-            if (index < headers.size - 1) {
-                Box(Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant)) // M3 Роздільник
-            }
+            val width = if (index < columnWidths.size) columnWidths[index] else 100
+            Text(
+                text = header,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .width(width.dp)
+                    .padding(horizontal = 8.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -332,38 +393,27 @@ fun <T: HasMetadata> KubeTableRow(
     item: T,
     headers: List<String>,
     resourceType: String,
+    columnWidths: List<Int>, // Add column widths parameter
     onRowClick: (T) -> Unit
 ) {
-    val cellValues = remember(item, resourceType) {
-        headers.indices.map { colIndex ->
-            getCellData(item, colIndex, resourceType)
-        }
-    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min) // Або фіксована висота Modifier.height(52.dp)
-            .clickable(onClick = { onRowClick(item) })
-            .padding(horizontal = 8.dp) // Застосовуємо горизонтальний тут
-            .padding(vertical = 8.dp), // Збільшено вертикальний паддінг
+            .clickable { onRowClick(item) }
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        cellValues.forEachIndexed { index, value ->
-            Box(
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp), // Горизонтальний для комірки
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Text( // M3 Text
-                    text = value,
-                    style = MaterialTheme.typography.bodyMedium, // Типографія M3
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface // Колір тексту M3
-                )
-            }
-            if (index < headers.size - 1) {
-                Box(Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))) // M3 Роздільник
-            }
+        headers.forEachIndexed { colIndex, _ ->
+            val width = if (colIndex < columnWidths.size) columnWidths[colIndex] else 100
+            Text(
+                text = getCellData(item, colIndex, resourceType),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .width(width.dp)
+                    .padding(horizontal = 8.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -2376,19 +2426,40 @@ fun App() {
                                             else if (headers.isNotEmpty()) {
                                                 // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
                                                 Column(modifier = Modifier.fillMaxSize()) {
-                                                    KubeTableHeaderRow(headers = headers) // Використовуємо M3 хедер
-                                                    Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
+                                                    // Calculate column widths based on headers and data
+                                                    val columnWidths = calculateColumnWidths(
+                                                        headers = headers,
+                                                        items = itemsToShow,
+                                                        resourceType = currentResourceType
+                                                    )
 
-                                                    LazyColumn(modifier = Modifier.weight(1f)) {
-                                                        items(itemsToShow) { item ->
-                                                            KubeTableRow(
-                                                                item = item, headers = headers, resourceType = currentResourceType,
-                                                                onRowClick = { clickedItem ->
-                                                                    detailedResource = clickedItem; detailedResourceType = currentResourceType;
-                                                                    showLogViewer.value = false; logViewerParams.value = null // Скидаємо логи
+                                                    // Use the calculated widths
+                                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                                        Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                                                            Column {
+                                                                KubeTableHeaderRow(headers = headers, columnWidths = columnWidths)
+                                                                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                                                LazyColumn(
+                                                                    modifier = Modifier.weight(1f, fill = false)
+                                                                ) {
+                                                                    items(itemsToShow) { item ->
+                                                                        KubeTableRow(
+                                                                            item = item,
+                                                                            headers = headers,
+                                                                            resourceType = currentResourceType,
+                                                                            columnWidths = columnWidths,
+                                                                            onRowClick = { clickedItem ->
+                                                                                detailedResource = clickedItem
+                                                                                detailedResourceType = currentResourceType
+                                                                                showLogViewer.value = false
+                                                                                logViewerParams.value = null
+                                                                            }
+                                                                        )
+                                                                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                                                    }
                                                                 }
-                                                            )
-                                                            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) // M3 Divider
+                                                            }
                                                         }
                                                     }
                                                 }
