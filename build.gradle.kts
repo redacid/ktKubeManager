@@ -32,6 +32,8 @@ dependencies {
     //implementation("androidx.compose.material3:material3:1.3.2")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3") //extract helm release
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.3") //extract helm release
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
     implementation("br.com.devsrsouza.compose.icons:feather:1.1.1") // https://feathericons.com/

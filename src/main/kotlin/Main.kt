@@ -55,9 +55,13 @@ import kotlinx.coroutines.*
 //import io.fabric8.kubernetes.client.dsl.LogWatch
 // Логер та інше
 import org.slf4j.LoggerFactory
-import java.io.IOException
+import com.fasterxml.jackson.databind.ObjectMapper //extract helm release
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule //extract helm release
+import java.util.zip.GZIPInputStream  //extract helm release
 //import java.io.BufferedReader
-//import java.io.InputStreamReader
+import java.io.ByteArrayInputStream
+import java.io.IOException 
+
 import java.time.Duration
 import java.time.OffsetDateTime
 
@@ -764,122 +768,104 @@ fun ServiceDetailsView(svc: Service) {
 }
 @Composable
 fun SecretDetailsView(secret: Secret) {
+    // For displaying copy notification
     // Для відображення сповіщення про копіювання
     val snackbarHostState = remember { SnackbarHostState() }
+    // Coroutine scope for showing snackbar
     // Корутин скоуп для показу снекбара
     val coroutineScope = rememberCoroutineScope()
+    
+    // Check if this is a Helm release secret
+    val isHelmRelease = secret.type == "helm.sh/release.v1"
+    
+    // For storing Helm release data
+    var helmReleaseInfo by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var helmReleaseError by remember { mutableStateOf<String?>(null) }
+    
+    // Process Helm release data if needed
+    LaunchedEffect(secret) {
+        if (isHelmRelease && secret.data?.isNotEmpty() == true) {
+            try {
+                // Most Helm releases store data in the "release" key
+                val releaseData = secret.data?.get("release")
+                if (releaseData != null) {
+                    // Decode base64 first
+                    val decodedBytes = java.util.Base64.getDecoder().decode(releaseData)
+                    
+                    // Decompress GZIP data
+                    val bais = ByteArrayInputStream(decodedBytes)
+                    val gzis = GZIPInputStream(bais)
+                    val decompressedData = gzis.readBytes()
+                    
+                    // Parse JSON data
+                    val mapper = ObjectMapper().registerKotlinModule()
+                    val helmData = mapper.readValue(decompressedData, Map::class.java) as Map<String, Any?>
+                    helmReleaseInfo = helmData
+                }
+            } catch (e: Exception) {
+                helmReleaseError = "Error decoding Helm release: ${e.message}"
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                //.fillMaxSize()
+                //.verticalScroll(rememberScrollState())
+        ) {
             DetailRow("Name", secret.metadata?.name)
             DetailRow("Namespace", secret.metadata?.namespace)
             DetailRow("Created", formatAge(secret.metadata?.creationTimestamp))
             DetailRow("Type", secret.type)
 
-            // Заголовок секції Data
-            Text(
-                text = "Secret Data:",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
-            // Відображення ключів та їх значень
-            secret.data?.forEach { (key, encodedValue) ->
-                var isDecoded by remember { mutableStateOf(false) }
-                var decodedValue by remember { mutableStateOf("") }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Ключ
+            // Special handling for Helm release secrets
+            if (isHelmRelease) {
+                Text(
+                    text = "Helm Release Data:",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                
+                if (helmReleaseError != null) {
                     Text(
-                        text = "$key:",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.width(150.dp)
-                    )
-
-                    // Значення (закодоване або декодоване)
-                    Text(
-                        text = if (isDecoded) decodedValue else encodedValue,
+                        text = helmReleaseError!!,
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
-
-                    // Іконка для копіювання
-                    IconButton(
-                        onClick = {
-                            val textToCopy = if (isDecoded) decodedValue else encodedValue
-                            try {
-                                // Копіюємо текст у буфер обміну
-                                val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                val selection = java.awt.datatransfer.StringSelection(textToCopy)
-                                clipboard.setContents(selection, null)
-
-                                // Показуємо сповіщення про успішне копіювання
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Value for '$key' copied to clipboard",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
-                            } catch (e: Exception) {
-                                // Сповіщаємо про помилку
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Error copying: ${e.message}",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = FeatherIcons.Copy,
-                            contentDescription = "Copy value",
-                            tint = MaterialTheme.colorScheme.primary
+                } else if (helmReleaseInfo != null) {
+                    // Display Helm release data
+                    val releaseInfo = helmReleaseInfo!!
+                    
+                    // Extract and display key information
+                    val name = (releaseInfo["name"] as? String) ?: "Unknown"
+                    val version = (releaseInfo["version"] as? Int)?.toString() ?: "Unknown"
+                    val status = ((releaseInfo["info"] as? Map<*, *>)?.get("status") as? String) ?: "Unknown"
+                    val chart = ((releaseInfo["chart"] as? Map<*, *>)?.get("metadata") as? Map<*, *>)?.let {
+                        "${it["name"]}:${it["version"]}"
+                    } ?: "Unknown"
+                    
+                    // Display main info
+                    DetailRow("Release Name", name)
+                    DetailRow("Release Version", version)
+                    DetailRow("Release Status", status)
+                    DetailRow("Chart", chart)
+                    
+                    // Display values data
+                    val values = releaseInfo["config"] as? Map<*, *>
+                    if (values != null && values.isNotEmpty()) {
+                        // Convert to JSON for display
+                        val mapper = ObjectMapper().registerKotlinModule()
+                        val valuesJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(values)
+                        
+                        Text(
+                            text = "Values:",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
                         )
-                    }
-
-                    // Іконка для декодування/кодування
-                    IconButton(
-                        onClick = {
-                            if (!isDecoded) {
-                                try {
-                                    // Декодуємо з Base64
-                                    decodedValue = String(java.util.Base64.getDecoder().decode(encodedValue))
-                                    isDecoded = true
-                                } catch (e: Exception) {
-                                    decodedValue = "Error decoding: ${e.message}"
-                                    isDecoded = true
-                                }
-                            } else {
-                                // Повертаємося в закодований вигляд
-                                isDecoded = false
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = if (isDecoded) FeatherIcons.EyeOff else FeatherIcons.Eye,
-                            contentDescription = if (isDecoded) "Hide decoded value" else "Decode value",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-
-            // Відображення stringData (незакодовані значення)
-            secret.stringData?.let { stringData ->
-                if (stringData.isNotEmpty()) {
-                    Text(
-                        text = "String Data (not encoded):",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
-                    )
-
-                    stringData.forEach { (key, value) ->
+                        
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -887,28 +873,23 @@ fun SecretDetailsView(secret: Secret) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "$key:",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.width(150.dp)
-                            )
-
-                            Text(
-                                text = value,
+                                text = valuesJson,
                                 style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.weight(1f)
                             )
-
-                            // Іконка для копіювання stringData
+                            
+                            // Copy button for values
                             IconButton(
                                 onClick = {
                                     try {
                                         val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                        val selection = java.awt.datatransfer.StringSelection(value)
+                                        val selection = java.awt.datatransfer.StringSelection(valuesJson)
                                         clipboard.setContents(selection, null)
-
+                                        
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = "Value for '$key' copied to clipboard",
+                                                message = "Values copied to clipboard",
                                                 duration = SnackbarDuration.Short
                                             )
                                         }
@@ -924,26 +905,202 @@ fun SecretDetailsView(secret: Secret) {
                             ) {
                                 Icon(
                                     imageVector = FeatherIcons.Copy,
-                                    contentDescription = "Copy value",
+                                    contentDescription = "Copy values",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
                     }
+                } else {
+                    Text(
+                        text = "Processing Helm release data...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
-            }
-
-            // Якщо немає даних у секреті
-            if ((secret.data == null || secret.data!!.isEmpty()) &&
-                (secret.stringData == null || secret.stringData!!.isEmpty())) {
+            } else {
+                // Regular secret data handling (original code for non-Helm secrets)
+                
+                // Data section header
+            // Заголовок секції Data
                 Text(
-                    text = "No data in this Secret",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Secret Data:",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
+
+                // Display keys and their values
+            // Відображення ключів та їх значень
+                secret.data?.forEach { (key, encodedValue) ->
+                    var isDecoded by remember { mutableStateOf(false) }
+                    var decodedValue by remember { mutableStateOf("") }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Key
+                        Text(
+                            text = "$key:",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.width(150.dp)
+                        )
+
+                        // Value (encoded or decoded)
+                    // Значення (закодоване або декодоване)
+                        Text(
+                            text = if (isDecoded) decodedValue else encodedValue,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Copy icon
+                    // Іконка для копіювання
+                        IconButton(
+                            onClick = {
+                                val textToCopy = if (isDecoded) decodedValue else encodedValue
+                                try {
+                                    // Copy text to clipboard
+                                // Копіюємо текст у буфер обміну
+                                    val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                    val selection = java.awt.datatransfer.StringSelection(textToCopy)
+                                    clipboard.setContents(selection, null)
+
+                                    // Show successful copy notification
+                                // Показуємо сповіщення про успішне копіювання
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Value for '$key' copied to clipboard",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    // Show error notification
+                                // Сповіщаємо про помилку
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Error copying: ${e.message}",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Copy,
+                                contentDescription = "Copy value",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        // Decode/encode icon
+                    // Іконка для декодування/кодування
+                        IconButton(
+                            onClick = {
+                                if (!isDecoded) {
+                                    try {
+                                        // Decode from Base64
+                                        decodedValue = String(java.util.Base64.getDecoder().decode(encodedValue))
+                                        isDecoded = true
+                                    } catch (e: Exception) {
+                                        decodedValue = "Error decoding: ${e.message}"
+                                        isDecoded = true
+                                    }
+                                } else {
+                                    // Return to encoded view
+                                // Повертаємося в закодований вигляд
+                                    isDecoded = false
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isDecoded) FeatherIcons.EyeOff else FeatherIcons.Eye,
+                                contentDescription = if (isDecoded) "Hide decoded value" else "Decode value",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                // Display stringData (unencoded values)
+                secret.stringData?.let { stringData ->
+                    if (stringData.isNotEmpty()) {
+                        Text(
+                            text = "String Data (not encoded):",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                        )
+
+                        stringData.forEach { (key, value) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "$key:",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    modifier = Modifier.width(150.dp)
+                                )
+
+                                Text(
+                                    text = value,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                // Copy icon for stringData
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                            val selection = java.awt.datatransfer.StringSelection(value)
+                                            clipboard.setContents(selection, null)
+
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Value for '$key' copied to clipboard",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                        } catch (e: Exception) {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Error copying: ${e.message}",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Copy,
+                                        contentDescription = "Copy value",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If no data in the secret
+            // Якщо немає даних у секреті
+                if ((secret.data == null || secret.data!!.isEmpty()) &&
+                    (secret.stringData == null || secret.stringData!!.isEmpty())) {
+                    Text(
+                        text = "No data in this Secret",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
             }
         }
 
+        // Snackbar for displaying notifications
         // Snackbar для відображення сповіщень
         SnackbarHost(
             hostState = snackbarHostState,
