@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
+//import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -49,12 +49,12 @@ import io.fabric8.kubernetes.api.model.rbac.*
 import io.fabric8.kubernetes.api.model.storage.*
 // Coroutines
 import kotlinx.coroutines.*
-import io.fabric8.kubernetes.client.dsl.LogWatch
+//import io.fabric8.kubernetes.client.dsl.LogWatch
 // Логер та інше
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.io.BufferedReader
-import java.io.InputStreamReader
+//import java.io.BufferedReader
+//import java.io.InputStreamReader
 import java.time.Duration
 import java.time.OffsetDateTime
 
@@ -1216,7 +1216,7 @@ fun App() {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
         isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
         var loadError: Exception? = null
-        var loadedContextNames: List<String> = emptyList()
+        var loadedContextNames: List<String>
         try {
             loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
@@ -1443,7 +1443,8 @@ fun App() {
                                     readOnly = true,
                                     label = { Text("Namespace Filter") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(), // menuAnchor для M3
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                                        .fillMaxWidth(), // menuAnchor для M3
                                     enabled = isFilterEnabled, // Вимикаємо для кластерних ресурсів
                                     colors = ExposedDropdownMenuDefaults.textFieldColors() // M3 кольори
                                 )
