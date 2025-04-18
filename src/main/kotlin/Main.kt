@@ -781,30 +781,14 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
                 }
             }
 
-            cm.data?.let { data ->
-                if (data.isNotEmpty()) {
-                    Text(
-                        text = "String Data (not encoded):",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
-                    )
-
-                    if (cm.data == null || cm.data!!.isEmpty()) {
-                        Text(
-                            text = "No data in this ConfigMap.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-                }
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier
-                        //.align(Alignment.BottomCenter)
-                        .padding(16.dp)
-                )
-            }
         }
+        // Snackbar для відображення сповіщень
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
 @Composable
