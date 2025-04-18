@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +32,8 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
+import compose.icons.feathericons.ArrowDown
+import compose.icons.feathericons.ArrowUp
 import compose.icons.feathericons.Circle
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Eye
@@ -478,7 +481,86 @@ fun NamespaceDetailsView(ns: Namespace) {
         DetailRow("Name", ns.metadata?.name)
         DetailRow("Status", ns.status?.phase)
         DetailRow("Created", formatAge(ns.metadata?.creationTimestamp))
-        // TODO: Додати Labels/Annotations
+
+        // Labels section with expandable panel
+        val labelsExpanded = remember { mutableStateOf(false) }
+        val labels = ns.metadata?.labels ?: emptyMap()
+
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { labelsExpanded.value = !labelsExpanded.value },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Labels (${labels.size})",
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Spacer(Modifier.weight(1f))
+            Icon(
+                if (labelsExpanded.value) FeatherIcons.ArrowUp else FeatherIcons.ArrowDown,
+                contentDescription = if (labelsExpanded.value) "Collapse" else "Expand"
+            )
+        }
+
+        if (labelsExpanded.value && labels.isNotEmpty()) {
+            Column(modifier = Modifier.padding(start = 16.dp)) {
+                labels.forEach { (key, value) ->
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(key, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(120.dp))
+                        Text(value, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        } else if (labelsExpanded.value) {
+            Text("No labels", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Annotations section with expandable panel
+        val annotationsExpanded = remember { mutableStateOf(false) }
+        val annotations = ns.metadata?.annotations ?: emptyMap()
+
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { annotationsExpanded.value = !annotationsExpanded.value },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Annotations (${annotations.size})",
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Spacer(Modifier.weight(1f))
+            Icon(
+                if (annotationsExpanded.value) FeatherIcons.ArrowUp else FeatherIcons.ArrowDown,
+                contentDescription = if (annotationsExpanded.value) "Collapse" else "Expand"
+            )
+        }
+
+        if (annotationsExpanded.value && annotations.isNotEmpty()) {
+            Column(modifier = Modifier.padding(start = 16.dp)) {
+                annotations.forEach { (key, value) ->
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(
+                            key,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.width(160.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            value,
+                            modifier = Modifier.padding(start = 8.dp),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        } else if (annotationsExpanded.value) {
+            Text("No annotations", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 @Composable
