@@ -2803,7 +2803,7 @@ fun IngressDetailsView(ing: Ingress) {
         if (!ing.status?.loadBalancer?.ingress.isNullOrEmpty()) {
             Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
             Text("Load Balancer Status:", style = MaterialTheme.typography.titleMedium)
-            ing.status?.loadBalancer?.ingress?.forEachIndexed { index, ingress ->
+            ing.status?.loadBalancer?.ingress?.forEachIndexed { _, ingress ->
                 Column(
                     modifier = Modifier
                         .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
