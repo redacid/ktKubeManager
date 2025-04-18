@@ -1,5 +1,6 @@
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -86,7 +87,7 @@ const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
 //const val FABRIC8_VERSION = "6.13.5"
-const val LOG_LINES_TO_TAIL = 500
+const val LOG_LINES_TO_TAIL = 50
 // ---
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
 
@@ -913,6 +914,7 @@ fun ResourceDetailPanel(
         }
     }
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogViewerPanel(
@@ -926,113 +928,229 @@ fun LogViewerPanel(
     val scrollState = rememberScrollState()
     val followLogs = remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
-    var logWatchRef by remember { mutableStateOf<LogWatch?>(null) }
     var isLogLoading by remember { mutableStateOf(false) }
+    // Fix the type to be kotlinx.coroutines.Job
+    var logJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    // Add debug state to see if logs are actually being received
+    var debugCounter by remember { mutableStateOf(0) }
+
+    // Define the extension function at the top level within the composable
+    fun startLogPolling(
+        scope: CoroutineScope,
+        namespace: String,
+        podName: String,
+        containerName: String,
+        client: KubernetesClient?,
+        logState: MutableState<String>,
+        scrollState: ScrollState,
+        followLogs: MutableState<Boolean>
+    ) {
+        logJob?.cancel()
+        var lastTimestamp = System.currentTimeMillis()
+        
+        logJob = scope.launch {
+            logger.info("Starting log polling for $namespace/$podName/$containerName")
+            while (isActive && followLogs.value) {
+                try {
+                    delay(1000) // Poll every second
+                    
+                    // Отримуємо тільки нові логи з моменту останнього запиту
+                    // Convert the Long to Int for sinceSeconds
+                    val sinceSeconds = ((System.currentTimeMillis() - lastTimestamp) / 1000 + 1).toInt()
+                    lastTimestamp = System.currentTimeMillis()
+                    
+                    // Debug log to verify that the coroutine is running
+                    logger.debug("Polling logs - iteration ${++debugCounter}")
+                    
+                    // Створюємо watchLog без sinceTime - просто слідкуємо за новими логами
+                    // Робимо окремий запит для отримання тільки нових логів
+                    val newLogs = withContext(Dispatchers.IO) {
+                        val logs = client?.pods()?.inNamespace(namespace)
+                            ?.withName(podName)
+                            ?.inContainer(containerName)
+                            ?.sinceSeconds(sinceSeconds)
+                            ?.tailingLines(100)
+                            ?.log
+                        
+                        // Debug log to verify if we're getting logs from Kubernetes
+                        if (logs != null && logs.isNotEmpty()) {
+                            logger.info("Retrieved new logs - length: ${logs.length} chars")
+                        }
+                        
+                        logs
+                    } ?: ""
+                    
+                    // Пропускаємо початкові логи, що дублюються з тими, які ми вже отримали
+                    if (newLogs.isNotEmpty()) {
+                        // Use withContext(Dispatchers.Main.immediate) to ensure UI updates immediately
+                        withContext(Dispatchers.Main.immediate) {
+                            if (isActive) {
+                                // Explicitly show that we're appending logs
+                                val currentText = logState.value
+                                // Додаємо нові логи до існуючих
+                                val textToAppend = if (currentText.endsWith("\n") || currentText.isEmpty()) newLogs else "\n$newLogs"
+                                val newText = currentText + textToAppend
+                                
+                                // Debug log to track text appending
+                                logger.info("Appending logs - current: ${currentText.length} chars, new: ${newText.length} chars")
+                                
+                                // Update the state with new text
+                                logState.value = newText
+                                
+                                // Force UI refresh by incrementing debug counter
+                                debugCounter++
+                                
+                                // Auto-scroll with a slight delay
+                                // Автоматична прокрутка вниз
+                                if (followLogs.value) {
+                                    launch { 
+                                        delay(50)
+                                        scrollState.animateScrollTo(scrollState.maxValue) 
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (isActive) {
+                        logger.warn("Error polling logs: ${e.message}", e)
+                        // Не зупиняємо опитування при помилці, продовжуємо спроби
+                    }
+                }
+            }
+            logger.info("Log polling stopped for $namespace/$podName/$containerName")
+        }
+    }
 
     DisposableEffect(namespace, podName, containerName) {
         logger.info("LogViewerPanel DisposableEffect: Starting for $namespace/$podName [$containerName]")
         isLogLoading = true
-        logState.value = "Завантаження..."
+        // Clear log state and start with a clear indicator
+        logState.value = "Loading last $LOG_LINES_TO_TAIL lines...\n"
 
-        val logLoadingJob: kotlinx.coroutines.Job = coroutineScope.launch {
-            var initialLogLoadError: Exception? = null
-            var watch: LogWatch?
-            var followJob: kotlinx.coroutines.Job? = null
-
+        // Завантаження початкових логів
+        val initialLogJob = coroutineScope.launch {
             try {
-                // 1. Початкові логи
-                val initialLogs = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    logger.info("[IO Log] Tailing initial logs for $namespace/$podName [$containerName]...")
+                logger.info("Fetching initial logs...")
+                // Спочатку отримуємо тільки останні N рядків
+                // 1. Отримання початкових логів
+                val initialLogs = withContext(Dispatchers.IO) {
                     client?.pods()?.inNamespace(namespace)
                         ?.withName(podName)
                         ?.inContainer(containerName)
                         ?.tailingLines(LOG_LINES_TO_TAIL)
-                        // ?.withTimestamps() // Прибрали через помилки
                         ?.log
-                } ?: "Не вдалося завантажити початкові логи."
-
-                withContext(Dispatchers.Main) {
-                    logState.value = initialLogs + "\n"
-                    launch { delay(50); scrollState.animateScrollTo(scrollState.maxValue) }
+                } ?: "Failed to load logs."
+                
+                logger.info("Initial logs fetched: ${initialLogs.length} characters")
+                
+                withContext(Dispatchers.Main.immediate) {
+                    // Explicitly clear and set instead of just replacing
+                    logState.value = "=== Log start ===\n$initialLogs"
+                    delay(100)
+                    scrollState.animateScrollTo(scrollState.maxValue)
+                    isLogLoading = false
+                    
+                    // Force a UI refresh
+                    debugCounter++
                 }
-
-                // 2. Стрімінг
-                if (followLogs.value && isActive) {
-                    logger.info("Starting log watch...")
-                    watch = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                        client?.pods()?.inNamespace(namespace)
-                            ?.withName(podName)
-                            ?.inContainer(containerName)
-                            // ?.withTimestamps() // Прибрали через помилки
-                            ?.watchLog()
-                    }
-                    logWatchRef = watch
-
-                    if (watch == null) throw IOException("Не вдалося запустити watchLog")
-
-                    followJob = launch(Dispatchers.IO) {
-                        logger.info("Log watch reading coroutine started...")
-                        try {
-                            BufferedReader(InputStreamReader(watch.output)).use { localReader ->
-                                while (isActive) {
-                                    val line = localReader.readLine() ?: break
-                                    withContext(Dispatchers.Main) {
-                                        if (isActive) {
-                                            logState.value += line + "\n"
-                                            if (followLogs.value) { launch { scrollState.animateScrollTo(scrollState.maxValue) } }
-                                        } else { return@withContext }
-                                    }
-                                }
-                            }
-                        } catch (e: IOException) { if(isActive) logger.warn("Log stream ended: ${e.message}") else logger.info("Log stream cancelled.") }
-                        catch (e: Exception) { if(isActive) { logger.error("Error reading log stream", e); withContext(Dispatchers.Main) { if(isActive) { logState.value += "\nПОМИЛКА СТРІМІНГУ: ${e.message}\n" } } } else { logger.info("Error in cancelled scope") } }
-                        finally { logger.info("Log reading followJob finished.") }
-                    }
-                } // end if follow
-
+                
+                // 2. Слідкування за появою нових рядків логів
+                // Запускаємо окремий процес для отримання нових логів
+                if (followLogs.value) {
+                    // Fix: Call the regular function instead of an extension function
+                    startLogPolling(coroutineScope, namespace, podName, containerName, client, logState, scrollState, followLogs)
+                }
+                
             } catch (e: Exception) {
-                initialLogLoadError = e
-                logger.error("Помилка завантаження/запуску логів: ${e.message}", e)
-                withContext(Dispatchers.Main) { if (isActive) { logState.value = "Помилка логів: ${e.message}\n" } }
-            } finally {
-                withContext(Dispatchers.Main) {
-                    if (isActive) { isLogLoading = false } // Вимикаємо індикатор ТІЛЬКИ якщо корутина ще активна
+                logger.error("Error loading initial logs: ${e.message}", e)
+                withContext(Dispatchers.Main.immediate) {
+                    logState.value = "Error loading logs: ${e.message}"
+                    isLogLoading = false
                 }
             }
-        } // end logLoadingJob launch
+        }
 
         onDispose {
-            logger.info("LogViewerPanel DisposableEffect: Disposing for $namespace/$podName [$containerName].")
-            logLoadingJob.cancel()
-            runCatching { logWatchRef?.close() }.onFailure { logger.warn("Error closing log watch: ${it.message}") }
-            logWatchRef = null
+            logger.info("LogViewerPanel DisposableEffect: Stopping for $namespace/$podName [$containerName]")
+            initialLogJob.cancel()
+            logJob?.cancel()
+            logJob = null
         }
     }
 
-    // --- UI панелі логів ---
+    // Обробник зміни стану "Слідкувати"
+    LaunchedEffect(followLogs.value) {
+        if (followLogs.value && logJob == null) {
+            // Fix: Call the regular function with the scope as a parameter
+            startLogPolling(
+                coroutineScope, namespace, podName, containerName, 
+                client, logState, scrollState, followLogs
+            )
+        } else if (!followLogs.value) {
+            logJob?.cancel()
+            logJob = null
+        }
+    }
+
+    // UI code
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(Modifier.width(4.dp)); Text("Back") }
-            Text(text = "Logs: $namespace/$podName [$containerName]", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), 
+            verticalAlignment = Alignment.CenterVertically, 
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = onClose) { 
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                Spacer(Modifier.width(4.dp))
+                Text("Назад") 
+            }
+            Text(
+                text = "Logs: $namespace/$podName [$containerName] (${if(debugCounter > 0) "Active" else "Inactive"})", 
+                style = MaterialTheme.typography.titleMedium, 
+                maxLines = 1, 
+                overflow = TextOverflow.Ellipsis
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = followLogs.value, onCheckedChange = { followLogs.value = it })
-                Text("Follow", style = MaterialTheme.typography.bodyMedium)
+                Text("Слідкувати", style = MaterialTheme.typography.bodyMedium)
             }
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
-        Box(modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
-            val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-            // Індикатор завантаження логів
+        Box(modifier = Modifier
+            .weight(1f)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
+            
             if (isLogLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
-            Row(modifier = Modifier.fillMaxSize()){
-                BasicTextField(
-                    value = logState.value, onValueChange = { }, readOnly = true,
-                    textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
-                    modifier = Modifier.weight(1f).verticalScroll(scrollState).padding(8.dp)
+            
+            // Add a debug message to indicate if no logs are being displayed
+            if (logState.value.isEmpty() || logState.value == "Завантаження логів..." || logState.value == "Loading last $LOG_LINES_TO_TAIL lines...\n") {
+                Text(
+                    "No logs to display yet (poll count: $debugCounter)",
+                    modifier = Modifier.align(Alignment.Center),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
                 )
-                VerticalScrollbar( modifier = Modifier.fillMaxHeight(), adapter = rememberScrollbarAdapter(scrollState) )
+            }
+            
+            Row(modifier = Modifier.fillMaxSize()) {
+                // Use a more explicit text container to ensure visibility
+                Box(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
+                    Text(
+                        text = logState.value,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+                VerticalScrollbar(
+                    modifier = Modifier.fillMaxHeight(), 
+                    adapter = rememberScrollbarAdapter(scrollState)
+                )
             }
         }
     }
