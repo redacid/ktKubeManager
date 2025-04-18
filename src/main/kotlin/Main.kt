@@ -790,7 +790,7 @@ fun SecretDetailsView(secret: Secret) {
                 val releaseData = secret.data?.get("release")
                 if (releaseData != null) {
                     // Decode base64 first
-                    val decodedBytes = java.util.Base64.getDecoder().decode(releaseData)
+                    val decodedBytes = java.util.Base64.getDecoder().decode(java.util.Base64.getDecoder().decode(releaseData))
                     
                     // Decompress GZIP data
                     val bais = ByteArrayInputStream(decodedBytes)
