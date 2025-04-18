@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.HorizontalDivider as Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -62,6 +63,9 @@ import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper //extract helm release
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule //extract helm release
+import compose.icons.feathericons.CheckCircle
+import compose.icons.feathericons.HelpCircle
+import compose.icons.feathericons.XCircle
 import java.util.zip.GZIPInputStream  //extract helm release
 //import java.io.BufferedReader
 import java.io.ByteArrayInputStream
@@ -328,6 +332,25 @@ suspend fun loadRolesFabric8(client: KubernetesClient?, namespace: String?) = fe
 suspend fun loadRoleBindingsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "RoleBindings", namespace) { cl, ns -> if(ns == null) cl.rbac().roleBindings().inAnyNamespace().list().items else cl.rbac().roleBindings().inNamespace(ns).list().items }
 suspend fun loadClusterRolesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoles", null) { cl, _ -> cl.rbac().clusterRoles().list().items } // Cluster-scoped
 suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoleBindings", null) { cl, _ -> cl.rbac().clusterRoleBindings().list().items } // Cluster-scoped
+// Function to load endpoints for a service
+suspend fun loadEndpointsForService(client: KubernetesClient?, namespace: String?, serviceName: String?): Result<Endpoints> {
+    if (client == null || namespace.isNullOrEmpty() || serviceName.isNullOrEmpty()) {
+        return Result.failure(IllegalArgumentException("Client, namespace, and service name are required"))
+    }
+
+    return try {
+        val endpoints = client.endpoints()
+            .inNamespace(namespace)
+            .withName(serviceName)
+            .get()
+
+        Result.success(endpoints)
+    } catch (e: Exception) {
+        logger.error("Failed to load endpoints for service $serviceName in namespace $namespace", e)
+        Result.failure(e)
+    }
+}
+
 // --- Функція підключення з ретраями (використовує Config.autoConfigure(contextName)) ---
 suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
     val targetContext = if (contextName.isNullOrBlank()) null else contextName
@@ -619,7 +642,22 @@ fun NamespaceDetailsView(ns: Namespace) {
 }
 @Composable
 fun NodeDetailsView(node: Node) {
-    Column {
+    val scrollState = rememberScrollState()
+    val showCapacity = remember { mutableStateOf(false) }
+    val showConditions = remember { mutableStateOf(false) }
+    val showLabels = remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            //.verticalScroll(scrollState)
+            .padding(16.dp)
+    ) {
+        // Basic node information section
+        Text(
+            text = "Node Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
         DetailRow("Name", node.metadata?.name)
         DetailRow("Status", formatNodeStatus(node.status?.conditions))
         DetailRow("Roles", formatNodeRoles(node.metadata?.labels))
@@ -628,10 +666,269 @@ fun NodeDetailsView(node: Node) {
         DetailRow("OS Image", node.status?.nodeInfo?.osImage)
         DetailRow("Kernel Version", node.status?.nodeInfo?.kernelVersion)
         DetailRow("Container Runtime", node.status?.nodeInfo?.containerRuntimeVersion)
+        DetailRow("Architecture", node.status?.nodeInfo?.architecture)
         DetailRow("Internal IP", node.status?.addresses?.find { it.type == "InternalIP" }?.address)
         DetailRow("External IP", node.status?.addresses?.find { it.type == "ExternalIP" }?.address)
+        DetailRow("Hostname", node.status?.addresses?.find { it.type == "Hostname" }?.address)
         DetailRow("Taints", formatTaints(node.spec?.taints))
-        // TODO: Додати Capacity/Allocatable, Conditions
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Capacity & Allocatable Resources section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showCapacity.value = !showCapacity.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showCapacity.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Expand Capacity"
+            )
+            Text(
+                text = "Capacity & Allocatable Resources",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        if (showCapacity.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Create a table-like view for capacity and allocatable
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Resource",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "Capacity",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "Allocatable",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    // CPUs
+                    ResourceRow(
+                        name = "CPU",
+                        capacity = node.status?.capacity?.get("cpu"),
+                        allocatable = node.status?.allocatable?.get("cpu")
+                    )
+
+                    // Memory
+                    ResourceRow(
+                        name = "Memory",
+                        capacity = node.status?.capacity?.get("memory"),
+                        allocatable = node.status?.allocatable?.get("memory")
+                    )
+
+                    // Ephemeral Storage
+                    ResourceRow(
+                        name = "Ephemeral Storage",
+                        capacity = node.status?.capacity?.get("ephemeral-storage"),
+                        allocatable = node.status?.allocatable?.get("ephemeral-storage")
+                    )
+
+                    // Pods
+                    ResourceRow(
+                        name = "Pods",
+                        capacity = node.status?.capacity?.get("pods"),
+                        allocatable = node.status?.allocatable?.get("pods")
+                    )
+
+                    // Display other resources dynamically
+                    node.status?.capacity?.entries?.filter {
+                        !setOf("cpu", "memory", "ephemeral-storage", "pods").contains(it.key)
+                    }?.forEach { entry ->
+                        ResourceRow(
+                            name = entry.key,
+                            capacity = entry.value,
+                            allocatable = node.status?.allocatable?.get(entry.key)
+                        )
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Conditions section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showConditions.value = !showConditions.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showConditions.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Expand Conditions"
+            )
+            Text(
+                text = "Conditions",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        if (showConditions.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    node.status?.conditions?.forEach { condition ->
+                        val statusColor = when(condition.status) {
+                            "True" -> MaterialTheme.colorScheme.primary
+                            "False" -> if (condition.type == "Ready")
+                                MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = when(condition.status) {
+                                            "True" -> FeatherIcons.CheckCircle
+                                            "False" -> FeatherIcons.XCircle
+                                            else -> FeatherIcons.HelpCircle
+                                        },
+                                        contentDescription = "Condition Status",
+                                        tint = statusColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = condition.type ?: "Unknown",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = statusColor
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = condition.status ?: "Unknown",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = statusColor
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                DetailRow("Last Transition", formatAge(condition.lastTransitionTime))
+                                if (!condition.message.isNullOrBlank()) {
+                                    DetailRow("Message", condition.message)
+                                }
+                                if (!condition.reason.isNullOrBlank()) {
+                                    DetailRow("Reason", condition.reason)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Labels section
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showLabels.value = !showLabels.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showLabels.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Expand Labels"
+            )
+            Text(
+                text = "Labels",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        if (showLabels.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    node.metadata?.labels?.entries?.forEach { (key, value) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = key,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.weight(0.4f)
+                            )
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.6f)
+                            )
+                        }
+                    }
+
+                    if (node.metadata?.labels.isNullOrEmpty()) {
+                        Text(
+                            text = "No labels",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun ResourceRow(name: String, capacity: Quantity?, allocatable: Quantity?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = capacity?.amount ?: "-",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = allocatable?.amount ?: "-",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 @Composable
@@ -805,15 +1102,336 @@ fun DeploymentDetailsView(dep: Deployment) {
 }
 @Composable
 fun ServiceDetailsView(svc: Service) {
-    Column {
+    //val scrollState = rememberScrollState()
+    val showPorts = remember { mutableStateOf(false) }
+    val showEndpoints = remember { mutableStateOf(false) }
+    val showLabels = remember { mutableStateOf(false) }
+    val showAnnotations = remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            //.verticalScroll(scrollState)
+            .padding(16.dp)
+    ) {
+        // Basic service information section
+        Text(
+            text = "Service Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
         DetailRow("Name", svc.metadata?.name)
         DetailRow("Namespace", svc.metadata?.namespace)
         DetailRow("Created", formatAge(svc.metadata?.creationTimestamp))
         DetailRow("Type", svc.spec?.type)
         DetailRow("ClusterIP(s)", svc.spec?.clusterIPs?.joinToString(", "))
         DetailRow("External IP(s)", formatServiceExternalIP(svc))
-        DetailRow("Selector", svc.spec?.selector?.map { "${it.key}=${it.value}" }?.joinToString(", "))
-        DetailRow("Ports", formatPorts(svc.spec?.ports))
+        DetailRow("Session Affinity", svc.spec?.sessionAffinity ?: "None")
+
+        if (svc.spec?.type == "LoadBalancer") {
+            DetailRow("Load Balancer IP", svc.spec?.loadBalancerIP)
+            DetailRow("Load Balancer Class", svc.spec?.loadBalancerClass)
+            DetailRow("Allocate Load Balancer NodePorts", svc.spec?.allocateLoadBalancerNodePorts?.toString() ?: "true")
+        }
+
+        if (svc.spec?.type == "ExternalName") {
+            DetailRow("External Name", svc.spec?.externalName)
+        }
+
+        DetailRow("Traffic Policy", svc.spec?.externalTrafficPolicy ?: "Cluster")
+        DetailRow("IP Families", svc.spec?.ipFamilies?.joinToString(", "))
+        DetailRow("IP Family Policy", svc.spec?.ipFamilyPolicy)
+        DetailRow("Selector", svc.spec?.selector?.map { "${it.key}=${it.value}" }?.joinToString(", ") ?: "None")
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Ports section (expandable)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showPorts.value = !showPorts.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showPorts.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Expand Ports"
+            )
+            Text(
+                text = "Ports (${svc.spec?.ports?.size ?: 0})",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        if (showPorts.value && !svc.spec?.ports.isNullOrEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Header row
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Name",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(0.22f)
+                        )
+                        Text(
+                            text = "Port",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(0.18f)
+                        )
+                        Text(
+                            text = "Target Port",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(0.25f)
+                        )
+                        Text(
+                            text = "Protocol",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(0.2f)
+                        )
+                        Text(
+                            text = "Node Port",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(0.15f)
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    // Port rows
+                    svc.spec?.ports?.forEach { port ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = port.name ?: "-",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.22f)
+                            )
+                            Text(
+                                text = port.port?.toString() ?: "-",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.18f)
+                            )
+                            Text(
+                                text = port.targetPort?.toString() ?: "-",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.25f)
+                            )
+                            Text(
+                                text = port.protocol ?: "TCP",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.2f)
+                            )
+                            Text(
+                                text = port.nodePort?.toString() ?: "-",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.15f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+//        // Endpoints section
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .clickable { showEndpoints.value = !showEndpoints.value }
+//                .padding(vertical = 8.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Icon(
+//                imageVector = if (showEndpoints.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+//                contentDescription = "Expand Endpoints"
+//            )
+//            Text(
+//                text = "Service Endpoints",
+//                style = MaterialTheme.typography.titleMedium,
+//            )
+//        }
+//
+//        if (showEndpoints.value) {
+//            // This would require fetching Endpoints from the API separately
+//            // For demonstration, we'll show a placeholder with how to implement it
+//            Card(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+//            ) {
+//                Column(modifier = Modifier.padding(16.dp)) {
+//                    Text(
+//                        text = "Endpoints for service ${svc.metadata?.name} should be fetched separately from the Kubernetes API.",
+//                        style = MaterialTheme.typography.bodyMedium,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant
+//                    )
+//
+//                    Spacer(modifier = Modifier.height(8.dp))
+//
+//                    // Placeholder for how the implementation would look
+//                    Text(
+//                        text = "Implementation note: You would need to call:",
+//                        style = MaterialTheme.typography.bodySmall,
+//                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+//                    )
+//
+//                    Text(
+//                        text = "client.endpoints().inNamespace(${svc.metadata?.namespace}).withName(${svc.metadata?.name}).get()",
+//                        style = MaterialTheme.typography.bodySmall,
+//                        fontFamily = FontFamily.Monospace,
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .background(MaterialTheme.colorScheme.surface)
+//                            .padding(8.dp)
+//                    )
+//
+//                    // If you had the actual endpoints:
+//                    /*
+//                    endpoints.subsets?.forEach { subset ->
+//                        subset.addresses?.forEach { address ->
+//                            Row {
+//                                Text(address.ip ?: "")
+//                                // Show target references
+//                                if (address.targetRef != null) {
+//                                    Text("-> ${address.targetRef.kind}/${address.targetRef.name}")
+//                                }
+//                            }
+//                        }
+//                    }
+//                    */
+//                }
+//            }
+//        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Labels section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showLabels.value = !showLabels.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showLabels.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Expand Labels"
+            )
+            Text(
+                text = "Labels (${svc.metadata?.labels?.size ?: 0})",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        if (showLabels.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    svc.metadata?.labels?.entries?.forEach { (key, value) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = key,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.weight(0.4f)
+                            )
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.6f)
+                            )
+                        }
+                    }
+
+                    if (svc.metadata?.labels.isNullOrEmpty()) {
+                        Text(
+                            text = "No labels",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Annotations section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showAnnotations.value = !showAnnotations.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showAnnotations.value) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = "Expand Annotations"
+            )
+            Text(
+                text = "Annotations (${svc.metadata?.annotations?.size ?: 0})",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        if (showAnnotations.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    svc.metadata?.annotations?.entries?.forEach { (key, value) ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = key,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = 8.dp, top = 2.dp),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    if (svc.metadata?.annotations.isNullOrEmpty()) {
+                        Text(
+                            text = "No annotations",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // You could add a section for events related to this service if you implement that
     }
 }
 @Composable
@@ -840,6 +1458,7 @@ fun SecretDetailsView(secret: Secret) {
                 val releaseData = secret.data?.get("release")
                 if (releaseData != null) {
                     // Decode base64 first
+                    // cat hr3.txt | base64 -d | base64 -d | gzip -d
                     val decodedBytes = java.util.Base64.getDecoder().decode(java.util.Base64.getDecoder().decode(releaseData))
                     
                     // Decompress GZIP data
@@ -915,50 +1534,119 @@ fun SecretDetailsView(secret: Secret) {
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
                         )
-                        
+                        // Copy button for values
+                        IconButton(
+                            onClick = {
+                                try {
+                                    val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                    val selection = java.awt.datatransfer.StringSelection(valuesJson)
+                                    clipboard.setContents(selection, null)
+
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Values copied to clipboard",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Error copying: ${e.message}",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Copy,
+                                contentDescription = "Copy values",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = valuesJson,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.weight(1f)
-                            )
-                            
-                            // Copy button for values
-                            IconButton(
-                                onClick = {
-                                    try {
-                                        val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                        val selection = java.awt.datatransfer.StringSelection(valuesJson)
-                                        clipboard.setContents(selection, null)
-                                        
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = "Values copied to clipboard",
-                                                duration = SnackbarDuration.Short
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = "Error copying: ${e.message}",
-                                                duration = SnackbarDuration.Short
-                                            )
-                                        }
-                                    }
-                                }
+                            SelectionContainer(
+                                modifier = Modifier
+                                    .padding(16.dp),
                             ) {
-                                Icon(
-                                    imageVector = FeatherIcons.Copy,
-                                    contentDescription = "Copy values",
-                                    tint = MaterialTheme.colorScheme.primary
+                                Text(
+                                    softWrap = true,
+                                    text = valuesJson,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
+
+                        }
+                    }
+                    //Global Values
+                    val valuesGlobal = ((releaseInfo["chart"] as? Map<*, *>)?.get("values") as? Map<*, *>)
+                    if (valuesGlobal != null && valuesGlobal.isNotEmpty()) {
+                        // Convert to JSON for display
+                        val mapper = ObjectMapper().registerKotlinModule()
+                        val valuesGlobalJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(valuesGlobal)
+
+                        Text(
+                            text = "GlobalValues:",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                        )
+                        // Copy button for values
+                        IconButton(
+
+                            onClick = {
+                                try {
+                                    val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                    val selection = java.awt.datatransfer.StringSelection(valuesGlobalJson)
+                                    clipboard.setContents(selection, null)
+
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Values copied to clipboard",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Error copying: ${e.message}",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Copy,
+                                contentDescription = "Copy valuesGlobal",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            SelectionContainer(
+                                modifier = Modifier
+                                    .padding(16.dp),
+                                ) {
+                                Text(
+                                    softWrap = true,
+                                    text = valuesGlobalJson,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
                         }
                     }
                 } else {
