@@ -2260,13 +2260,13 @@ fun App() {
                             ExposedDropdownMenuBox(
                                 expanded = isNamespaceDropdownExpanded,
                                 onExpandedChange = { if (isFilterEnabled) isNamespaceDropdownExpanded = it },
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                             ) {
                                 TextField( // M3 TextField
                                     value = selectedNamespaceFilter,
                                     onValueChange = {}, // ReadOnly
                                     readOnly = true,
-                                    label = { Text("Namespace Filter") },
+                                    //label = { Text("Namespace Filter") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
                                     modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                                         .fillMaxWidth(), // menuAnchor для M3
@@ -2314,7 +2314,7 @@ fun App() {
                                 }
                             }
                             Divider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(4.dp))
                         }
                         // --- КІНЕЦЬ ФІЛЬТРА ---
 
