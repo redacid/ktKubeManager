@@ -83,7 +83,7 @@ private val logger = LoggerFactory.getLogger("MainKtNamespaceFilter")
 
 // --- Константи ---
 const val MAX_CONNECT_RETRIES = 1
-const val RETRY_DELAY_MS = 1000L
+//const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
 //const val FABRIC8_VERSION = "6.13.5"
@@ -148,9 +148,9 @@ fun formatJobDuration(status: JobStatus?): String {
     val end = status?.completionTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     return when { start == null -> "<pending>"; end == null -> Duration.between(start, OffsetDateTime.now(start.offset)).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s" }
 }
-fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
-    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
-}
+//fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
+//    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
+//}
 fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
         "Namespaces" -> listOf("Name", "Status", "Age")
@@ -288,7 +288,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
             return Result.success(resultPair)
         } catch (e: Exception) {
             lastError = e; logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
-            if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
+            //if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
         }
     }
     logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
