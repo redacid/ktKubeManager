@@ -108,7 +108,6 @@ fun formatContextNameForDisplay(contextName: String): String {
         contextName
     }
 }
-
 fun formatAge(creationTimestamp: String?): String {
     if (creationTimestamp.isNullOrBlank()) return "N/A"
     try {
@@ -237,7 +236,6 @@ suspend fun <T> fetchK8sResource(
     } catch (e: KubernetesClientException) { logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e) }
     catch (e: Exception) { logger.error("Помилка $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e) }
 }
-
 suspend fun loadNamespacesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Namespaces", null) { cl, _ -> cl.namespaces().list().items } // Namespaces не фільтруються
 suspend fun loadNodesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Nodes", null) { cl, _ -> cl.nodes().list().items } // Nodes не фільтруються
 suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Pods", namespace) { cl, ns -> if (ns == null) cl.pods().inAnyNamespace().list().items else cl.pods().inNamespace(ns).list().items }
@@ -260,7 +258,6 @@ suspend fun loadRolesFabric8(client: KubernetesClient?, namespace: String?) = fe
 suspend fun loadRoleBindingsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "RoleBindings", namespace) { cl, ns -> if(ns == null) cl.rbac().roleBindings().inAnyNamespace().list().items else cl.rbac().roleBindings().inNamespace(ns).list().items }
 suspend fun loadClusterRolesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoles", null) { cl, _ -> cl.rbac().clusterRoles().list().items } // Cluster-scoped
 suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoleBindings", null) { cl, _ -> cl.rbac().clusterRoleBindings().list().items } // Cluster-scoped
-
 // --- Функція підключення з ретраями (використовує Config.autoConfigure(contextName)) ---
 suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
     val targetContext = if (contextName.isNullOrBlank()) null else contextName
@@ -952,20 +949,6 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
     }
 }
 @Composable
-//fun PVDetailsView(pv: PersistentVolume) {
-//    Column {
-//        DetailRow("Name", pv.metadata?.name)
-//        DetailRow("Created", formatAge(pv.metadata?.creationTimestamp))
-//        DetailRow("Status", pv.status?.phase)
-//        DetailRow("Claim", pv.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" })
-//        DetailRow("Reclaim Policy", pv.spec?.persistentVolumeReclaimPolicy)
-//        DetailRow("Access Modes", formatAccessModes(pv.spec?.accessModes))
-//        DetailRow("Storage Class", pv.spec?.storageClassName)
-//        DetailRow("Capacity", pv.spec?.capacity?.get("storage")?.toString())
-//        DetailRow("Volume Mode", pv.spec?.volumeMode)
-//        // TODO: Source details (NFS, HostPath, etc.)
-//    }
-//}
 fun PVDetailsView(pv: PersistentVolume) {
     Column {
         DetailRow("Name", pv.metadata?.name)
@@ -1123,7 +1106,6 @@ fun PVDetailsView(pv: PersistentVolume) {
         }
     }
 }
-
 @Composable
 fun PVCDetailsView(pvc: PersistentVolumeClaim) {
     Column {
@@ -1469,7 +1451,6 @@ fun IngressDetailsView(ing: Ingress) {
         }
     }
 }
-
 @Composable
 fun ResourceDetailPanel(
     resource: Any?,
@@ -1520,7 +1501,6 @@ fun ResourceDetailPanel(
         }
     }
 }
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogViewerPanel(
@@ -2194,7 +2174,6 @@ fun App() {
         } // Кінець Surface M3
     } // Кінець MaterialTheme M3
 }
-
 @Composable
 fun ResourceTreeView(
     rootIds: List<String>,
@@ -2215,7 +2194,6 @@ fun ResourceTreeView(
         }
     }
 }
-
 @Composable
 fun ResourceTreeNode(
     nodeId: String,
