@@ -24,7 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
+//import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,7 +35,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.dp
+//import androidx.compose.ui.unit.dp
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
 import compose.icons.feathericons.ArrowDown
@@ -69,11 +69,9 @@ import compose.icons.feathericons.XCircle
 import java.util.zip.GZIPInputStream  //extract helm release
 //import java.io.BufferedReader
 import java.io.ByteArrayInputStream
-import java.io.IOException 
-
+import java.io.IOException
 import java.time.Duration
 import java.time.OffsetDateTime
-
 
 // TODO: check NS filter for all resources (e.g. Pods)
 
@@ -92,18 +90,24 @@ val resourceLeafNodes: Set<String> = setOf(
     "Services", "Ingresses", "PersistentVolumes", "PersistentVolumeClaims", "StorageClasses", "ConfigMaps", "Secrets",
     "ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"
 )
+
 // Мапа для визначення, чи є ресурс неймспейсним (спрощено)
-val namespacedResources: Set<String> = resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings")
+val namespacedResources: Set<String> =
+    resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings")
+
 // Логер
 private val logger = LoggerFactory.getLogger("MainKtNamespaceFilter")
 
 // --- Константи ---
 const val MAX_CONNECT_RETRIES = 1
+
 //const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
+
 //const val FABRIC8_VERSION = "6.13.5"
 const val LOG_LINES_TO_TAIL = 50
+
 // ---
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
 
@@ -182,6 +186,7 @@ fun formatContextNameForDisplay(contextName: String): String {
         contextName
     }
 }
+
 fun formatAge(creationTimestamp: String?): String {
     if (creationTimestamp.isNullOrBlank()) return "N/A"
     try {
@@ -194,33 +199,99 @@ fun formatAge(creationTimestamp: String?): String {
             duration.toMinutes() > 0 -> "${duration.toMinutes()}m"
             else -> "${duration.seconds}s"
         }
-    } catch (e: Exception) { logger.warn("Failed to format timestamp '$creationTimestamp': ${e.message}"); return "Invalid" }
+    } catch (e: Exception) {
+        logger.warn("Failed to format timestamp '$creationTimestamp': ${e.message}"); return "Invalid"
+    }
 }
-fun formatPodContainers(statuses: List<ContainerStatus>?): String { val total = statuses?.size ?: 0; val ready = statuses?.count { it.ready == true } ?: 0; return "$ready/$total" }
-fun formatPodRestarts(statuses: List<ContainerStatus>?): String { return statuses?.sumOf { it.restartCount ?: 0 }?.toString() ?: "0" }
-fun formatNodeStatus(conditions: List<NodeCondition>?): String { val ready = conditions?.find { it.type == "Ready" }; return when (ready?.status) { "True" -> "Ready"; "False" -> "NotReady${ready.reason?.let { " ($it)" } ?: ""}"; else -> "Unknown" } }
-fun formatNodeRoles(labels: Map<String, String>?): String { val r = labels?.filterKeys { it.startsWith("node-role.kubernetes.io/") }?.map { it.key.substringAfter('/') }?.sorted()?.joinToString(","); return if(r.isNullOrEmpty()) "<none>" else r }
-fun formatTaints(taints: List<Taint>?): String { return taints?.size?.toString() ?: "0" }
-fun formatPorts(ports: List<ServicePort>?): String { if (ports.isNullOrEmpty()) return "<none>"; return ports.joinToString(", ") { p -> "${p.port}${p.nodePort?.let { ":$it" } ?: ""}/${p.protocol ?: "TCP"}${p.name?.let { "($it)" } ?: ""}" } }
+
+fun formatPodContainers(statuses: List<ContainerStatus>?): String {
+    val total = statuses?.size ?: 0;
+    val ready = statuses?.count { it.ready == true } ?: 0; return "$ready/$total"
+}
+
+fun formatPodRestarts(statuses: List<ContainerStatus>?): String {
+    return statuses?.sumOf { it.restartCount ?: 0 }?.toString() ?: "0"
+}
+
+fun formatNodeStatus(conditions: List<NodeCondition>?): String {
+    val ready = conditions?.find { it.type == "Ready" }; return when (ready?.status) {
+        "True" -> "Ready"; "False" -> "NotReady${ready.reason?.let { " ($it)" } ?: ""}"; else -> "Unknown"
+    }
+}
+
+fun formatNodeRoles(labels: Map<String, String>?): String {
+    val r =
+        labels?.filterKeys { it.startsWith("node-role.kubernetes.io/") }?.map { it.key.substringAfter('/') }?.sorted()
+            ?.joinToString(","); return if (r.isNullOrEmpty()) "<none>" else r
+}
+
+fun formatTaints(taints: List<Taint>?): String {
+    return taints?.size?.toString() ?: "0"
+}
+
+fun formatPorts(ports: List<ServicePort>?): String {
+    if (ports.isNullOrEmpty()) return "<none>"; return ports.joinToString(", ") { p -> "${p.port}${p.nodePort?.let { ":$it" } ?: ""}/${p.protocol ?: "TCP"}${p.name?.let { "($it)" } ?: ""}" }
+}
+
 fun formatServiceExternalIP(service: Service?): String {
     if (service == null) return "<none>"
     val ips = mutableListOf<String>()
     when (service.spec?.type) {
-        "LoadBalancer" -> { service.status?.loadBalancer?.ingress?.forEach { ingress -> ingress.ip?.let { ips.add(it) }; ingress.hostname?.let { ips.add(it) } } }
-        "NodePort", "ClusterIP" -> { service.spec?.clusterIPs?.let { ips.addAll(it.filterNotNull()) } }
-        "ExternalName" -> { return service.spec?.externalName ?: "<none>" }
+        "LoadBalancer" -> {
+            service.status?.loadBalancer?.ingress?.forEach { ingress ->
+                ingress.ip?.let { ips.add(it) }; ingress.hostname?.let {
+                ips.add(
+                    it
+                )
+            }
+            }
+        }
+
+        "NodePort", "ClusterIP" -> {
+            service.spec?.clusterIPs?.let { ips.addAll(it.filterNotNull()) }
+        }
+
+        "ExternalName" -> {
+            return service.spec?.externalName ?: "<none>"
+        }
     }
     return if (ips.isEmpty() || (ips.size == 1 && ips[0].isBlank())) "<none>" else ips.joinToString(",")
 }
-fun formatIngressHosts(rules: List<IngressRule>?): String { val hosts = rules?.mapNotNull { it.host }?.distinct() ?: emptyList(); return if (hosts.isEmpty()) "*" else hosts.joinToString(",") }
-fun formatIngressAddress(ingresses: List<IngressLoadBalancerIngress>?): String { val addresses = mutableListOf<String>(); ingresses?.forEach { ingress -> ingress.ip?.let { addresses.add(it) }; ingress.hostname?.let { addresses.add(it) } }; return if (addresses.isEmpty()) "<none>" else addresses.joinToString(",") }
-fun formatIngressPorts(tls: List<IngressTLS>?): String { return if (tls.isNullOrEmpty()) "80" else "80, 443" }
-fun formatAccessModes(modes: List<String>?): String { return modes?.joinToString(",") ?: "<none>" }
+
+fun formatIngressHosts(rules: List<IngressRule>?): String {
+    val hosts = rules?.mapNotNull { it.host }?.distinct()
+        ?: emptyList(); return if (hosts.isEmpty()) "*" else hosts.joinToString(",")
+}
+
+fun formatIngressAddress(ingresses: List<IngressLoadBalancerIngress>?): String {
+    val addresses = mutableListOf<String>(); ingresses?.forEach { ingress ->
+        ingress.ip?.let { addresses.add(it) }; ingress.hostname?.let {
+        addresses.add(
+            it
+        )
+    }
+    }; return if (addresses.isEmpty()) "<none>" else addresses.joinToString(",")
+}
+
+fun formatIngressPorts(tls: List<IngressTLS>?): String {
+    return if (tls.isNullOrEmpty()) "80" else "80, 443"
+}
+
+fun formatAccessModes(modes: List<String>?): String {
+    return modes?.joinToString(",") ?: "<none>"
+}
+
 fun formatJobDuration(status: JobStatus?): String {
     val start = status?.startTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     val end = status?.completionTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-    return when { start == null -> "<pending>"; end == null -> Duration.between(start, OffsetDateTime.now(start.offset)).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s" }
+    return when {
+        start == null -> "<pending>"; end == null -> Duration.between(
+            start,
+            OffsetDateTime.now(start.offset)
+        ).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s"
+    }
 }
+
 //fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
 //    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
 //}
@@ -237,8 +308,28 @@ fun getHeadersForType(resourceType: String): List<String> {
         "CronJobs" -> listOf("Namespace", "Name", "Schedule", "Suspend", "Active", "Last Schedule", "Age")
         "Services" -> listOf("Namespace", "Name", "Type", "ClusterIP", "ExternalIP", "Ports", "Age")
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
-        "PersistentVolumes" -> listOf("Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age")
-        "PersistentVolumeClaims" -> listOf("Namespace", "Name", "Status", "Volume", "Capacity", "Access Modes", "StorageClass", "Age")
+        "PersistentVolumes" -> listOf(
+            "Name",
+            "Capacity",
+            "Access Modes",
+            "Reclaim Policy",
+            "Status",
+            "Claim",
+            "StorageClass",
+            "Age"
+        )
+
+        "PersistentVolumeClaims" -> listOf(
+            "Namespace",
+            "Name",
+            "Status",
+            "Volume",
+            "Capacity",
+            "Access Modes",
+            "StorageClass",
+            "Age"
+        )
+
         "StorageClasses" -> listOf("Name", "Provisioner", "Reclaim Policy", "Binding Mode", "Allow Expand", "Age")
         "ConfigMaps" -> listOf("Namespace", "Name", "Data", "Age")
         "Secrets" -> listOf("Namespace", "Name", "Type", "Data", "Age")
@@ -250,31 +341,195 @@ fun getHeadersForType(resourceType: String): List<String> {
         else -> listOf("Name")
     }
 }
+
 fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
     val na = "N/A"
     try {
         return when (resourceType) {
-            "Namespaces" -> if (resource is Namespace) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> resource.status?.phase ?: na; 2 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Nodes" -> if (resource is Node) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> formatNodeStatus(resource.status?.conditions); 2 -> formatNodeRoles(resource.metadata?.labels); 3 -> resource.status?.nodeInfo?.kubeletVersion ?: na; 4 -> formatTaints(resource.spec?.taints); 5 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Pods" -> if (resource is Pod) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> formatPodContainers(resource.status?.containerStatuses); 3 -> resource.status?.phase ?: na; 4 -> formatPodRestarts(resource.status?.containerStatuses); 5 -> resource.spec?.nodeName ?: "<none>"; 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Deployments" -> if (resource is Deployment) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"; 3 -> resource.status?.updatedReplicas?.toString() ?: "0"; 4 -> resource.status?.availableReplicas?.toString() ?: "0"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "StatefulSets" -> if (resource is StatefulSet) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "DaemonSets" -> if (resource is DaemonSet) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.status?.desiredNumberScheduled?.toString() ?: "0"; 3 -> resource.status?.currentNumberScheduled?.toString() ?: "0"; 4 -> resource.status?.numberReady?.toString() ?: "0"; 5 -> resource.status?.updatedNumberScheduled?.toString() ?: "0"; 6 -> resource.status?.numberAvailable?.toString() ?: "0"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "ReplicaSets" -> if (resource is ReplicaSet) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.replicas?.toString() ?: "0"; 3 -> resource.status?.replicas?.toString() ?: "0"; 4 -> resource.status?.readyReplicas?.toString() ?: "0"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Jobs" -> if (resource is  io.fabric8.kubernetes.api.model.batch.v1.Job) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> "${resource.status?.succeeded ?: 0}/${resource.spec?.completions ?: '?'}" ; 3 -> formatJobDuration(resource.status); 4 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "CronJobs" -> if (resource is CronJob) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.schedule ?: na; 3 -> resource.spec?.suspend?.toString() ?: "false"; 4 -> resource.status?.active?.size?.toString() ?: "0"; 5 -> resource.status?.lastScheduleTime?.let { formatAge(it) } ?: "<never>"; 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Services" -> if (resource is Service) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.type ?: na; 3 -> resource.spec?.clusterIPs?.joinToString(",") ?: na; 4 -> formatServiceExternalIP(resource); 5 -> formatPorts(resource.spec?.ports); 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Ingresses" -> if (resource is Ingress) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.spec?.ingressClassName ?: "<none>"; 3 -> formatIngressHosts(resource.spec?.rules); 4 -> formatIngressAddress(resource.status?.loadBalancer?.ingress); 5 -> formatIngressPorts(resource.spec?.tls); 6 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "PersistentVolumes" -> if (resource is PersistentVolume) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> resource.spec?.capacity?.get("storage")?.toString() ?: na; 2 -> formatAccessModes(resource.spec?.accessModes); 3 -> resource.spec?.persistentVolumeReclaimPolicy ?: na; 4 -> resource.status?.phase ?: na; 5 -> resource.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" } ?: "<none>"; 6 -> resource.spec?.storageClassName ?: "<none>"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.status?.phase ?: na; 3 -> resource.spec?.volumeName ?: "<none>"; 4 -> resource.status?.capacity?.get("storage")?.toString() ?: na; 5 -> formatAccessModes(resource.spec?.accessModes); 6 -> resource.spec?.storageClassName ?: "<none>"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "StorageClasses" -> if (resource is StorageClass) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> resource.provisioner ?: na; 2 -> resource.reclaimPolicy ?: na; 3 -> resource.volumeBindingMode ?: na; 4 -> resource.allowVolumeExpansion?.toString() ?: "false"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "ConfigMaps" -> if (resource is ConfigMap) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.data?.size?.toString() ?: "0"; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Secrets" -> if (resource is Secret) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.type ?: na; 3 -> (resource.data?.size ?: 0).plus(resource.stringData?.size ?: 0).toString(); 4 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "ServiceAccounts" -> if (resource is ServiceAccount) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.secrets?.size?.toString() ?: "0"; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "Roles" -> if (resource is Role) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "RoleBindings" -> if (resource is RoleBinding) { when (colIndex) { 0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.roleRef?.kind ?: na; 3 -> resource.roleRef.name ?: na; 4 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "ClusterRoles" -> if (resource is ClusterRole) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
-            "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) { when (colIndex) { 0 -> resource.metadata?.name ?: na; 1 -> resource.roleRef?.kind ?: na; 2 -> resource.roleRef.name ?: na; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> "" } } else ""
+            "Namespaces" -> if (resource is Namespace) {
+                when (colIndex) {
+                    0 -> resource.metadata?.name ?: na; 1 -> resource.status?.phase
+                    ?: na; 2 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Nodes" -> if (resource is Node) {
+                when (colIndex) {
+                    0 -> resource.metadata?.name
+                        ?: na; 1 -> formatNodeStatus(resource.status?.conditions); 2 -> formatNodeRoles(resource.metadata?.labels); 3 -> resource.status?.nodeInfo?.kubeletVersion
+                    ?: na; 4 -> formatTaints(resource.spec?.taints); 5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Pods" -> if (resource is Pod) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> formatPodContainers(resource.status?.containerStatuses); 3 -> resource.status?.phase
+                    ?: na; 4 -> formatPodRestarts(resource.status?.containerStatuses); 5 -> resource.spec?.nodeName
+                    ?: "<none>"; 6 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Deployments" -> if (resource is Deployment) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"; 3 -> resource.status?.updatedReplicas?.toString()
+                    ?: "0"; 4 -> resource.status?.availableReplicas?.toString()
+                    ?: "0"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "StatefulSets" -> if (resource is StatefulSet) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"; 3 -> formatAge(
+                    resource.metadata?.creationTimestamp
+                ); else -> ""
+                }
+            } else ""
+
+            "DaemonSets" -> if (resource is DaemonSet) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.status?.desiredNumberScheduled?.toString()
+                    ?: "0"; 3 -> resource.status?.currentNumberScheduled?.toString()
+                    ?: "0"; 4 -> resource.status?.numberReady?.toString()
+                    ?: "0"; 5 -> resource.status?.updatedNumberScheduled?.toString()
+                    ?: "0"; 6 -> resource.status?.numberAvailable?.toString()
+                    ?: "0"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "ReplicaSets" -> if (resource is ReplicaSet) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.spec?.replicas?.toString() ?: "0"; 3 -> resource.status?.replicas?.toString()
+                    ?: "0"; 4 -> resource.status?.readyReplicas?.toString()
+                    ?: "0"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> "${resource.status?.succeeded ?: 0}/${resource.spec?.completions ?: '?'}"; 3 -> formatJobDuration(
+                    resource.status
+                ); 4 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "CronJobs" -> if (resource is CronJob) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.spec?.schedule ?: na; 3 -> resource.spec?.suspend?.toString()
+                    ?: "false"; 4 -> resource.status?.active?.size?.toString()
+                    ?: "0"; 5 -> resource.status?.lastScheduleTime?.let { formatAge(it) } ?: "<never>"; 6 -> formatAge(
+                    resource.metadata?.creationTimestamp
+                ); else -> ""
+                }
+            } else ""
+
+            "Services" -> if (resource is Service) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.spec?.type ?: na; 3 -> resource.spec?.clusterIPs?.joinToString(",")
+                    ?: na; 4 -> formatServiceExternalIP(resource); 5 -> formatPorts(resource.spec?.ports); 6 -> formatAge(
+                    resource.metadata?.creationTimestamp
+                ); else -> ""
+                }
+            } else ""
+
+            "Ingresses" -> if (resource is Ingress) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.spec?.ingressClassName
+                    ?: "<none>"; 3 -> formatIngressHosts(resource.spec?.rules); 4 -> formatIngressAddress(resource.status?.loadBalancer?.ingress); 5 -> formatIngressPorts(
+                    resource.spec?.tls
+                ); 6 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "PersistentVolumes" -> if (resource is PersistentVolume) {
+                when (colIndex) {
+                    0 -> resource.metadata?.name ?: na; 1 -> resource.spec?.capacity?.get("storage")?.toString()
+                    ?: na; 2 -> formatAccessModes(resource.spec?.accessModes); 3 -> resource.spec?.persistentVolumeReclaimPolicy
+                    ?: na; 4 -> resource.status?.phase
+                    ?: na; 5 -> resource.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" }
+                    ?: "<none>"; 6 -> resource.spec?.storageClassName
+                    ?: "<none>"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.status?.phase ?: na; 3 -> resource.spec?.volumeName
+                    ?: "<none>"; 4 -> resource.status?.capacity?.get("storage")?.toString()
+                    ?: na; 5 -> formatAccessModes(resource.spec?.accessModes); 6 -> resource.spec?.storageClassName
+                    ?: "<none>"; 7 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "StorageClasses" -> if (resource is StorageClass) {
+                when (colIndex) {
+                    0 -> resource.metadata?.name ?: na; 1 -> resource.provisioner ?: na; 2 -> resource.reclaimPolicy
+                    ?: na; 3 -> resource.volumeBindingMode ?: na; 4 -> resource.allowVolumeExpansion?.toString()
+                    ?: "false"; 5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "ConfigMaps" -> if (resource is ConfigMap) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.data?.size?.toString()
+                    ?: "0"; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Secrets" -> if (resource is Secret) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name ?: na; 2 -> resource.type
+                    ?: na; 3 -> (resource.data?.size ?: 0).plus(resource.stringData?.size ?: 0)
+                    .toString(); 4 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "ServiceAccounts" -> if (resource is ServiceAccount) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.secrets?.size?.toString()
+                    ?: "0"; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Roles" -> if (resource is Role) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "RoleBindings" -> if (resource is RoleBinding) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na; 1 -> resource.metadata?.name
+                    ?: na; 2 -> resource.roleRef?.kind ?: na; 3 -> resource.roleRef.name
+                    ?: na; 4 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "ClusterRoles" -> if (resource is ClusterRole) {
+                when (colIndex) {
+                    0 -> resource.metadata?.name ?: na; 1 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) {
+                when (colIndex) {
+                    0 -> resource.metadata?.name ?: na; 1 -> resource.roleRef?.kind ?: na; 2 -> resource.roleRef.name
+                    ?: na; 3 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
             else -> if (resource is HasMetadata) resource.metadata?.name ?: "?" else "?"
         }
     } catch (e: Exception) {
@@ -283,6 +538,7 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
         return "<error>"
     }
 }
+
 suspend fun <T> fetchK8sResource(
     client: KubernetesClient?,
     resourceType: String,
@@ -307,33 +563,132 @@ suspend fun <T> fetchK8sResource(
             logger.warn("Не вдалося сортувати $resourceType: ${e.message}")
             Result.success(items)
         }
-    } catch (e: KubernetesClientException) { logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e) }
-    catch (e: Exception) { logger.error("Помилка $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e) }
+    } catch (e: KubernetesClientException) {
+        logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
+    } catch (e: Exception) {
+        logger.error("Помилка $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
+    }
 }
-suspend fun loadNamespacesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Namespaces", null) { cl, _ -> cl.namespaces().list().items } // Namespaces не фільтруються
-suspend fun loadNodesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "Nodes", null) { cl, _ -> cl.nodes().list().items } // Nodes не фільтруються
-suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Pods", namespace) { cl, ns -> if (ns == null) cl.pods().inAnyNamespace().list().items else cl.pods().inNamespace(ns).list().items }
-suspend fun loadDeploymentsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Deployments", namespace) { cl, ns -> if (ns == null) cl.apps().deployments().inAnyNamespace().list().items else cl.apps().deployments().inNamespace(ns).list().items }
+
+suspend fun loadNamespacesFabric8(client: KubernetesClient?) =
+    fetchK8sResource(client, "Namespaces", null) { cl, _ -> cl.namespaces().list().items } // Namespaces не фільтруються
+
+suspend fun loadNodesFabric8(client: KubernetesClient?) =
+    fetchK8sResource(client, "Nodes", null) { cl, _ -> cl.nodes().list().items } // Nodes не фільтруються
+
+suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Pods", namespace) { cl, ns ->
+        if (ns == null) cl.pods().inAnyNamespace().list().items else cl.pods().inNamespace(ns).list().items
+    }
+
+suspend fun loadDeploymentsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Deployments", namespace) { cl, ns ->
+        if (ns == null) cl.apps().deployments().inAnyNamespace().list().items else cl.apps().deployments()
+            .inNamespace(ns).list().items
+    }
+
 // ... і так далі для всіх інших типів ресурсів ...
-suspend fun loadStatefulSetsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "StatefulSets", namespace) { cl, ns -> if(ns == null) cl.apps().statefulSets().inAnyNamespace().list().items else cl.apps().statefulSets().inNamespace(ns).list().items }
-suspend fun loadDaemonSetsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "DaemonSets", namespace) { cl, ns -> if(ns == null) cl.apps().daemonSets().inAnyNamespace().list().items else cl.apps().daemonSets().inNamespace(ns).list().items }
-suspend fun loadReplicaSetsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "ReplicaSets", namespace) { cl, ns -> if(ns == null) cl.apps().replicaSets().inAnyNamespace().list().items else cl.apps().replicaSets().inNamespace(ns).list().items }
-suspend fun loadJobsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Jobs", namespace) { cl, ns -> if(ns == null) cl.batch().v1().jobs().inAnyNamespace().list().items else cl.batch().v1().jobs().inNamespace(ns).list().items }
-suspend fun loadCronJobsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "CronJobs", namespace) { cl, ns -> if(ns == null) cl.batch().v1().cronjobs().inAnyNamespace().list().items else cl.batch().v1().cronjobs().inNamespace(ns).list().items }
-suspend fun loadServicesFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Services", namespace) { cl, ns -> if(ns == null) cl.services().inAnyNamespace().list().items else cl.services().inNamespace(ns).list().items }
-suspend fun loadIngressesFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Ingresses", namespace) { cl, ns -> if(ns == null) cl.network().v1().ingresses().inAnyNamespace().list().items else cl.network().v1().ingresses().inNamespace(ns).list().items }
-suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumes", null) { cl, _ -> cl.persistentVolumes().list().items } // Cluster-scoped
-suspend fun loadPVCsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "PersistentVolumeClaims", namespace) { cl, ns -> if(ns == null) cl.persistentVolumeClaims().inAnyNamespace().list().items else cl.persistentVolumeClaims().inNamespace(ns).list().items }
-suspend fun loadStorageClassesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "StorageClasses", null) { cl, _ -> cl.storage().v1().storageClasses().list().items } // Cluster-scoped
-suspend fun loadConfigMapsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "ConfigMaps", namespace) { cl, ns -> if(ns == null) cl.configMaps().inAnyNamespace().list().items else cl.configMaps().inNamespace(ns).list().items }
-suspend fun loadSecretsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Secrets", namespace) { cl, ns -> if(ns == null) cl.secrets().inAnyNamespace().list().items else cl.secrets().inNamespace(ns).list().items }
-suspend fun loadServiceAccountsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "ServiceAccounts", namespace) { cl, ns -> if(ns == null) cl.serviceAccounts().inAnyNamespace().list().items else cl.serviceAccounts().inNamespace(ns).list().items }
-suspend fun loadRolesFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "Roles", namespace) { cl, ns -> if(ns == null) cl.rbac().roles().inAnyNamespace().list().items else cl.rbac().roles().inNamespace(ns).list().items }
-suspend fun loadRoleBindingsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(client, "RoleBindings", namespace) { cl, ns -> if(ns == null) cl.rbac().roleBindings().inAnyNamespace().list().items else cl.rbac().roleBindings().inNamespace(ns).list().items }
-suspend fun loadClusterRolesFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoles", null) { cl, _ -> cl.rbac().clusterRoles().list().items } // Cluster-scoped
-suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "ClusterRoleBindings", null) { cl, _ -> cl.rbac().clusterRoleBindings().list().items } // Cluster-scoped
+suspend fun loadStatefulSetsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "StatefulSets", namespace) { cl, ns ->
+        if (ns == null) cl.apps().statefulSets().inAnyNamespace().list().items else cl.apps().statefulSets()
+            .inNamespace(ns).list().items
+    }
+
+suspend fun loadDaemonSetsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "DaemonSets", namespace) { cl, ns ->
+        if (ns == null) cl.apps().daemonSets().inAnyNamespace().list().items else cl.apps().daemonSets().inNamespace(ns)
+            .list().items
+    }
+
+suspend fun loadReplicaSetsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "ReplicaSets", namespace) { cl, ns ->
+        if (ns == null) cl.apps().replicaSets().inAnyNamespace().list().items else cl.apps().replicaSets()
+            .inNamespace(ns).list().items
+    }
+
+suspend fun loadJobsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Jobs", namespace) { cl, ns ->
+        if (ns == null) cl.batch().v1().jobs().inAnyNamespace().list().items else cl.batch().v1().jobs().inNamespace(ns)
+            .list().items
+    }
+
+suspend fun loadCronJobsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "CronJobs", namespace) { cl, ns ->
+        if (ns == null) cl.batch().v1().cronjobs().inAnyNamespace().list().items else cl.batch().v1().cronjobs()
+            .inNamespace(ns).list().items
+    }
+
+suspend fun loadServicesFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Services", namespace) { cl, ns ->
+        if (ns == null) cl.services().inAnyNamespace().list().items else cl.services().inNamespace(ns).list().items
+    }
+
+suspend fun loadIngressesFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Ingresses", namespace) { cl, ns ->
+        if (ns == null) cl.network().v1().ingresses().inAnyNamespace().list().items else cl.network().v1().ingresses()
+            .inNamespace(ns).list().items
+    }
+
+suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumes", null) { cl, _ ->
+    cl.persistentVolumes().list().items
+} // Cluster-scoped
+
+suspend fun loadPVCsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(
+    client,
+    "PersistentVolumeClaims",
+    namespace
+) { cl, ns ->
+    if (ns == null) cl.persistentVolumeClaims().inAnyNamespace().list().items else cl.persistentVolumeClaims()
+        .inNamespace(ns).list().items
+}
+
+suspend fun loadStorageClassesFabric8(client: KubernetesClient?) =
+    fetchK8sResource(client, "StorageClasses", null) { cl, _ ->
+        cl.storage().v1().storageClasses().list().items
+    } // Cluster-scoped
+
+suspend fun loadConfigMapsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "ConfigMaps", namespace) { cl, ns ->
+        if (ns == null) cl.configMaps().inAnyNamespace().list().items else cl.configMaps().inNamespace(ns).list().items
+    }
+
+suspend fun loadSecretsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Secrets", namespace) { cl, ns ->
+        if (ns == null) cl.secrets().inAnyNamespace().list().items else cl.secrets().inNamespace(ns).list().items
+    }
+
+suspend fun loadServiceAccountsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "ServiceAccounts", namespace) { cl, ns ->
+        if (ns == null) cl.serviceAccounts().inAnyNamespace().list().items else cl.serviceAccounts().inNamespace(ns)
+            .list().items
+    }
+
+suspend fun loadRolesFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Roles", namespace) { cl, ns ->
+        if (ns == null) cl.rbac().roles().inAnyNamespace().list().items else cl.rbac().roles().inNamespace(ns)
+            .list().items
+    }
+
+suspend fun loadRoleBindingsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "RoleBindings", namespace) { cl, ns ->
+        if (ns == null) cl.rbac().roleBindings().inAnyNamespace().list().items else cl.rbac().roleBindings()
+            .inNamespace(ns).list().items
+    }
+
+suspend fun loadClusterRolesFabric8(client: KubernetesClient?) =
+    fetchK8sResource(client, "ClusterRoles", null) { cl, _ -> cl.rbac().clusterRoles().list().items } // Cluster-scoped
+
+suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) =
+    fetchK8sResource(client, "ClusterRoleBindings", null) { cl, _ ->
+        cl.rbac().clusterRoleBindings().list().items
+    } // Cluster-scoped
+
 // Function to load endpoints for a service
-suspend fun loadEndpointsForService(client: KubernetesClient?, namespace: String?, serviceName: String?): Result<Endpoints> {
+suspend fun loadEndpointsForService(
+    client: KubernetesClient?,
+    namespace: String?,
+    serviceName: String?
+): Result<Endpoints> {
     if (client == null || namespace.isNullOrEmpty() || serviceName.isNullOrEmpty()) {
         return Result.failure(IllegalArgumentException("Client, namespace, and service name are required"))
     }
@@ -384,6 +739,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
     logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
     return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
 }
+
 @Composable
 fun KubeTableHeaderRow(
     headers: List<String>,
@@ -411,8 +767,9 @@ fun KubeTableHeaderRow(
         }
     }
 }
+
 @Composable
-fun <T: HasMetadata> KubeTableRow(
+fun <T : HasMetadata> KubeTableRow(
     item: T,
     headers: List<String>,
     resourceType: String,
@@ -440,6 +797,7 @@ fun <T: HasMetadata> KubeTableRow(
         }
     }
 }
+
 @Composable
 fun DetailRow(label: String, value: String?) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -455,6 +813,7 @@ fun DetailRow(label: String, value: String?) {
         )
     }
 }
+
 // === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА (M3) ===
 @Composable
 fun ContainerSelectionDialog(
@@ -469,18 +828,29 @@ fun ContainerSelectionDialog(
         text = {
             Column {
                 containers.forEach { containerName ->
-                    Row( Modifier.fillMaxWidth().clickable { selectedOption = containerName }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically ) {
-                        RadioButton( selected = (containerName == selectedOption), onClick = { selectedOption = containerName } )
+                    Row(
+                        Modifier.fillMaxWidth().clickable { selectedOption = containerName }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (containerName == selectedOption),
+                            onClick = { selectedOption = containerName })
                         Spacer(Modifier.width(8.dp))
                         Text(containerName)
                     }
                 }
             }
         },
-        confirmButton = { Button( onClick = { onContainerSelected(selectedOption) }, enabled = selectedOption.isNotEmpty() ) { Text("View Logs") } },
+        confirmButton = {
+            Button(
+                onClick = { onContainerSelected(selectedOption) },
+                enabled = selectedOption.isNotEmpty()
+            ) { Text("View Logs") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
+
 // ===
 @Composable
 fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функція для базових метаданих
@@ -493,6 +863,7 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
     DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
     DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
 }
+
 @Composable
 fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) { // Додано onShowLogsRequest
     val showContainerDialog = remember { mutableStateOf(false) }
@@ -539,19 +910,29 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Text("Containers:", style = MaterialTheme.typography.titleMedium)
         pod.status?.containerStatuses?.forEach { cs ->
-            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)).padding(4.dp) ) {
+            Column(
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
+            ) {
                 DetailRow("  Name", cs.name)
                 DetailRow("  Image", cs.image)
                 DetailRow("  Ready", cs.ready?.toString())
                 DetailRow("  Restarts", cs.restartCount?.toString())
-                DetailRow("  State", cs.state?.let { when { it.running != null -> "Running"; it.waiting != null -> "Waiting (${it.waiting.reason})"; it.terminated != null -> "Terminated (${it.terminated.reason}, Exit: ${it.terminated.exitCode})"; else -> "?" } })
+                DetailRow("  State", cs.state?.let {
+                    when {
+                        it.running != null -> "Running"; it.waiting != null -> "Waiting (${it.waiting.reason})"; it.terminated != null -> "Terminated (${it.terminated.reason}, Exit: ${it.terminated.exitCode})"; else -> "?"
+                    }
+                })
                 DetailRow("  Image ID", cs.imageID)
             }
         }
-        if (pod.status?.containerStatuses.isNullOrEmpty()) { Text("  (No container statuses)", modifier = Modifier.padding(start=8.dp)) }
+        if (pod.status?.containerStatuses.isNullOrEmpty()) {
+            Text("  (No container statuses)", modifier = Modifier.padding(start = 8.dp))
+        }
         // ---
     }
 }
+
 @Composable
 fun NamespaceDetailsView(ns: Namespace) {
     Column {
@@ -589,7 +970,11 @@ fun NamespaceDetailsView(ns: Namespace) {
                 }
             }
         } else if (labelsExpanded.value) {
-            Text("No labels", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "No labels",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
         }
 
@@ -636,10 +1021,15 @@ fun NamespaceDetailsView(ns: Namespace) {
                 }
             }
         } else if (annotationsExpanded.value) {
-            Text("No annotations", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "No annotations",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
+
 @Composable
 fun NodeDetailsView(node: Node) {
     val scrollState = rememberScrollState()
@@ -792,11 +1182,12 @@ fun NodeDetailsView(node: Node) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     node.status?.conditions?.forEach { condition ->
-                        val statusColor = when(condition.status) {
+                        val statusColor = when (condition.status) {
                             "True" -> MaterialTheme.colorScheme.primary
                             "False" -> if (condition.type == "Ready")
                                 MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.primary
+
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
 
@@ -809,7 +1200,7 @@ fun NodeDetailsView(node: Node) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = when(condition.status) {
+                                        imageVector = when (condition.status) {
                                             "True" -> FeatherIcons.CheckCircle
                                             "False" -> FeatherIcons.XCircle
                                             else -> FeatherIcons.HelpCircle
@@ -906,6 +1297,7 @@ fun NodeDetailsView(node: Node) {
         }
     }
 }
+
 @Composable
 fun ResourceRow(name: String, capacity: Quantity?, allocatable: Quantity?) {
     Row(
@@ -931,6 +1323,7 @@ fun ResourceRow(name: String, capacity: Quantity?, allocatable: Quantity?) {
         )
     }
 }
+
 @Composable
 fun DeploymentDetailsView(dep: Deployment) {
     Column {
@@ -979,8 +1372,10 @@ fun DeploymentDetailsView(dep: Deployment) {
         Text("Pod Template:", style = MaterialTheme.typography.titleMedium)
 
         // Template labels
-        Text("  Labels:", style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(start = 8.dp, top = 4.dp))
+        Text(
+            "  Labels:", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+        )
         dep.spec?.template?.metadata?.labels?.forEach { (key, value) ->
             DetailRow("    $key", value)
         }
@@ -989,8 +1384,10 @@ fun DeploymentDetailsView(dep: Deployment) {
         }
 
         // Template containers
-        Text("  Containers:", style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(start = 8.dp, top = 4.dp))
+        Text(
+            "  Containers:", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+        )
         dep.spec?.template?.spec?.containers?.forEach { container ->
             Column(
                 modifier = Modifier
@@ -1004,18 +1401,24 @@ fun DeploymentDetailsView(dep: Deployment) {
 
                 // Container ports
                 if (!container.ports.isNullOrEmpty()) {
-                    Text("Ports:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        "Ports:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                     container.ports.forEach { port ->
-                        DetailRow("  ${port.name ?: port.containerPort}",
-                            "${port.containerPort}/${port.protocol ?: "TCP"}")
+                        DetailRow(
+                            "  ${port.name ?: port.containerPort}",
+                            "${port.containerPort}/${port.protocol ?: "TCP"}"
+                        )
                     }
                 }
 
                 // Resource requirements
                 container.resources?.let { resources ->
-                    Text("Resources:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        "Resources:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                     resources.limits?.forEach { (key, value) ->
                         DetailRow("  Limit $key", value.toString())
                     }
@@ -1026,17 +1429,22 @@ fun DeploymentDetailsView(dep: Deployment) {
 
                 // Environment variables
                 if (!container.env.isNullOrEmpty()) {
-                    Text("Environment:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        "Environment:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                     container.env.forEach { env ->
                         val valueText = when {
                             env.value != null -> env.value
                             env.valueFrom?.configMapKeyRef != null ->
                                 "ConfigMap: ${env.valueFrom?.configMapKeyRef?.name}.${env.valueFrom?.configMapKeyRef?.key}"
+
                             env.valueFrom?.secretKeyRef != null ->
                                 "Secret: ${env.valueFrom?.secretKeyRef?.name}.${env.valueFrom?.secretKeyRef?.key}"
+
                             env.valueFrom?.fieldRef != null ->
                                 "Field: ${env.valueFrom?.fieldRef?.fieldPath}"
+
                             else -> "<complex>"
                         }
                         DetailRow("  ${env.name}", valueText)
@@ -1045,8 +1453,11 @@ fun DeploymentDetailsView(dep: Deployment) {
 
                 // Volume mounts
                 if (!container.volumeMounts.isNullOrEmpty()) {
-                    Text("Volume Mounts:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        "Volume Mounts:",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                     container.volumeMounts.forEach { mount ->
                         DetailRow("  ${mount.name}", "${mount.mountPath}${if (mount.readOnly == true) " (ro)" else ""}")
                     }
@@ -1059,8 +1470,10 @@ fun DeploymentDetailsView(dep: Deployment) {
 
         // Volumes
         if (!dep.spec?.template?.spec?.volumes.isNullOrEmpty()) {
-            Text("  Volumes:", style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(start = 8.dp, top = 4.dp))
+            Text(
+                "  Volumes:", style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+            )
             dep.spec?.template?.spec?.volumes?.forEach { volume ->
                 Column(
                     modifier = Modifier
@@ -1075,24 +1488,29 @@ fun DeploymentDetailsView(dep: Deployment) {
                             DetailRow("Type", "ConfigMap")
                             DetailRow("ConfigMap Name", volume.configMap.name)
                         }
+
                         volume.secret != null -> {
                             DetailRow("Type", "Secret")
                             DetailRow("Secret Name", volume.secret.secretName)
                         }
+
                         volume.persistentVolumeClaim != null -> {
                             DetailRow("Type", "PVC")
                             DetailRow("Claim Name", volume.persistentVolumeClaim.claimName)
                             DetailRow("Read Only", volume.persistentVolumeClaim.readOnly?.toString() ?: "false")
                         }
+
                         volume.emptyDir != null -> {
                             DetailRow("Type", "EmptyDir")
                             DetailRow("Medium", volume.emptyDir.medium ?: "")
                         }
+
                         volume.hostPath != null -> {
                             DetailRow("Type", "HostPath")
                             DetailRow("Path", volume.hostPath.path)
                             DetailRow("Type", volume.hostPath.type ?: "")
                         }
+
                         else -> DetailRow("Type", "<complex>")
                     }
                 }
@@ -1100,6 +1518,7 @@ fun DeploymentDetailsView(dep: Deployment) {
         }
     }
 }
+
 @Composable
 fun ServiceDetailsView(svc: Service) {
     //val scrollState = rememberScrollState()
@@ -1434,6 +1853,7 @@ fun ServiceDetailsView(svc: Service) {
         // You could add a section for events related to this service if you implement that
     }
 }
+
 @Composable
 fun SecretDetailsView(secret: Secret) {
     // For displaying copy notification
@@ -1442,14 +1862,14 @@ fun SecretDetailsView(secret: Secret) {
     // Coroutine scope for showing snackbar
     // Корутин скоуп для показу снекбара
     val coroutineScope = rememberCoroutineScope()
-    
+
     // Check if this is a Helm release secret
     val isHelmRelease = secret.type == "helm.sh/release.v1"
-    
+
     // For storing Helm release data
     var helmReleaseInfo by remember { mutableStateOf<Map<String, Any?>?>(null) }
     var helmReleaseError by remember { mutableStateOf<String?>(null) }
-    
+
     // Process Helm release data if needed
     LaunchedEffect(secret) {
         if (isHelmRelease && secret.data?.isNotEmpty() == true) {
@@ -1459,13 +1879,14 @@ fun SecretDetailsView(secret: Secret) {
                 if (releaseData != null) {
                     // Decode base64 first
                     // cat hr3.txt | base64 -d | base64 -d | gzip -d
-                    val decodedBytes = java.util.Base64.getDecoder().decode(java.util.Base64.getDecoder().decode(releaseData))
-                    
+                    val decodedBytes =
+                        java.util.Base64.getDecoder().decode(java.util.Base64.getDecoder().decode(releaseData))
+
                     // Decompress GZIP data
                     val bais = ByteArrayInputStream(decodedBytes)
                     val gzis = GZIPInputStream(bais)
                     val decompressedData = gzis.readBytes()
-                    
+
                     // Parse JSON data
                     val mapper = ObjectMapper().registerKotlinModule()
                     val helmData = mapper.readValue(decompressedData, Map::class.java) as Map<String, Any?>
@@ -1481,8 +1902,8 @@ fun SecretDetailsView(secret: Secret) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                //.fillMaxSize()
-                //.verticalScroll(rememberScrollState())
+            //.fillMaxSize()
+            //.verticalScroll(rememberScrollState())
         ) {
             DetailRow("Name", secret.metadata?.name)
             DetailRow("Namespace", secret.metadata?.namespace)
@@ -1496,7 +1917,7 @@ fun SecretDetailsView(secret: Secret) {
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
-                
+
                 if (helmReleaseError != null) {
                     Text(
                         text = helmReleaseError!!,
@@ -1507,7 +1928,7 @@ fun SecretDetailsView(secret: Secret) {
                 } else if (helmReleaseInfo != null) {
                     // Display Helm release data
                     val releaseInfo = helmReleaseInfo!!
-                    
+
                     // Extract and display key information
                     val name = (releaseInfo["name"] as? String) ?: "Unknown"
                     val version = (releaseInfo["version"] as? Int)?.toString() ?: "Unknown"
@@ -1515,20 +1936,20 @@ fun SecretDetailsView(secret: Secret) {
                     val chart = ((releaseInfo["chart"] as? Map<*, *>)?.get("metadata") as? Map<*, *>)?.let {
                         "${it["name"]}:${it["version"]}"
                     } ?: "Unknown"
-                    
+
                     // Display main info
                     DetailRow("Release Name", name)
                     DetailRow("Release Version", version)
                     DetailRow("Release Status", status)
                     DetailRow("Chart", chart)
-                    
+
                     // Display values data
                     val values = releaseInfo["config"] as? Map<*, *>
                     if (values != null && values.isNotEmpty()) {
                         // Convert to JSON for display
                         val mapper = ObjectMapper().registerKotlinModule()
                         val valuesJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(values)
-                        
+
                         Text(
                             text = "Values:",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
@@ -1564,25 +1985,32 @@ fun SecretDetailsView(secret: Secret) {
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Row(
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.Top
+                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            SelectionContainer(
+                            Row(
                                 modifier = Modifier
-                                    .padding(16.dp),
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Text(
-                                    softWrap = true,
-                                    text = valuesJson,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
+                                SelectionContainer(
+                                    modifier = Modifier
+                                        .padding(16.dp),
+                                ) {
+                                    Text(
+                                        softWrap = true,
+                                        text = valuesJson,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
 
+                            }
                         }
                     }
                     //Global Values
@@ -1628,25 +2056,32 @@ fun SecretDetailsView(secret: Secret) {
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Row(
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.Top
+                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            SelectionContainer(
+                            Row(
                                 modifier = Modifier
-                                    .padding(16.dp),
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                SelectionContainer(
+                                    modifier = Modifier
+                                        .padding(16.dp),
                                 ) {
-                                Text(
-                                    softWrap = true,
-                                    text = valuesGlobalJson,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
+                                    Text(
+                                        softWrap = true,
+                                        text = valuesGlobalJson,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
 
+                            }
                         }
                     }
                 } else {
@@ -1658,9 +2093,9 @@ fun SecretDetailsView(secret: Secret) {
                 }
             } else {
                 // Regular secret data handling (original code for non-Helm secrets)
-                
+
                 // Data section header
-            // Заголовок секції Data
+                // Заголовок секції Data
                 Text(
                     text = "Secret Data:",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
@@ -1668,7 +2103,7 @@ fun SecretDetailsView(secret: Secret) {
                 )
 
                 // Display keys and their values
-            // Відображення ключів та їх значень
+                // Відображення ключів та їх значень
                 secret.data?.forEach { (key, encodedValue) ->
                     var isDecoded by remember { mutableStateOf(false) }
                     var decodedValue by remember { mutableStateOf("") }
@@ -1687,7 +2122,7 @@ fun SecretDetailsView(secret: Secret) {
                         )
 
                         // Value (encoded or decoded)
-                    // Значення (закодоване або декодоване)
+                        // Значення (закодоване або декодоване)
                         Text(
                             text = if (isDecoded) decodedValue else encodedValue,
                             style = MaterialTheme.typography.bodyMedium,
@@ -1695,19 +2130,19 @@ fun SecretDetailsView(secret: Secret) {
                         )
 
                         // Copy icon
-                    // Іконка для копіювання
+                        // Іконка для копіювання
                         IconButton(
                             onClick = {
                                 val textToCopy = if (isDecoded) decodedValue else encodedValue
                                 try {
                                     // Copy text to clipboard
-                                // Копіюємо текст у буфер обміну
+                                    // Копіюємо текст у буфер обміну
                                     val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
                                     val selection = java.awt.datatransfer.StringSelection(textToCopy)
                                     clipboard.setContents(selection, null)
 
                                     // Show successful copy notification
-                                // Показуємо сповіщення про успішне копіювання
+                                    // Показуємо сповіщення про успішне копіювання
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
                                             message = "Value for '$key' copied to clipboard",
@@ -1716,7 +2151,7 @@ fun SecretDetailsView(secret: Secret) {
                                     }
                                 } catch (e: Exception) {
                                     // Show error notification
-                                // Сповіщаємо про помилку
+                                    // Сповіщаємо про помилку
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
                                             message = "Error copying: ${e.message}",
@@ -1734,7 +2169,7 @@ fun SecretDetailsView(secret: Secret) {
                         }
 
                         // Decode/encode icon
-                    // Іконка для декодування/кодування
+                        // Іконка для декодування/кодування
                         IconButton(
                             onClick = {
                                 if (!isDecoded) {
@@ -1748,7 +2183,7 @@ fun SecretDetailsView(secret: Secret) {
                                     }
                                 } else {
                                     // Return to encoded view
-                                // Повертаємося в закодований вигляд
+                                    // Повертаємося в закодований вигляд
                                     isDecoded = false
                                 }
                             }
@@ -1826,9 +2261,10 @@ fun SecretDetailsView(secret: Secret) {
                 }
 
                 // If no data in the secret
-            // Якщо немає даних у секреті
+                // Якщо немає даних у секреті
                 if ((secret.data == null || secret.data!!.isEmpty()) &&
-                    (secret.stringData == null || secret.stringData!!.isEmpty())) {
+                    (secret.stringData == null || secret.stringData!!.isEmpty())
+                ) {
                     Text(
                         text = "No data in this Secret",
                         style = MaterialTheme.typography.bodyMedium,
@@ -1848,8 +2284,10 @@ fun SecretDetailsView(secret: Secret) {
         )
     }
 }
+
 @Composable
 fun ConfigMapDetailsView(cm: ConfigMap) {
+    // TODO change vertical align cmname,copybutton
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1925,6 +2363,7 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
         )
     }
 }
+
 @Composable
 fun PVDetailsView(pv: PersistentVolume) {
     Column {
@@ -2056,8 +2495,11 @@ fun PVDetailsView(pv: PersistentVolume) {
                         DetailRow("FS Type", spec.csi.fsType ?: "<not specified>")
 
                         if (!spec.csi.volumeAttributes.isNullOrEmpty()) {
-                            Text("Volume Attributes:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                modifier = Modifier.padding(top = 2.dp))
+                            Text(
+                                "Volume Attributes:",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
                             spec.csi.volumeAttributes.forEach { (key, value) ->
                                 DetailRow("  $key", value)
                             }
@@ -2075,14 +2517,17 @@ fun PVDetailsView(pv: PersistentVolume) {
                     // Empty - no source provided
                     else -> {
                         DetailRow("Type", "<unknown>")
-                        Text("No volume source details available", style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(vertical = 4.dp))
+                        Text(
+                            "No volume source details available", style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                 }
             }
         }
     }
 }
+
 @Composable
 fun PVCDetailsView(pvc: PersistentVolumeClaim) {
     Column {
@@ -2137,8 +2582,10 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
             Column(modifier = Modifier.padding(start = 8.dp)) {
                 // Match Labels
                 if (!selector.matchLabels.isNullOrEmpty()) {
-                    Text("Match Labels:", style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(top = 4.dp))
+                    Text(
+                        "Match Labels:", style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                     selector.matchLabels.forEach { (key, value) ->
                         DetailRow("  $key", value)
                     }
@@ -2146,8 +2593,10 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
 
                 // Match Expressions
                 if (!selector.matchExpressions.isNullOrEmpty()) {
-                    Text("Match Expressions:", style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(top = 4.dp))
+                    Text(
+                        "Match Expressions:", style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                     selector.matchExpressions.forEach { expr ->
                         val values = if (expr.values.isNullOrEmpty()) "<none>" else expr.values.joinToString(", ")
                         DetailRow("  ${expr.key} ${expr.operator}", values)
@@ -2232,6 +2681,7 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
         }
     }
 }
+
 @Composable
 fun IngressDetailsView(ing: Ingress) {
     Column {
@@ -2276,7 +2726,10 @@ fun IngressDetailsView(ing: Ingress) {
         Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Text("Rules:", style = MaterialTheme.typography.titleMedium)
         ing.spec?.rules?.forEachIndexed { index, rule ->
-            Text("  Rule ${index + 1}: Host: ${rule.host ?: "*"}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+            Text(
+                "  Rule ${index + 1}: Host: ${rule.host ?: "*"}",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+            )
             rule.http?.paths?.forEach { path ->
                 Column(modifier = Modifier.padding(start = 16.dp)) {
                     DetailRow("    Path", path.path ?: "/")
@@ -2314,7 +2767,10 @@ fun IngressDetailsView(ing: Ingress) {
         Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Text("TLS:", style = MaterialTheme.typography.titleMedium)
         ing.spec?.tls?.forEach { tls ->
-            Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)).padding(4.dp) ) {
+            Column(
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
+            ) {
                 DetailRow("  Hosts", tls.hosts?.joinToString(", "))
                 DetailRow("  Secret Name", tls.secretName)
             }
@@ -2331,7 +2787,7 @@ fun IngressDetailsView(ing: Ingress) {
                 Column(
                     modifier = Modifier
                         .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         .padding(4.dp)
                 ) {
                     DetailRow("  IP", ingress.ip)
@@ -2339,8 +2795,10 @@ fun IngressDetailsView(ing: Ingress) {
 
                     // Ports (in newer API versions)
                     if (!ingress.ports.isNullOrEmpty()) {
-                        Text("  Ports:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            modifier = Modifier.padding(top = 4.dp))
+                        Text(
+                            "  Ports:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                         ingress.ports.forEach { port ->
                             DetailRow("    ${port.port}", port.protocol ?: "TCP")
                         }
@@ -2350,18 +2808,18 @@ fun IngressDetailsView(ing: Ingress) {
         }
 
         // Conditions section (newer API versions may include this)
-        val conditions = ing.status?.let { 
+        val conditions = ing.status?.let {
             try {
                 it::class.members.find { member -> member.name == "conditions" }?.call(it) as? List<*>
             } catch (e: Exception) {
                 null
             }
         }
-        
+
         if (!conditions.isNullOrEmpty()) {
             Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
             Text("Conditions:", style = MaterialTheme.typography.titleMedium)
-        
+
             conditions.forEach { condition ->
                 Column(
                     modifier = Modifier
@@ -2374,9 +2832,11 @@ fun IngressDetailsView(ing: Ingress) {
                     val status = condition?.let { if (it is Map<*, *>) it["status"] as? String else null }
                     val reason = condition?.let { if (it is Map<*, *>) it["reason"] as? String else null }
                     val message = condition?.let { if (it is Map<*, *>) it["message"] as? String else null }
-                    val lastTransitionTime = condition?.let { if (it is Map<*, *>) it["lastTransitionTime"] as? String else null }
-                    val observedGeneration = condition?.let { if (it is Map<*, *>) it["observedGeneration"]?.toString() else null }
-        
+                    val lastTransitionTime =
+                        condition?.let { if (it is Map<*, *>) it["lastTransitionTime"] as? String else null }
+                    val observedGeneration =
+                        condition?.let { if (it is Map<*, *>) it["observedGeneration"]?.toString() else null }
+
                     DetailRow("Type", type)
                     DetailRow("Status", status)
                     DetailRow("Reason", reason)
@@ -2428,6 +2888,7 @@ fun IngressDetailsView(ing: Ingress) {
         }
     }
 }
+
 @Composable
 fun ResourceDetailPanel(
     resource: Any?,
@@ -2440,10 +2901,19 @@ fun ResourceDetailPanel(
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         // --- Верхня панель ---
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(Modifier.width(4.dp)); Text("Back to List") }
+            Button(onClick = onClose) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back"); Spacer(
+                Modifier.width(4.dp)
+            ); Text("Back")
+            }
             Spacer(Modifier.weight(1f))
             val name = if (resource is HasMetadata) resource.metadata?.name else "Details"
-            Text(text = "$resourceType: $name", style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = "$resourceType: $name",
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Spacer(Modifier.weight(1f))
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -2453,9 +2923,20 @@ fun ResourceDetailPanel(
         Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 // --- Виклик відповідного DetailsView ---
-                when(resourceType) {
+                when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName -> (resource as? HasMetadata)?.metadata?.let { meta -> onShowLogsRequest(meta.namespace, meta.name, containerName) } ?: logger.error("Metadata is null for Pod.") } ) else Text("Invalid Pod data")
+                    "Pods" -> if (resource is Pod) PodDetailsView(
+                        pod = resource,
+                        onShowLogsRequest = { containerName ->
+                            (resource as? HasMetadata)?.metadata?.let { meta ->
+                                onShowLogsRequest(
+                                    meta.namespace,
+                                    meta.name,
+                                    containerName
+                                )
+                            } ?: logger.error("Metadata is null for Pod.")
+                        }) else Text("Invalid Pod data")
+
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -2463,7 +2944,10 @@ fun ResourceDetailPanel(
                     "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
+                        "Invalid PVC data"
+                    )
+
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     // TODO: Додати кейси для всіх інших типів ресурсів (StatefulSet, DaemonSet, Role, etc.)
                     else -> {
@@ -2478,6 +2962,7 @@ fun ResourceDetailPanel(
         }
     }
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogViewerPanel(
@@ -2511,21 +2996,21 @@ fun LogViewerPanel(
     ) {
         logJob?.cancel()
         var lastTimestamp = System.currentTimeMillis()
-        
+
         logJob = scope.launch {
             logger.info("Starting log polling for $namespace/$podName/$containerName")
             while (isActive && followLogs.value) {
                 try {
                     delay(1000) // Poll every second
-                    
+
                     // Отримуємо тільки нові логи з моменту останнього запиту
                     // Convert the Long to Int for sinceSeconds
                     val sinceSeconds = ((System.currentTimeMillis() - lastTimestamp) / 1000 + 1).toInt()
                     lastTimestamp = System.currentTimeMillis()
-                    
+
                     // Debug log to verify that the coroutine is running
                     logger.debug("Polling logs - iteration ${++debugCounter}")
-                    
+
                     // Створюємо watchLog без sinceTime - просто слідкуємо за новими логами
                     // Робимо окремий запит для отримання тільки нових логів
                     val newLogs = withContext(Dispatchers.IO) {
@@ -2536,15 +3021,15 @@ fun LogViewerPanel(
                             ?.tailingLines(100)
                             ?.withPrettyOutput()
                             ?.log
-                        
+
                         // Debug log to verify if we're getting logs from Kubernetes
                         if (logs != null && logs.isNotEmpty()) {
                             logger.info("Retrieved new logs - length: ${logs.length} chars")
                         }
-                        
+
                         logs
                     } ?: ""
-                    
+
                     // Пропускаємо початкові логи, що дублюються з тими, які ми вже отримали
                     if (newLogs.isNotEmpty()) {
                         // Use withContext(Dispatchers.Main.immediate) to ensure UI updates immediately
@@ -2553,25 +3038,27 @@ fun LogViewerPanel(
                                 // Explicitly show that we're appending logs
                                 val currentText = logState.value
                                 // Додаємо нові логи до існуючих
-                                val textToAppend = if (currentText.endsWith("\n") || currentText.isEmpty()) newLogs else "\n$newLogs"
-                                val separator = "--------------------------------------------------------------------------------------------\n"
+                                val textToAppend =
+                                    if (currentText.endsWith("\n") || currentText.isEmpty()) newLogs else "\n$newLogs"
+                                val separator =
+                                    "--------------------------------------------------------------------------------------------\n"
                                 val newText = currentText + separator + textToAppend
-                                
+
                                 // Debug log to track text appending
                                 logger.info("Appending logs - current: ${currentText.length} chars, new: ${newText.length} chars")
-                                
+
                                 // Update the state with new text
                                 logState.value = newText
-                                
+
                                 // Force UI refresh by incrementing debug counter
                                 debugCounter++
-                                
+
                                 // Auto-scroll with a slight delay
                                 // Автоматична прокрутка вниз
                                 if (followLogs.value) {
-                                    launch { 
+                                    launch {
                                         delay(50)
-                                        scrollState.animateScrollTo(scrollState.maxValue) 
+                                        scrollState.animateScrollTo(scrollState.maxValue)
                                     }
                                 }
                             }
@@ -2608,27 +3095,36 @@ fun LogViewerPanel(
                         ?.withPrettyOutput()
                         ?.log
                 } ?: "Failed to load logs."
-                
+
                 logger.info("Initial logs fetched: ${initialLogs.length} characters")
-                
+
                 withContext(Dispatchers.Main.immediate) {
                     // Explicitly clear and set instead of just replacing
                     logState.value = "=== Log start ===\n$initialLogs"
                     delay(100)
                     scrollState.animateScrollTo(scrollState.maxValue)
                     isLogLoading = false
-                    
+
                     // Force a UI refresh
                     debugCounter++
                 }
-                
+
                 // 2. Слідкування за появою нових рядків логів
                 // Запускаємо окремий процес для отримання нових логів
                 if (followLogs.value) {
                     // Fix: Call the regular function instead of an extension function
-                    startLogPolling(coroutineScope, namespace, podName, containerName, client, logState, scrollState, followLogs)
+                    startLogPolling(
+                        coroutineScope,
+                        namespace,
+                        podName,
+                        containerName,
+                        client,
+                        logState,
+                        scrollState,
+                        followLogs
+                    )
                 }
-                
+
             } catch (e: Exception) {
                 logger.error("Error loading initial logs: ${e.message}", e)
                 withContext(Dispatchers.Main.immediate) {
@@ -2651,7 +3147,7 @@ fun LogViewerPanel(
         if (followLogs.value && logJob == null) {
             // Fix: Call the regular function with the scope as a parameter
             startLogPolling(
-                coroutineScope, namespace, podName, containerName, 
+                coroutineScope, namespace, podName, containerName,
                 client, logState, scrollState, followLogs
             )
         } else if (!followLogs.value) {
@@ -2662,18 +3158,20 @@ fun LogViewerPanel(
 
     // UI code
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), 
-            verticalAlignment = Alignment.CenterVertically, 
-            horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = onClose) { 
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Button(onClick = onClose) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 Spacer(Modifier.width(4.dp))
-                Text("Назад") 
+                Text("Назад")
             }
             Text(
-                text = "Logs: $namespace/$podName [$containerName] (${if(debugCounter > 0) "Active" else "Inactive"})", 
-                style = MaterialTheme.typography.titleMedium, 
-                maxLines = 1, 
+                text = "Logs: $namespace/$podName [$containerName] (${if (debugCounter > 0) "Active" else "Inactive"})",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2682,15 +3180,17 @@ fun LogViewerPanel(
             }
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
-        Box(modifier = Modifier
-            .weight(1f)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
-            
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        ) {
+
             if (isLogLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
-            
+
             // Add a debug message to indicate if no logs are being displayed
             if (logState.value.isEmpty() || logState.value == "Завантаження логів..." || logState.value == "Loading last $LOG_LINES_TO_TAIL lines...\n") {
                 Text(
@@ -2700,7 +3200,7 @@ fun LogViewerPanel(
                     color = MaterialTheme.colorScheme.error
                 )
             }
-            
+
             Row(modifier = Modifier.fillMaxSize()) {
                 // Use a more explicit text container to ensure visibility
                 Box(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
@@ -2714,13 +3214,14 @@ fun LogViewerPanel(
                     )
                 }
                 VerticalScrollbar(
-                    modifier = Modifier.fillMaxHeight(), 
+                    modifier = Modifier.fillMaxHeight(),
                     adapter = rememberScrollbarAdapter(scrollState)
                 )
             }
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
 @Composable
 @Preview
@@ -2762,18 +3263,25 @@ fun App() {
     var detailedResourceType by remember { mutableStateOf<String?>(null) }
     // Стани для лог вікна
     val showLogViewer = remember { mutableStateOf(false) } // Прапорець видимості
-    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
+    val logViewerParams =
+        remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
     // Діалог помилки
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
-    var allNamespaces by remember { mutableStateOf<List<String>>(listOf(ALL_NAMESPACES_OPTION)) }
+    var allNamespaces by remember { mutableStateOf(listOf(ALL_NAMESPACES_OPTION)) }
     var selectedNamespaceFilter by remember { mutableStateOf(ALL_NAMESPACES_OPTION) }
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
-        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList();
+        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList =
+            emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList =
+            emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList =
+            emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList =
+            emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList =
+            emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList =
+            emptyList(); clusterRoleBindingsList = emptyList();
     }
     // ---
 
@@ -2791,9 +3299,16 @@ fun App() {
                 logger.info("[IO] Знайдено контекстів: ${names.size}")
                 names
             }
-            contexts = loadedContextNames; errorMessage = if (loadedContextNames.isEmpty()) "Контексти не знайдено" else null; connectionStatus = if (loadedContextNames.isEmpty()) "Контексти не знайдено" else "Виберіть контекст"
-        } catch (e: Exception) { loadError = e; logger.error("Помилка завантаження контекстів: ${e.message}", e) }
-        finally { if (loadError != null) { errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження" }; isLoading = false }
+            contexts = loadedContextNames; errorMessage =
+                if (loadedContextNames.isEmpty()) "Контексти не знайдено" else null; connectionStatus =
+                if (loadedContextNames.isEmpty()) "Контексти не знайдено" else "Виберіть контекст"
+        } catch (e: Exception) {
+            loadError = e; logger.error("Помилка завантаження контекстів: ${e.message}", e)
+        } finally {
+            if (loadError != null) {
+                errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження"
+            }; isLoading = false
+        }
     }
     // --- Кінець LaunchedEffect ---
     // --- Завантаження неймспейсів ПІСЛЯ успішного підключення ---
@@ -2838,14 +3353,26 @@ fun App() {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(modifier = Modifier.weight(1f)) {
                     // --- Ліва панель ---
-                    Column( modifier = Modifier.fillMaxHeight().width(300.dp).padding(16.dp) ) {
-                        Text("Контексти Kubernetes:", style = MaterialTheme.typography.titleMedium); Spacer(modifier = Modifier.height(8.dp)) // M3 Text + Typography
-                        Box(modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)) { // M3 колір
-                            if (isLoading && contexts.isEmpty()) { CircularProgressIndicator(modifier = Modifier.align(Alignment.Center)) } // M3 Indicator
-                            else if (!isLoading && contexts.isEmpty()) { Text(errorMessage ?: "Контексти не знайдено", modifier = Modifier.align(Alignment.Center)) } // M3 Text
+                    Column(modifier = Modifier.fillMaxHeight().width(300.dp).padding(16.dp)) {
+                        Text(
+                            "Контексти Kubernetes:",
+                            style = MaterialTheme.typography.titleMedium
+                        ); Spacer(modifier = Modifier.height(8.dp)) // M3 Text + Typography
+                        Box(
+                            modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) { // M3 колір
+                            if (isLoading && contexts.isEmpty()) {
+                                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                            } // M3 Indicator
+                            else if (!isLoading && contexts.isEmpty()) {
+                                Text(
+                                    errorMessage ?: "Контексти не знайдено",
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            } // M3 Text
                             else {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(contexts) { contextName -> 
+                                    items(contexts) { contextName ->
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier
@@ -2866,25 +3393,29 @@ fun App() {
                                                             detailedResourceType = null
                                                             showLogViewer.value = false
                                                             logViewerParams.value = null // Скидаємо все
-                                                            
+
                                                             val connectionResult = connectWithRetries(contextName)
                                                             isLoading = false
-                                
-                                                            connectionResult.onSuccess { (newClient, serverVersion) -> 
-                                                                    activeClient = newClient
-                                                                    selectedContext = contextName
-                                                                    connectionStatus = "Підключено до: $contextName (v$serverVersion)"
-                                                                    errorMessage = null
-                                                                    logger.info("UI State updated on Success for $contextName") 
-                                                                }
-                                                                .onFailure { error -> 
-                                                                    connectionStatus = "Помилка підключення до '$contextName'"
-                                                                    errorMessage = error.localizedMessage ?: "Невід. помилка"
+
+                                                            connectionResult.onSuccess { (newClient, serverVersion) ->
+                                                                activeClient = newClient
+                                                                selectedContext = contextName
+                                                                connectionStatus =
+                                                                    "Підключено до: $contextName (v$serverVersion)"
+                                                                errorMessage = null
+                                                                logger.info("UI State updated on Success for $contextName")
+                                                            }
+                                                                .onFailure { error ->
+                                                                    connectionStatus =
+                                                                        "Помилка підключення до '$contextName'"
+                                                                    errorMessage =
+                                                                        error.localizedMessage ?: "Невід. помилка"
                                                                     logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
-                                                                    dialogErrorMessage.value = "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"
+                                                                    dialogErrorMessage.value =
+                                                                        "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"
                                                                     showErrorDialog.value = true
                                                                     activeClient = null
-                                                                    selectedContext = null 
+                                                                    selectedContext = null
                                                                 }
                                                             logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
                                                         }
@@ -2894,22 +3425,22 @@ fun App() {
                                         ) {
                                             // Додаємо іконку
                                             Icon(
-                                                imageVector = SimpleIcons.Kubernetes , // Ви можете змінити цю іконку на іншу
+                                                imageVector = SimpleIcons.Kubernetes, // Ви можете змінити цю іконку на іншу
                                                 contentDescription = "Kubernetes Context",
-                                                tint = if (contextName == selectedContext) 
-                                                    MaterialTheme.colorScheme.primary 
-                                                else 
+                                                tint = if (contextName == selectedContext)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
                                                     MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
-                                            
+
                                             // Текст після іконки
                                             Text(
                                                 text = formatContextNameForDisplay(contextName),
                                                 fontSize = 14.sp,
-                                                color = if (contextName == selectedContext) 
-                                                    MaterialTheme.colorScheme.primary 
-                                                else 
+                                                color = if (contextName == selectedContext)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
                                                     MaterialTheme.colorScheme.onSurface
                                             )
                                         }
@@ -2917,62 +3448,186 @@ fun App() {
                                 }
                             }
                         } // Кінець Box списку
-                        Spacer(modifier = Modifier.height(16.dp)); Text("Ресурси Кластера:", style = MaterialTheme.typography.titleMedium); Spacer(modifier = Modifier.height(8.dp)) // M3 Text
-                        Box(modifier = Modifier.weight(2f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)) { // M3 колір
-                            ResourceTreeView(rootIds = resourceTreeData[""] ?: emptyList(), expandedNodes = expandedNodes, onNodeClick = { nodeId, isLeaf ->
-                                logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
-                                if (isLeaf) {
-                                    if (activeClient != null && !isLoading) {
-                                        // Скидаємо показ деталей/логів при виборі нового типу ресурсу
-                                        detailedResource = null; detailedResourceType = null; showLogViewer.value = false; logViewerParams.value = null;
-                                        selectedResourceType = nodeId; resourceLoadError = null; clearResourceLists()
-                                        connectionStatus = "Завантаження $nodeId..."; isLoading = true
-                                        coroutineScope.launch {
-                                            var loadOk = false; var errorMsg: String? = null
-                                            val currentFilter = selectedNamespaceFilter // Беремо поточне значення фільтра
+                        Spacer(modifier = Modifier.height(16.dp)); Text(
+                        "Ресурси Кластера:",
+                        style = MaterialTheme.typography.titleMedium
+                    ); Spacer(modifier = Modifier.height(8.dp)) // M3 Text
+                        Box(
+                            modifier = Modifier.weight(2f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) { // M3 колір
+                            ResourceTreeView(
+                                rootIds = resourceTreeData[""] ?: emptyList(),
+                                expandedNodes = expandedNodes,
+                                onNodeClick = { nodeId, isLeaf ->
+                                    logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
+                                    if (isLeaf) {
+                                        if (activeClient != null && !isLoading) {
+                                            // Скидаємо показ деталей/логів при виборі нового типу ресурсу
+                                            detailedResource = null; detailedResourceType = null; showLogViewer.value =
+                                                false; logViewerParams.value = null;
+                                            selectedResourceType = nodeId; resourceLoadError =
+                                                null; clearResourceLists()
+                                            connectionStatus = "Завантаження $nodeId..."; isLoading = true
+                                            coroutineScope.launch {
+                                                var loadOk = false;
+                                                var errorMsg: String? = null
+                                                val currentFilter =
+                                                    selectedNamespaceFilter // Беремо поточне значення фільтра
 
-                                            // Визначаємо, чи ресурс неймспейсний, щоб знати, чи передавати фільтр
-                                            val namespaceToUse = if (namespacedResources.contains(nodeId)) currentFilter else null
-                                            // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
-                                            when (nodeId) {
-                                                "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Nodes" -> loadNodesFabric8(activeClient).onSuccess { nodesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Deployments" -> loadDeploymentsFabric8(activeClient, namespaceToUse).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "StatefulSets" -> loadStatefulSetsFabric8(activeClient, namespaceToUse).onSuccess { statefulSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "DaemonSets" -> loadDaemonSetsFabric8(activeClient, namespaceToUse).onSuccess { daemonSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ReplicaSets" -> loadReplicaSetsFabric8(activeClient, namespaceToUse).onSuccess { replicaSetsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Jobs" -> loadJobsFabric8(activeClient, namespaceToUse).onSuccess { jobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "CronJobs" -> loadCronJobsFabric8(activeClient, namespaceToUse).onSuccess { cronJobsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Services" -> loadServicesFabric8(activeClient, namespaceToUse).onSuccess { servicesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Ingresses" -> loadIngressesFabric8(activeClient, namespaceToUse).onSuccess { ingressesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess { pvsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient, namespaceToUse).onSuccess { pvcsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "StorageClasses" -> loadStorageClassesFabric8(activeClient).onSuccess { storageClassesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ConfigMaps" -> loadConfigMapsFabric8(activeClient, namespaceToUse).onSuccess { configMapsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Secrets" -> loadSecretsFabric8(activeClient, namespaceToUse).onSuccess { secretsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ServiceAccounts" -> loadServiceAccountsFabric8(activeClient, namespaceToUse).onSuccess { serviceAccountsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "Roles" -> loadRolesFabric8(activeClient, namespaceToUse).onSuccess { rolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "RoleBindings" -> loadRoleBindingsFabric8(activeClient, namespaceToUse).onSuccess { roleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ClusterRoles" -> loadClusterRolesFabric8(activeClient).onSuccess { clusterRolesList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess { clusterRoleBindingsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                else -> { logger.warn("Обробник '$nodeId' не реалізовано."); loadOk = false; errorMsg = "Не реалізовано" }
+                                                // Визначаємо, чи ресурс неймспейсний, щоб знати, чи передавати фільтр
+                                                val namespaceToUse =
+                                                    if (namespacedResources.contains(nodeId)) currentFilter else null
+                                                // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
+                                                when (nodeId) {
+                                                    "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess {
+                                                        namespacesList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    "Nodes" -> loadNodesFabric8(activeClient).onSuccess {
+                                                        nodesList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    "Pods" -> loadPodsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { podsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "Deployments" -> loadDeploymentsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { deploymentsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "StatefulSets" -> loadStatefulSetsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { statefulSetsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "DaemonSets" -> loadDaemonSetsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { daemonSetsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "ReplicaSets" -> loadReplicaSetsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { replicaSetsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "Jobs" -> loadJobsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { jobsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "CronJobs" -> loadCronJobsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { cronJobsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "Services" -> loadServicesFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { servicesList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "Ingresses" -> loadIngressesFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { ingressesList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess {
+                                                        pvsList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    "PersistentVolumeClaims" -> loadPVCsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { pvcsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "StorageClasses" -> loadStorageClassesFabric8(activeClient).onSuccess {
+                                                        storageClassesList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    "ConfigMaps" -> loadConfigMapsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { configMapsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "Secrets" -> loadSecretsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { secretsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "ServiceAccounts" -> loadServiceAccountsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { serviceAccountsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "Roles" -> loadRolesFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { rolesList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "RoleBindings" -> loadRoleBindingsFabric8(
+                                                        activeClient,
+                                                        namespaceToUse
+                                                    ).onSuccess { roleBindingsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
+                                                    "ClusterRoles" -> loadClusterRolesFabric8(activeClient).onSuccess {
+                                                        clusterRolesList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess {
+                                                        clusterRoleBindingsList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    else -> {
+                                                        logger.warn("Обробник '$nodeId' не реалізовано."); loadOk =
+                                                            false; errorMsg = "Не реалізовано"
+                                                    }
+                                                }
+                                                // Оновлюємо статус після завершення
+                                                if (loadOk) {
+                                                    connectionStatus =
+                                                        "Завантажено $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                } else {
+                                                    resourceLoadError = "Помилка $nodeId: $errorMsg"; connectionStatus =
+                                                        "Помилка $nodeId"
+                                                }
+                                                isLoading = false
                                             }
-                                            // Оновлюємо статус після завершення
-                                            if (loadOk) { connectionStatus = "Завантажено $nodeId ${ if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else "" }" }
-                                            else { resourceLoadError = "Помилка $nodeId: $errorMsg"; connectionStatus = "Помилка $nodeId" }
-                                            isLoading = false
+                                        } else if (activeClient == null) {
+                                            logger.warn("Немає підключення."); connectionStatus =
+                                                "Підключіться до кластера!"; selectedResourceType = null
                                         }
-                                    } else if (activeClient == null) { logger.warn("Немає підключення."); connectionStatus = "Підключіться до кластера!"; selectedResourceType = null }
-                                } else { expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false) }
-                            })
+                                    } else {
+                                        expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
+                                    }
+                                })
                         }
                     } // Кінець лівої панелі
 
-                    Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
+                    Divider(
+                        modifier = Modifier.fillMaxHeight().width(1.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    ) // M3 Divider
 
                     // --- Права панель (АБО Таблиця АБО Деталі АБО Логи) ---
-                    Column(modifier = Modifier.fillMaxHeight().weight(1f).padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxHeight().weight(1f).padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                    ) {
                         val resourceToShowDetails = detailedResource
                         val typeForDetails = detailedResourceType
                         val paramsForLogs = logViewerParams.value
@@ -2997,7 +3652,8 @@ fun App() {
 
                         // --- ДОДАНО ФІЛЬТР НЕЙМСПЕЙСІВ (якщо є клієнт і це не деталі/логи) ---
                         if (currentView == "table" && activeClient != null) {
-                            val isFilterEnabled = namespacedResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                            val isFilterEnabled =
+                                namespacedResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
                             ExposedDropdownMenuBox(
                                 expanded = isNamespaceDropdownExpanded,
                                 onExpandedChange = { if (isFilterEnabled) isNamespaceDropdownExpanded = it },
@@ -3031,20 +3687,46 @@ fun App() {
                                                     if (selectedResourceType != null) {
                                                         // Повторно викликаємо ту саму логіку, що й в onNodeClick
                                                         resourceLoadError = null; clearResourceLists()
-                                                        connectionStatus = "Завантаження $selectedResourceType (фільтр)..."; isLoading = true
+                                                        connectionStatus =
+                                                            "Завантаження $selectedResourceType (фільтр)..."; isLoading =
+                                                            true
                                                         coroutineScope.launch {
-                                                            var loadOk = false; var errorMsg: String? = null
-                                                            val namespaceToUse = if (namespacedResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                            var loadOk = false;
+                                                            var errorMsg: String? = null
+                                                            val namespaceToUse =
+                                                                if (namespacedResources.contains(selectedResourceType)) selectedNamespaceFilter else null
                                                             when (selectedResourceType) { // Повторний виклик з новим фільтром
-                                                                "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess { podsList = it; loadOk = true }.onFailure { errorMsg = it.message }
-                                                                "Deployments" -> loadDeploymentsFabric8(activeClient, namespaceToUse).onSuccess { deploymentsList = it; loadOk = true }.onFailure { errorMsg = it.message }
+                                                                "Pods" -> loadPodsFabric8(
+                                                                    activeClient,
+                                                                    namespaceToUse
+                                                                ).onSuccess { podsList = it; loadOk = true }
+                                                                    .onFailure { errorMsg = it.message }
+
+                                                                "Deployments" -> loadDeploymentsFabric8(
+                                                                    activeClient,
+                                                                    namespaceToUse
+                                                                ).onSuccess { deploymentsList = it; loadOk = true }
+                                                                    .onFailure { errorMsg = it.message }
                                                                 // ... додати ВСІ неймспейсні ресурси ...
-                                                                "Namespaces" -> { loadNamespacesFabric8(activeClient).onSuccess { namespacesList = it; loadOk = true }.onFailure { errorMsg = it.message } } // Namespaces не фільтруємо
+                                                                "Namespaces" -> {
+                                                                    loadNamespacesFabric8(activeClient).onSuccess {
+                                                                        namespacesList = it; loadOk = true
+                                                                    }.onFailure { errorMsg = it.message }
+                                                                } // Namespaces не фільтруємо
                                                                 // ... решта ...
-                                                                else -> { loadOk = false; errorMsg = "Фільтр не застосовується" }
+                                                                else -> {
+                                                                    loadOk = false; errorMsg =
+                                                                        "Фільтр не застосовується"
+                                                                }
                                                             }
-                                                            if (loadOk) { connectionStatus = "Завантажено $selectedResourceType ${ if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else "" }" }
-                                                            else { resourceLoadError = "Помилка $selectedResourceType: $errorMsg"; connectionStatus = "Помилка $selectedResourceType" }
+                                                            if (loadOk) {
+                                                                connectionStatus =
+                                                                    "Завантажено $selectedResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                            } else {
+                                                                resourceLoadError =
+                                                                    "Помилка $selectedResourceType: $errorMsg"; connectionStatus =
+                                                                    "Помилка $selectedResourceType"
+                                                            }
                                                             isLoading = false
                                                         }
                                                     }
@@ -3060,28 +3742,43 @@ fun App() {
                         // --- КІНЕЦЬ ФІЛЬТРА ---
 
                         if (headerTitle != null && currentView != "details") {
-                            Text(text = headerTitle, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp)) // M3 Text
+                            Text(
+                                text = headerTitle,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) // M3 Text
                             Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
                         } else if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
                             Spacer(modifier = Modifier.height(48.dp)) // Висота імітує заголовок
                         }
 
                         // --- Основний уміст правої панелі ---
-                        Box(modifier = Modifier.weight(1f).padding(top = if (headerTitle != null && currentView != "details") 8.dp else 0.dp)) {
-                            when(currentView) {
+                        Box(
+                            modifier = Modifier.weight(1f)
+                                .padding(top = if (headerTitle != null && currentView != "details") 8.dp else 0.dp)
+                        ) {
+                            when (currentView) {
                                 "logs" -> {
                                     if (paramsForLogs != null) {
                                         LogViewerPanel(
-                                            namespace = paramsForLogs.first, podName = paramsForLogs.second, containerName = paramsForLogs.third,
+                                            namespace = paramsForLogs.first,
+                                            podName = paramsForLogs.second,
+                                            containerName = paramsForLogs.third,
                                             client = activeClient, // Передаємо активний клієнт
-                                            onClose = { showLogViewer.value = false; logViewerParams.value = null } // Закриття панелі логів
+                                            onClose = {
+                                                showLogViewer.value = false; logViewerParams.value = null
+                                            } // Закриття панелі логів
                                         )
                                     } else {
                                         // Стан коли прапорець showLogViewer ще true, але параметри вже скинуті
-                                        Text("Завантаження параметрів логів...", modifier = Modifier.align(Alignment.Center))
-                                        LaunchedEffect(Unit){ showLogViewer.value = false } // Скидаємо прапорець
+                                        Text(
+                                            "Завантаження параметрів логів...",
+                                            modifier = Modifier.align(Alignment.Center)
+                                        )
+                                        LaunchedEffect(Unit) { showLogViewer.value = false } // Скидаємо прапорець
                                     }
                                 }
+
                                 "details" -> {
                                     ResourceDetailPanel(
                                         resource = resourceToShowDetails,
@@ -3096,24 +3793,69 @@ fun App() {
                                         }
                                     )
                                 }
+
                                 "table" -> {
                                     // --- Таблиця або Статус/Помилка ---
                                     val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
                                     val currentClientForPanel = activeClient
                                     when {
-                                        isLoading -> { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) { CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text(connectionStatus) } } // M3 Indicator, M3 Text
-                                        currentErrorMessageForPanel != null -> { androidx.compose.material3.Text( text = currentErrorMessageForPanel, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center) ) } // Явний M3 Text
+                                        isLoading -> {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                modifier = Modifier.align(Alignment.Center)
+                                            ) {
+                                                CircularProgressIndicator(); Spacer(modifier = Modifier.height(8.dp)); Text(
+                                                connectionStatus
+                                            )
+                                            }
+                                        } // M3 Indicator, M3 Text
+                                        currentErrorMessageForPanel != null -> {
+                                            androidx.compose.material3.Text(
+                                                text = currentErrorMessageForPanel,
+                                                color = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.align(Alignment.Center)
+                                            )
+                                        } // Явний M3 Text
                                         currentClientForPanel != null && currentResourceType != null -> {
                                             // Отримуємо список та заголовки
-                                            val itemsToShow: List<HasMetadata> = remember(currentResourceType, namespacesList, nodesList, podsList, deploymentsList, statefulSetsList, daemonSetsList, replicaSetsList, jobsList, cronJobsList, servicesList, ingressesList, pvsList, pvcsList, storageClassesList, configMapsList, secretsList, serviceAccountsList, rolesList, roleBindingsList, clusterRolesList, clusterRoleBindingsList ) {
+                                            val itemsToShow: List<HasMetadata> = remember(
+                                                currentResourceType,
+                                                namespacesList,
+                                                nodesList,
+                                                podsList,
+                                                deploymentsList,
+                                                statefulSetsList,
+                                                daemonSetsList,
+                                                replicaSetsList,
+                                                jobsList,
+                                                cronJobsList,
+                                                servicesList,
+                                                ingressesList,
+                                                pvsList,
+                                                pvcsList,
+                                                storageClassesList,
+                                                configMapsList,
+                                                secretsList,
+                                                serviceAccountsList,
+                                                rolesList,
+                                                roleBindingsList,
+                                                clusterRolesList,
+                                                clusterRoleBindingsList
+                                            ) {
                                                 when (currentResourceType) {
                                                     "Namespaces" -> namespacesList; "Nodes" -> nodesList; "Pods" -> podsList; "Deployments" -> deploymentsList; "StatefulSets" -> statefulSetsList; "DaemonSets" -> daemonSetsList; "ReplicaSets" -> replicaSetsList; "Jobs" -> jobsList; "CronJobs" -> cronJobsList; "Services" -> servicesList; "Ingresses" -> ingressesList; "PersistentVolumes" -> pvsList; "PersistentVolumeClaims" -> pvcsList; "StorageClasses" -> storageClassesList; "ConfigMaps" -> configMapsList; "Secrets" -> secretsList; "ServiceAccounts" -> serviceAccountsList; "Roles" -> rolesList; "RoleBindings" -> roleBindingsList; "ClusterRoles" -> clusterRolesList; "ClusterRoleBindings" -> clusterRoleBindingsList
                                                     else -> emptyList()
                                                 }
                                             }
-                                            val headers = remember(currentResourceType) { getHeadersForType(currentResourceType) }
+                                            val headers =
+                                                remember(currentResourceType) { getHeadersForType(currentResourceType) }
 
-                                            if (itemsToShow.isEmpty() && !isLoading) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Немає ресурсів типу '$currentResourceType'") } } // M3 Text
+                                            if (itemsToShow.isEmpty() && !isLoading) {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) { Text("Немає ресурсів типу '$currentResourceType'") }
+                                            } // M3 Text
                                             else if (headers.isNotEmpty()) {
                                                 // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
                                                 Column(modifier = Modifier.fillMaxSize()) {
@@ -3128,7 +3870,10 @@ fun App() {
                                                     Box(modifier = Modifier.fillMaxWidth()) {
                                                         Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                                                             Column {
-                                                                KubeTableHeaderRow(headers = headers, columnWidths = columnWidths)
+                                                                KubeTableHeaderRow(
+                                                                    headers = headers,
+                                                                    columnWidths = columnWidths
+                                                                )
                                                                 Divider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                                                 LazyColumn(
@@ -3142,23 +3887,44 @@ fun App() {
                                                                             columnWidths = columnWidths,
                                                                             onRowClick = { clickedItem ->
                                                                                 detailedResource = clickedItem
-                                                                                detailedResourceType = currentResourceType
+                                                                                detailedResourceType =
+                                                                                    currentResourceType
                                                                                 showLogViewer.value = false
                                                                                 logViewerParams.value = null
                                                                             }
                                                                         )
-                                                                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                                                        Divider(
+                                                                            color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                                                alpha = 0.5f
+                                                                            )
+                                                                        )
                                                                     }
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 }
-                                            } else { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Немає колонок для '$currentResourceType'") } } // M3 Text
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) { Text("Немає колонок для '$currentResourceType'") }
+                                            } // M3 Text
                                         }
                                         // --- Стани за замовчуванням (M3 Text) ---
-                                        activeClient != null -> { androidx.compose.material3.Text("Підключено до $selectedContext.\nВиберіть тип ресурсу.", modifier = Modifier.align(Alignment.Center)) }
-                                        else -> { androidx.compose.material3.Text(errorMessage ?: "Виберіть контекст.", modifier = Modifier.align(Alignment.Center)) }
+                                        activeClient != null -> {
+                                            androidx.compose.material3.Text(
+                                                "Підключено до $selectedContext.\nВиберіть тип ресурсу.",
+                                                modifier = Modifier.align(Alignment.Center)
+                                            )
+                                        }
+
+                                        else -> {
+                                            androidx.compose.material3.Text(
+                                                errorMessage ?: "Виберіть контекст.",
+                                                modifier = Modifier.align(Alignment.Center)
+                                            )
+                                        }
                                     }
                                 } // Кінець table case
                             } // Кінець when(currentView)
@@ -3167,14 +3933,24 @@ fun App() {
                 } // Кінець Row
                 // --- Статус-бар ---
                 Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Text(text = connectionStatus, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall); if (isLoading) { CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } // Явний M3 Text, M3 Indicator
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.material3.Text(
+                        text = connectionStatus,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelSmall
+                    ); if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } // Явний M3 Text, M3 Indicator
                 }
                 // ---------------
             } // Кінець Column
         } // Кінець Surface M3
     } // Кінець MaterialTheme M3
 }
+
 @Composable
 fun ResourceTreeView(
     rootIds: List<String>,
@@ -3195,6 +3971,7 @@ fun ResourceTreeView(
         }
     }
 }
+
 @Composable
 fun ResourceTreeNode(
     nodeId: String,
