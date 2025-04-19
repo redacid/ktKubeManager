@@ -76,6 +76,10 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.time.Duration
 import java.time.OffsetDateTime
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+
 
 // TODO: check NS filter for all resources (e.g. Pods)
 
@@ -175,6 +179,25 @@ fun calculateColumnWidths(
         widths
     }
 }
+
+fun convertJsonToYaml(jsonString: String): String {
+    try {
+        // Parse JSON to object
+        val jsonMapper = ObjectMapper().registerKotlinModule()
+        val jsonObject = jsonMapper.readValue(jsonString, Any::class.java)
+
+        // Convert object to YAML
+        val yamlMapper = ObjectMapper(YAMLFactory()
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES))
+            .registerKotlinModule()
+
+        return yamlMapper.writeValueAsString(jsonObject)
+    } catch (e: Exception) {
+        return "Error converting JSON to YAML: ${e.message}"
+    }
+}
+
 
 // Helper function to measure text width
 private fun measureTextWidth(
@@ -1970,17 +1993,36 @@ fun SecretDetailsView(secret: Secret) {
                         val mapper = ObjectMapper().registerKotlinModule()
                         val valuesJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(values)
 
+                        val isYamlView = remember { mutableStateOf(false) }
+                        // Compute formatted content
+                        val formattedContent = remember(valuesJson, isYamlView.value) {
+                            if (isYamlView.value) convertJsonToYaml(valuesJson) else valuesJson
+                        }
+
                         Text(
                             text = "Values:",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
                         )
+
+                        // Format toggle button
+                        OutlinedButton(
+                            onClick = { isYamlView.value = !isYamlView.value },
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Text(
+                                text = if (isYamlView.value) "View as JSON" else "View as YAML",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
                         // Copy button for values
                         IconButton(
                             onClick = {
                                 try {
                                     val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                    val selection = java.awt.datatransfer.StringSelection(valuesJson)
+                                    val selection = java.awt.datatransfer.StringSelection(formattedContent)
                                     clipboard.setContents(selection, null)
 
                                     coroutineScope.launch {
@@ -2023,7 +2065,7 @@ fun SecretDetailsView(secret: Secret) {
                                 ) {
                                     Text(
                                         softWrap = true,
-                                        text = valuesJson,
+                                        text = formattedContent,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontFamily = FontFamily.Monospace,
                                         modifier = Modifier.weight(1f)
@@ -2040,18 +2082,35 @@ fun SecretDetailsView(secret: Secret) {
                         val mapper = ObjectMapper().registerKotlinModule()
                         val valuesGlobalJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(valuesGlobal)
 
+                        val isYamlView = remember { mutableStateOf(false) }
+                        // Compute formatted content
+                        val formattedGlobalContent = remember(valuesGlobalJson, isYamlView.value) {
+                            if (isYamlView.value) convertJsonToYaml(valuesGlobalJson) else valuesGlobalJson
+                        }
+
                         Text(
                             text = "GlobalValues:",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
                         )
+                        // Format toggle button
+                        OutlinedButton(
+                            onClick = { isYamlView.value = !isYamlView.value },
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Text(
+                                text = if (isYamlView.value) "View as JSON" else "View as YAML",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                         // Copy button for values
                         IconButton(
 
                             onClick = {
                                 try {
                                     val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                    val selection = java.awt.datatransfer.StringSelection(valuesGlobalJson)
+                                    val selection = java.awt.datatransfer.StringSelection(formattedGlobalContent)
                                     clipboard.setContents(selection, null)
 
                                     coroutineScope.launch {
@@ -2094,7 +2153,7 @@ fun SecretDetailsView(secret: Secret) {
                                 ) {
                                     Text(
                                         softWrap = true,
-                                        text = valuesGlobalJson,
+                                        text = formattedGlobalContent,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontFamily = FontFamily.Monospace,
                                         modifier = Modifier.weight(1f)

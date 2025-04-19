@@ -21,6 +21,7 @@ all: help
 ## Build and Publish
 git-publish:
 	make clean-workspace
+	make build
 	make git-release
 	make git-upload-release
 	make clean-workspace
