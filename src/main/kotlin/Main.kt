@@ -40,15 +40,44 @@ import compose.icons.feathericons.EyeOff
 import compose.icons.simpleicons.Kubernetes
 // Fabric8
 import io.fabric8.kubernetes.client.Config
+import io.fabric8.kubernetes.api.model.Config as KubeConfigModel
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.KubernetesClientException
+import io.fabric8.kubernetes.client.internal.KubeConfigUtils
+
 import io.fabric8.kubernetes.api.model.*
 import io.fabric8.kubernetes.api.model.apps.*
 import io.fabric8.kubernetes.api.model.batch.v1.*
 import io.fabric8.kubernetes.api.model.networking.v1.*
 import io.fabric8.kubernetes.api.model.rbac.*
 import io.fabric8.kubernetes.api.model.storage.*
+import io.fabric8.kubernetes.client.OAuthTokenProvider // Імпорт для TokenProvider
+import io.fabric8.kubernetes.api.model.AuthInfo // Need AuthInfo
+import io.fabric8.kubernetes.api.model.Cluster // Need Cluster
+import io.fabric8.kubernetes.api.model.Context // Need Context
+import io.fabric8.kubernetes.api.model.ExecConfig // Need ExecConfig
+import io.fabric8.kubernetes.api.model.ExecEnvVar // Need ExecEnvVar
+import io.fabric8.kubernetes.api.model.NamedAuthInfo // Need NamedAuthInfo
+import io.fabric8.kubernetes.api.model.NamedCluster // Need NamedCluster
+import io.fabric8.kubernetes.api.model.NamedContext // Need NamedContext
+
+
+// AWS SDK v2 Imports for EKS Token Generation
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
+import software.amazon.awssdk.http.SdkHttpFullRequest
+import software.amazon.awssdk.http.SdkHttpMethod
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.http.auth.aws.signer.AwsV4HttpSigner
+import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
+import software.amazon.awssdk.http.auth.spi.signer.SignRequest // <--- Додати цей імпорт
+import software.amazon.awssdk.http.auth.spi.signer.SignedRequest
+import software.amazon.awssdk.identity.spi.IdentityProperty // Для властивостей credentials
+import software.amazon.awssdk.identity.spi.Identity // <-- Add Import
+import software.amazon.awssdk.http.auth.spi.signer.SignerProperty // <-- Add Import
+
 // Coroutines
 import kotlinx.coroutines.*
 //import io.fabric8.kubernetes.client.dsl.LogWatch
@@ -70,9 +99,18 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.time.Duration
 import java.time.OffsetDateTime
+import java.net.URI
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Base64
+import java.nio.charset.StandardCharsets
+
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import software.amazon.awssdk.http.SdkHttpRequest
+import java.io.File
 
 
 // TODO: check NS filter for all resources (e.g. Pods)
@@ -128,6 +166,258 @@ var ICON_EYEOFF = FeatherIcons.EyeOff
 var ICON_CONTEXT = SimpleIcons.Kubernetes
 var ICON_RESOURCE = FeatherIcons.Aperture
 var ICON_NF = Icons.Filled.Place
+
+class EksTokenProvider(
+    private val clusterName: String,
+    private val region: String,
+    private val awsProfile: String? = null
+) : OAuthTokenProvider {
+
+    // Відновлюємо члени класу
+    private val credentialsProvider: AwsCredentialsProvider = if (awsProfile != null) {
+        logger.info("Використання AWS профілю '$awsProfile' для EKS автентифікації.")
+        ProfileCredentialsProvider.builder().profileName(awsProfile).build()
+    } else {
+        logger.info("Використання стандартного ланцюжка провайдерів AWS для EKS автентифікації.")
+        DefaultCredentialsProvider.create()
+    }
+
+    private val signer = AwsV4HttpSigner.create()
+
+    // Форматер для заголовка X-Amz-Date
+    private val amzDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+        .withZone(ZoneId.of("UTC"))
+
+
+    override fun getToken(): String {
+        logger.debug("Генерація нового EKS токена для кластера '$clusterName' в регіоні '$region'...")
+        try {
+            // Отримуємо credentials як AwsCredentialsIdentity
+            val credentials = credentialsProvider.resolveIdentity().join() as AwsCredentialsIdentity
+            val now = Instant.now()
+            val formattedDate = amzDateFormatter.format(now)
+            val requestUri = URI.create("https://sts.${region}.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15")
+
+            // Будуємо НЕпідписаний запит
+            val unsignedRequest = SdkHttpFullRequest.builder()
+                .uri(requestUri)
+                .method(SdkHttpMethod.GET)
+                .putHeader("Host", "sts.${region}.amazonaws.com")
+                .putHeader("x-k8s-aws-id", clusterName)
+                .putHeader("X-Amz-Date", formattedDate)
+                .build()
+
+            // Використовуємо signer.sign з Consumer<SignRequest.Builder<...>>
+            // Використовуємо signer.sign з Consumer<SignRequest.Builder<...>>
+            val signedRequest: SignedRequest = signer.sign { builder: SignRequest.Builder<AwsCredentialsIdentity> ->
+                builder
+                    .request(unsignedRequest)
+                    .putProperty(AwsV4HttpSigner.SERVICE_SIGNING_NAME, "sts")
+                    .putProperty(AwsV4HttpSigner.REGION_NAME, region)
+                    .identity(credentials) // Передаємо екземпляр credentials
+            }
+
+            // Формуємо presigned URL
+            // --- Потенційне виправлення: Отримати запит окремо ---
+            val request: SdkHttpRequest = signedRequest.request() // Отримуємо запит
+            val baseUri = request.uri.toString() // Тепер викликаємо uri() на окремому об'єкті
+
+            // Збираємо параметри для URL
+            // --- Потенційне виправлення: Використовувати request замість signedRequest.request() ---
+            val queryParams = request.headers().entries // Використовуємо request.headers()
+                .mapNotNull { (key, values) ->
+                    if (key.equals("Authorization", ignoreCase = true) || key.startsWith("X-Amz-", ignoreCase = true)) {
+                        values.joinToString("&") { value ->
+                            "${key.encodeURLParameter()}=${value.encodeURLParameter()}"
+                        }
+                    } else {
+                        null
+                    }
+                }
+                .joinToString("&")
+
+            val presignedUrl = if (queryParams.isNotEmpty()) "$baseUri&$queryParams" else baseUri
+
+            // Кодуємо URL в Base64
+            val base64Url = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(presignedUrl.toByteArray(StandardCharsets.UTF_8))
+
+            // Формуємо фінальний токен
+            val eksToken = "k8s-aws-v1.$base64Url"
+            logger.debug("EKS токен успішно згенеровано.")
+            return eksToken
+
+        } catch (e: Exception) {
+            logger.error("Помилка генерації EKS токена для '$clusterName': ${e.message}", e)
+            throw RuntimeException("Не вдалося згенерувати EKS токен: ${e.message}", e)
+        }
+
+    }
+
+
+}
+
+
+// Допоміжна функція для URL кодування
+private fun String.encodeURLParameter(): String = java.net.URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+
+suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
+    val targetContext = if (contextName.isNullOrBlank()) null else contextName
+    var lastError: Exception? = null
+    // targetContext тут може бути null, autoConfigure сам визначить поточний
+    val contextNameToLog = targetContext ?: "(default)"
+
+    for (attempt in 1..MAX_CONNECT_RETRIES) {
+        logger.info("Спроба підключення до '$contextNameToLog' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
+        try {
+            val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) {
+                logger.info("[IO] Створення базового конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
+                // 1. Отримуємо оброблену конфігурацію
+                val resolvedConfig: io.fabric8.kubernetes.client.Config = io.fabric8.kubernetes.client.Config.autoConfigure(targetContext)
+                    ?: throw KubernetesClientException("Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'")
+
+                // --- Починаємо аналіз сирого KubeConfig для перевірки ExecConfig ---
+                try {
+                    // Створюємо власну логіку для отримання та аналізу KubeConfig
+                    // Стандартні місця розташування kubeconfig
+                    val kubeConfigPath = System.getenv("KUBECONFIG")
+                        ?: "${System.getProperty("user.home")}/.kube/config"
+
+                    val kubeConfigFile = File(kubeConfigPath)
+                    if (!kubeConfigFile.exists()) {
+                        throw KubernetesClientException("Файл KubeConfig не знайдено за шляхом: $kubeConfigPath")
+                    }
+
+                    logger.info("Аналіз файлу KubeConfig: ${kubeConfigFile.absolutePath}")
+
+                    // Використовуємо Jackson для розбору YAML файлу
+                    val mapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
+                    val kubeConfigModel: KubeConfigModel = mapper.readValue(kubeConfigFile, KubeConfigModel::class.java)
+
+                    // 3. Визначаємо ім'я контексту, яке було фактично використано
+                    val actualContextName = resolvedConfig.currentContext?.name
+                        ?: kubeConfigModel.currentContext // Беремо з resolvedConfig, або з моделі якщо там null
+                        ?: throw KubernetesClientException("Не вдалося визначити поточний контекст")
+
+                    // 4. Знаходимо NamedContext у сирій моделі
+                    val namedContext: NamedContext? = kubeConfigModel.contexts?.find { it.name == actualContextName }
+                    val contextInfo = namedContext?.context ?: throw KubernetesClientException("Не знайдено деталей для контексту '$actualContextName' у KubeConfig моделі")
+
+                    // 5. Отримуємо ім'я користувача з контексту
+                    val userName: String? = contextInfo.user
+
+                    if (userName != null) {
+                        // 6. Отримуємо список користувачів (NamedAuthInfo) з сирої моделі
+                        val usersList: List<NamedAuthInfo> = kubeConfigModel.users ?: emptyList() // У моделі поле називається 'users'
+
+                        // 7. Знаходимо NamedAuthInfo для нашого користувача
+                        val namedAuthInfo: NamedAuthInfo? = usersList.find { it.name == userName }
+                        val userAuth: AuthInfo? = namedAuthInfo?.user // AuthInfo з сирої моделі
+
+                        // 8. Отримуємо ExecConfig
+                        val execConfig: ExecConfig? = userAuth?.exec
+
+                        // 9. Перевіряємо, чи це EKS exec
+                        if (execConfig != null && (execConfig.command == "aws" || execConfig.command.endsWith("/aws"))) {
+                            logger.info("Виявлено EKS конфігурацію з exec command: '${execConfig.command}'. Спроба використання кастомного TokenProvider.")
+
+                            val execArgs: List<String> = execConfig.args ?: emptyList()
+                            val execEnv: List<io.fabric8.kubernetes.api.model.ExecEnvVar> = execConfig.env ?: emptyList() // Тип з моделі
+
+                            // Функції findArgumentValue/findEnvValue потрібно буде адаптувати під List<ExecEnvVar> з моделі
+                            val clusterName = findArgumentValue(execArgs, "--cluster-name")
+                                ?: findEnvValueModel(execEnv, "AWS_CLUSTER_NAME") // Використовуємо адаптовану функцію
+                                ?: throw KubernetesClientException("Не вдалося знайти 'cluster-name' в exec config для '$userName'")
+
+                            val region = findArgumentValue(execArgs, "--region")
+                                ?: findEnvValueModel(execEnv, "AWS_REGION") // Використовуємо адаптовану функцію
+                                ?: throw KubernetesClientException("Не вдалося знайти 'region' в exec config для '$userName'")
+
+                            val awsProfile = findArgumentValue(execArgs, "--profile")
+                                ?: findEnvValueModel(execEnv, "AWS_PROFILE") // Використовуємо адаптовану функцію
+
+                            logger.info("Параметри для EKS TokenProvider: cluster='$clusterName', region='$region', profile='${awsProfile ?: "(default)"}'")
+
+                            // 10. Створюємо та встановлюємо наш кастомний провайдер токенів в ОБРОБЛЕНУ конфігурацію
+                            resolvedConfig.oauthTokenProvider = EksTokenProvider(clusterName, region, awsProfile)
+
+                            // 11. Обнуляємо конфліктуючі методи аутентифікації в ОБРОБЛЕНІЙ конфігурації
+                            // Достатньо обнулити поля верхнього рівня в resolvedConfig
+                            resolvedConfig.username = null
+                            resolvedConfig.password = null
+                            resolvedConfig.oauthToken = null
+                            // Також authProvider, якщо він був встановлений autoConfigure для exec (малоймовірно)
+                            resolvedConfig.authProvider = null
+                            // Обнулення полів client-cert/key також може бути доречним, якщо вони були встановлені
+                            resolvedConfig.clientCertFile = null
+                            resolvedConfig.clientCertData = null
+                            resolvedConfig.clientKeyFile = null
+                            resolvedConfig.clientKeyData = null
+
+                            logger.info("Кастомний EksTokenProvider встановлено для контексту '$actualContextName'.")
+                        }
+                    } else {
+                        logger.warn("У контексті '$actualContextName' не вказано ім'я користувача (user). Неможливо перевірити ExecConfig.")
+                    }
+
+                } catch (kubeConfigEx: Exception) {
+                    // Логуємо помилку завантаження/аналізу KubeConfig, але продовжуємо з resolvedConfig
+                    logger.warn("Не вдалося проаналізувати KubeConfig для перевірки Exec: ${kubeConfigEx.message}")
+                    // Можливо, варто тут перервати, якщо EKS є критичним? Залежить від вимог.
+                    // throw KubernetesClientException("Помилка аналізу KubeConfig: ${kubeConfigEx.message}", kubeConfigEx)
+                }
+                // --- Кінець аналізу сирого KubeConfig ---
+
+
+                // Використовуємо resolvedConfig (потенційно модифікований для EKS) для створення клієнта
+                resolvedConfig.connectionTimeout = CONNECTION_TIMEOUT_MS
+                resolvedConfig.requestTimeout = REQUEST_TIMEOUT_MS
+                logger.info("[IO] Config context: ${resolvedConfig.currentContext?.name ?: "(не вказано)"}. Namespace: ${resolvedConfig.namespace}")
+
+                val client = KubernetesClientBuilder().withConfig(resolvedConfig).build()
+                logger.info("[IO] Fabric8 client created. Checking version...")
+                val ver = client.kubernetesVersion?.gitVersion ?: "невідомо"
+                logger.info("[IO] Версія сервера: $ver для '${resolvedConfig.currentContext?.name ?: contextNameToLog}'")
+                Pair(client, ver)
+            }
+            logger.info("Підключення до '${resultPair.first.configuration.currentContext?.name ?: contextNameToLog}' успішне (спроба $attempt).")
+            return Result.success(resultPair)
+        } catch (e: Exception) {
+            lastError = e
+            logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
+            //if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
+        }
+    }
+    logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
+    return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
+}
+
+// Потрібно адаптувати або створити нову функцію для роботи з List<io.fabric8.kubernetes.api.model.ExecEnvVar>
+fun findEnvValueModel(envVars: List<io.fabric8.kubernetes.api.model.ExecEnvVar>, key: String): String? {
+    return envVars.find { it.name == key }?.value
+}
+
+// Стара функція findEnvValue (якщо вона існувала) була для List<ExecEnvVar> з іншого пакету або типу
+// Потрібно або видалити її, або перейменувати, щоб уникнути конфлікту з findEnvValueModel
+
+// Функція findArgumentValue залишається як є, якщо вона працює з List<String>
+fun findArgumentValue(args: List<String>, argName: String): String? {
+    val index = args.indexOf(argName)
+    return if (index != -1 && index + 1 < args.size) {
+        args[index + 1]
+    } else {
+        null
+    }
+}
+
+
+/** Знаходить значення змінної середовища з ExecEnvVar списку. */
+private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
+    return envList?.find { it.name == key }?.value
+}
+
+
 
 // Calculate optimal column widths based on content
 @Composable
@@ -741,40 +1031,6 @@ suspend fun loadEndpointsForService(
         logger.error("Failed to load endpoints for service $serviceName in namespace $namespace", e)
         Result.failure(e)
     }
-}
-
-// --- Функція підключення з ретраями (використовує Config.autoConfigure(contextName)) ---
-suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
-    val targetContext = if (contextName.isNullOrBlank()) null else contextName
-    var lastError: Exception? = null
-    val contextNameToLog = targetContext ?: "(default)"
-
-    for (attempt in 1..MAX_CONNECT_RETRIES) {
-        logger.info("Спроба підключення до '$contextNameToLog' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
-        try {
-            val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) { // Сподіваємось, компілюється
-                logger.info("[IO] Створення конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
-                val config = Config.autoConfigure(targetContext)
-                    ?: throw KubernetesClientException("Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'")
-                config.connectionTimeout = CONNECTION_TIMEOUT_MS
-                config.requestTimeout = REQUEST_TIMEOUT_MS
-                logger.info("[IO] Config context: ${config.currentContext?.name ?: "(не вказано)"}. Namespace: ${config.namespace}")
-
-                val client = KubernetesClientBuilder().withConfig(config).build()
-                logger.info("[IO] Fabric8 client created. Checking version...")
-                val ver = client.kubernetesVersion?.gitVersion ?: "невідомо" // Спрощено
-                logger.info("[IO] Версія сервера: $ver для '$contextNameToLog'")
-                Pair(client, ver)
-            }
-            logger.info("Підключення до '$contextNameToLog' успішне (спроба $attempt).")
-            return Result.success(resultPair)
-        } catch (e: Exception) {
-            lastError = e; logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
-            //if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
-        }
-    }
-    logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
-    return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
 }
 
 @Composable
