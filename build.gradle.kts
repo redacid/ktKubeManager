@@ -39,6 +39,16 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
     implementation("br.com.devsrsouza.compose.icons:feather:1.1.1") // https://feathericons.com/
     implementation("br.com.devsrsouza.compose.icons:simple-icons:1.1.1") // https://simpleicons.org/
+    val awssdkVersion = "2.31.25" // Переконайтеся, що версія актуальна
+    implementation("software.amazon.awssdk:sts:${awssdkVersion}") // Для GetCallerIdentity
+    implementation("software.amazon.awssdk:auth:${awssdkVersion}") // Для CredentialsProvider
+    implementation("software.amazon.awssdk:regions:${awssdkVersion}") // Для Region
+    implementation("software.amazon.awssdk:http-client-spi:${awssdkVersion}") // Інтерфейси HTTP
+    implementation("software.amazon.awssdk:apache-client:${awssdkVersion}") // Конкретна реалізація HTTP клієнта (або інша)
+    implementation("software.amazon.awssdk:sdk-core:${awssdkVersion}")
+    // Ключова залежність для підписувача:
+    implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
+    implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}") // Потрібно для http-auth-aws
 
     testImplementation(kotlin("test"))
 }
