@@ -105,10 +105,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Base64
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import software.amazon.awssdk.auth.credentials.AwsCredentials
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.http.SdkHttpRequest
 import java.io.File
 
@@ -188,71 +193,155 @@ class EksTokenProvider(
     private val amzDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
         .withZone(ZoneId.of("UTC"))
 
-
     override fun getToken(): String {
         logger.debug("Генерація нового EKS токена для кластера '$clusterName' в регіоні '$region'...")
         try {
-            // Отримуємо credentials як AwsCredentialsIdentity
-            val credentials = credentialsProvider.resolveIdentity().join() as AwsCredentialsIdentity
+            // Отримуємо AWS креденціали
+            val credentials = credentialsProvider.resolveCredentials()
             val now = Instant.now()
             val formattedDate = amzDateFormatter.format(now)
-            val requestUri = URI.create("https://sts.${region}.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15")
+            val datestamp = formattedDate.substring(0, 8)
 
-            // Будуємо НЕпідписаний запит
-            val unsignedRequest = SdkHttpFullRequest.builder()
-                .uri(requestUri)
-                .method(SdkHttpMethod.GET)
-                .putHeader("Host", "sts.${region}.amazonaws.com")
-                .putHeader("x-k8s-aws-id", clusterName)
-                .putHeader("X-Amz-Date", formattedDate)
-                .build()
+            // Будуємо канонічний запит
+            val canonicalRequest = buildCanonicalRequest(
+                clusterName,
+                "sts.${region}.amazonaws.com",
+                formattedDate,
+                credentials
+            )
 
-            // Використовуємо signer.sign з Consumer<SignRequest.Builder<...>>
-            // Використовуємо signer.sign з Consumer<SignRequest.Builder<...>>
-            val signedRequest: SignedRequest = signer.sign { builder: SignRequest.Builder<AwsCredentialsIdentity> ->
-                builder
-                    .request(unsignedRequest)
-                    .putProperty(AwsV4HttpSigner.SERVICE_SIGNING_NAME, "sts")
-                    .putProperty(AwsV4HttpSigner.REGION_NAME, region)
-                    .identity(credentials) // Передаємо екземпляр credentials
-            }
+            // Обчислюємо підпис
+            val stringToSign = buildStringToSign(canonicalRequest, datestamp, region, formattedDate)
+            val signature = calculateSignature(stringToSign, credentials.secretAccessKey(), datestamp, region)
 
-            // Формуємо presigned URL
-            // --- Потенційне виправлення: Отримати запит окремо ---
-            val request: SdkHttpRequest = signedRequest.request() // Отримуємо запит
-            val baseUri = request.uri.toString() // Тепер викликаємо uri() на окремому об'єкті
+            // Будуємо presigned URL
+            val scope = "$datestamp/$region/sts/aws4_request".encodeURLParameter()
+            val presignedUrl = buildPresignedUrl(
+                clusterName,
+                "sts.${region}.amazonaws.com",
+                formattedDate,
+                credentials,
+                scope,
+                signature
+            )
 
-            // Збираємо параметри для URL
-            // --- Потенційне виправлення: Використовувати request замість signedRequest.request() ---
-            val queryParams = request.headers().entries // Використовуємо request.headers()
-                .mapNotNull { (key, values) ->
-                    if (key.equals("Authorization", ignoreCase = true) || key.startsWith("X-Amz-", ignoreCase = true)) {
-                        values.joinToString("&") { value ->
-                            "${key.encodeURLParameter()}=${value.encodeURLParameter()}"
-                        }
-                    } else {
-                        null
-                    }
-                }
-                .joinToString("&")
-
-            val presignedUrl = if (queryParams.isNotEmpty()) "$baseUri&$queryParams" else baseUri
-
-            // Кодуємо URL в Base64
+            // Кодуємо в Base64Url
             val base64Url = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(presignedUrl.toByteArray(StandardCharsets.UTF_8))
 
             // Формуємо фінальний токен
             val eksToken = "k8s-aws-v1.$base64Url"
-            logger.debug("EKS токен успішно згенеровано.")
-            return eksToken
+            logger.debug("EKS токен успішно згенеровано. Довжина: ${eksToken.length} \n Token: ${eksToken}")
 
+            return eksToken
         } catch (e: Exception) {
             logger.error("Помилка генерації EKS токена для '$clusterName': ${e.message}", e)
             throw RuntimeException("Не вдалося згенерувати EKS токен: ${e.message}", e)
         }
-
     }
+
+    // Допоміжні функції для SigV4 підпису
+    private fun buildCanonicalRequest(
+        clusterName: String,
+        host: String,
+        formattedDate: String,
+        credentials: AwsCredentials
+    ): String {
+        val canonicalUri = "/"
+        val canonicalQueryString = "Action=GetCallerIdentity&Version=2011-06-15"
+        val canonicalHeaders = "host:$host\nx-k8s-aws-id:$clusterName\n"
+        val signedHeaders = "host;x-k8s-aws-id"
+
+        // Хеш порожнього тіла запиту
+        val payloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+        return "GET\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
+    }
+
+    private fun buildStringToSign(
+        canonicalRequest: String,
+        datestamp: String,
+        region: String,
+        formattedDate: String
+    ): String {
+        val algorithm = "AWS4-HMAC-SHA256"
+        val scope = "$datestamp/$region/sts/aws4_request"
+        val canonicalRequestHash = sha256Hex(canonicalRequest)
+
+        return "$algorithm\n$formattedDate\n$scope\n$canonicalRequestHash"
+    }
+
+    private fun calculateSignature(
+        stringToSign: String,
+        secretKey: String,
+        datestamp: String,
+        region: String
+    ): String {
+        val kSecret = "AWS4$secretKey".toByteArray(StandardCharsets.UTF_8)
+        val kDate = hmacSha256(kSecret, datestamp)
+        val kRegion = hmacSha256(kDate, region)
+        val kService = hmacSha256(kRegion, "sts")
+        val kSigning = hmacSha256(kService, "aws4_request")
+
+        return hmacSha256Hex(kSigning, stringToSign)
+    }
+
+    private fun buildPresignedUrl(
+        clusterName: String,
+        host: String,
+        formattedDate: String,
+        credentials: AwsCredentials,
+        scope: String,
+        signature: String
+    ): String {
+        val baseUrl = "https://$host/?"
+        val params = mutableListOf(
+            "Action=GetCallerIdentity",
+            "Version=2011-06-15",
+            "X-Amz-Algorithm=AWS4-HMAC-SHA256",
+            "X-Amz-Credential=${credentials.accessKeyId()}%2F$scope",
+            "X-Amz-Date=$formattedDate",
+            "X-Amz-Expires=60",
+            "X-Amz-SignedHeaders=host%3Bx-k8s-aws-id"
+        )
+
+        // Додаємо токен сесії, якщо він є
+        if (credentials is AwsSessionCredentials) {
+            params.add("X-Amz-Security-Token=${credentials.sessionToken().encodeURLParameter()}")
+        }
+
+        // Додаємо підпис
+        params.add("X-Amz-Signature=$signature")
+
+        return baseUrl + params.joinToString("&")
+        //return "https://sts.eu-central-1.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIATQSCNHYK3225O3D3%2F20250422%2Feu-central-1%2Fsts%2Faws4_request&X-Amz-Date=20250422T062501Z&X-Amz-Expires=60&X-Amz-SignedHeaders=host%3Bx-k8s-aws-id&X-Amz-Signature=9911b4f58ee27828f5f54a22fbc65eafccb622d24600231a5e73975c1e898205"
+    }
+
+    // Криптографічні функції для SigV4
+    private fun sha256Hex(data: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(data.toByteArray(StandardCharsets.UTF_8))
+        return hash.joinToString("") { String.format("%02x", it) }
+    }
+
+    private fun hmacSha256(key: ByteArray, data: String): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key, "HmacSHA256"))
+        return mac.doFinal(data.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    private fun hmacSha256Hex(key: ByteArray, data: String): String {
+        val hmacBytes = hmacSha256(key, data)
+        return hmacBytes.joinToString("") { String.format("%02x", it) }
+    }
+
+    private fun String.encodeURLParameter(): String {
+        return java.net.URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+            .replace("+", "%20")
+            .replace("*", "%2A")
+            .replace("%7E", "~")
+    }
+
 
 
 }
