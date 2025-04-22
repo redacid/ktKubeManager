@@ -52,11 +52,11 @@ import io.fabric8.kubernetes.api.model.networking.v1.*
 import io.fabric8.kubernetes.api.model.rbac.*
 import io.fabric8.kubernetes.api.model.storage.*
 import io.fabric8.kubernetes.client.OAuthTokenProvider
-import io.fabric8.kubernetes.api.model.AuthInfo import io.fabric8.kubernetes.api.model.ExecConfig // Need ExecConfig
-import io.fabric8.kubernetes.api.model.ExecEnvVar // Need ExecEnvVar
-import io.fabric8.kubernetes.api.model.NamedAuthInfo // Need NamedAuthInfo
-import io.fabric8.kubernetes.api.model.NamedCluster // Need NamedCluster
-import io.fabric8.kubernetes.api.model.NamedContext // Need NamedContext
+import io.fabric8.kubernetes.api.model.AuthInfo import io.fabric8.kubernetes.api.model.ExecConfig
+import io.fabric8.kubernetes.api.model.ExecEnvVar
+import io.fabric8.kubernetes.api.model.NamedAuthInfo
+import io.fabric8.kubernetes.api.model.NamedCluster
+import io.fabric8.kubernetes.api.model.NamedContext
 
 // AWS SDK v2 Imports for EKS Token Generation
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
@@ -70,6 +70,8 @@ import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
 import software.amazon.awssdk.http.auth.spi.signer.SignRequest
 import software.amazon.awssdk.auth.credentials.AwsCredentials
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
+import software.amazon.awssdk.http.auth.aws.signer.RegionSet
+
 // Coroutines
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -97,7 +99,7 @@ import java.nio.charset.StandardCharsets
 import java.io.File
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import software.amazon.awssdk.http.auth.aws.signer.RegionSet
+
 
 
 // TODO: check NS filter for all resources (e.g. Pods)
@@ -332,9 +334,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                             resolvedConfig.username = null
                             resolvedConfig.password = null
                             resolvedConfig.oauthToken = null
-                            // Також authProvider, якщо він був встановлений autoConfigure для exec (малоймовірно)
                             resolvedConfig.authProvider = null
-                            // Обнулення полів client-cert/key також може бути доречним, якщо вони були встановлені
                             resolvedConfig.clientCertFile = null
                             resolvedConfig.clientCertData = null
                             resolvedConfig.clientKeyFile = null
