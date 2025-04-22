@@ -49,7 +49,7 @@ dependencies {
     // Ключова залежність для підписувача:
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}") // Потрібно для http-auth-aws
-    implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}")
+    //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}")
     testImplementation(kotlin("test"))
 }
 

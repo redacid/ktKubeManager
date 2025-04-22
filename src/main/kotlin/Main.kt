@@ -65,7 +65,7 @@ import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.http.SdkHttpFullRequest
 import software.amazon.awssdk.http.SdkHttpMethod
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner as AwsV4HttpSigner
+import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner as AwsV4aHttpSigner
 import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
 import software.amazon.awssdk.http.auth.spi.signer.SignRequest
 import software.amazon.awssdk.auth.credentials.AwsCredentials
@@ -172,7 +172,7 @@ class EksTokenProvider(
     }
 
     // Підписувач HTTP запитів за алгоритмом AWS SigV4
-    private val signer = AwsV4HttpSigner.create()
+    private val signer = AwsV4aHttpSigner.create()
 
     // Форматер для дати в заголовку X-Amz-Date
     private val amzDateFormatter = DateTimeFormatter
@@ -223,10 +223,10 @@ class EksTokenProvider(
                 )
                 b.identity(identity)
                 // Додаємо інші необхідні властивості з використанням констант
-                b.putProperty(AwsV4HttpSigner.SERVICE_SIGNING_NAME, "sts")
-                b.putProperty(AwsV4HttpSigner.REGION_SET, RegionSet.create(region))
-                b.putProperty(AwsV4HttpSigner.PAYLOAD_SIGNING_ENABLED, true)
-                b.putProperty(AwsV4HttpSigner.EXPIRATION_DURATION, Duration.ofMinutes(1))
+                b.putProperty(AwsV4aHttpSigner.SERVICE_SIGNING_NAME, "sts")
+                b.putProperty(AwsV4aHttpSigner.REGION_SET, RegionSet.create(region))
+                b.putProperty(AwsV4aHttpSigner.PAYLOAD_SIGNING_ENABLED, true)
+                b.putProperty(AwsV4aHttpSigner.EXPIRATION_DURATION, Duration.ofMinutes(1))
             }
 
             // Отримуємо URL з підписаним запитом
