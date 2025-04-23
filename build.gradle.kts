@@ -44,7 +44,7 @@ dependencies {
     implementation("software.amazon.awssdk:auth:${awssdkVersion}") // Для CredentialsProvider
     implementation("software.amazon.awssdk:regions:${awssdkVersion}") // Для Region
     implementation("software.amazon.awssdk:http-client-spi:${awssdkVersion}") // Інтерфейси HTTP
-    implementation("software.amazon.awssdk:apache-client:${awssdkVersion}") // Конкретна реалізація HTTP клієнта (або інша)
+    //implementation("software.amazon.awssdk:apache-client:${awssdkVersion}") // Конкретна реалізація HTTP клієнта (або інша)
     implementation("software.amazon.awssdk:sdk-core:${awssdkVersion}")
     // Ключова залежність для підписувача:
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")

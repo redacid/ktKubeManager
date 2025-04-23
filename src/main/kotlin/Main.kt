@@ -1,106 +1,121 @@
+// Fabric8
+// AWS SDK v2 Imports for EKS Token Generation
+
+// Coroutines
 import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.HorizontalDivider as Divider
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
-import compose.icons.feathericons.ArrowDown
-import compose.icons.feathericons.ArrowUp
-import compose.icons.feathericons.Circle
-import compose.icons.feathericons.Eye
-import compose.icons.feathericons.EyeOff
+import compose.icons.feathericons.*
 import compose.icons.simpleicons.Kubernetes
-// Fabric8
+import io.fabric8.kubernetes.api.model.*
+import io.fabric8.kubernetes.api.model.apps.DaemonSet
+import io.fabric8.kubernetes.api.model.apps.Deployment
+import io.fabric8.kubernetes.api.model.apps.ReplicaSet
+import io.fabric8.kubernetes.api.model.apps.StatefulSet
+import io.fabric8.kubernetes.api.model.batch.v1.CronJob
+import io.fabric8.kubernetes.api.model.batch.v1.JobStatus
+import io.fabric8.kubernetes.api.model.networking.v1.Ingress
+import io.fabric8.kubernetes.api.model.networking.v1.IngressLoadBalancerIngress
+import io.fabric8.kubernetes.api.model.networking.v1.IngressRule
+import io.fabric8.kubernetes.api.model.networking.v1.IngressTLS
+import io.fabric8.kubernetes.api.model.rbac.ClusterRole
+import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
+import io.fabric8.kubernetes.api.model.rbac.Role
+import io.fabric8.kubernetes.api.model.rbac.RoleBinding
+import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.Config
-import io.fabric8.kubernetes.api.model.Config as KubeConfigModel
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.KubernetesClientException
-
-import io.fabric8.kubernetes.api.model.*
-import io.fabric8.kubernetes.api.model.apps.*
-import io.fabric8.kubernetes.api.model.batch.v1.*
-import io.fabric8.kubernetes.api.model.networking.v1.*
-import io.fabric8.kubernetes.api.model.rbac.*
-import io.fabric8.kubernetes.api.model.storage.*
 import io.fabric8.kubernetes.client.OAuthTokenProvider
-import io.fabric8.kubernetes.api.model.AuthInfo import io.fabric8.kubernetes.api.model.ExecConfig
-import io.fabric8.kubernetes.api.model.ExecEnvVar
-import io.fabric8.kubernetes.api.model.NamedAuthInfo
-import io.fabric8.kubernetes.api.model.NamedCluster
-import io.fabric8.kubernetes.api.model.NamedContext
-
-// AWS SDK v2 Imports for EKS Token Generation
+import kotlinx.coroutines.*
+import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.http.SdkHttpFullRequest
 import software.amazon.awssdk.http.SdkHttpMethod
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner as AwsV4aHttpSigner
-import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
-import software.amazon.awssdk.http.auth.spi.signer.SignRequest
-import software.amazon.awssdk.auth.credentials.AwsCredentials
-import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
+import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner
 import software.amazon.awssdk.http.auth.aws.signer.RegionSet
-
-// Coroutines
-import kotlinx.coroutines.*
-import org.slf4j.LoggerFactory
-import com.fasterxml.jackson.databind.ObjectMapper //extract helm release
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule //extract helm release
-import compose.icons.feathericons.Aperture
-import compose.icons.feathericons.ArrowLeft
-import compose.icons.feathericons.ArrowRight
-import compose.icons.feathericons.CheckCircle
-import compose.icons.feathericons.Copy
-import compose.icons.feathericons.HelpCircle
-import compose.icons.feathericons.List
-import compose.icons.feathericons.XCircle
-import java.util.zip.GZIPInputStream  //extract helm release
+import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.IOException
-import java.time.Duration
-import java.time.OffsetDateTime
 import java.net.URI
+import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.time.Instant
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Base64
-import java.nio.charset.StandardCharsets
-import java.io.File
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-
-
+import java.util.*
+import java.util.zip.GZIPInputStream
+import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.collections.MutableList
+import kotlin.collections.MutableMap
+import kotlin.collections.Set
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.contains
+import kotlin.collections.count
+import kotlin.collections.distinct
+import kotlin.collections.emptyList
+import kotlin.collections.emptyMap
+import kotlin.collections.filter
+import kotlin.collections.filterKeys
+import kotlin.collections.filterNotNull
+import kotlin.collections.find
+import kotlin.collections.first
+import kotlin.collections.firstOrNull
+import kotlin.collections.forEach
+import kotlin.collections.forEachIndexed
+import kotlin.collections.get
+import kotlin.collections.isNotEmpty
+import kotlin.collections.isNullOrEmpty
+import kotlin.collections.joinToString
+import kotlin.collections.listOf
+import kotlin.collections.map
+import kotlin.collections.mapNotNull
+import kotlin.collections.mapOf
+import kotlin.collections.minus
+import kotlin.collections.mutableListOf
+import kotlin.collections.plus
+import kotlin.collections.set
+import kotlin.collections.setOf
+import kotlin.collections.sorted
+import kotlin.collections.sortedBy
+import kotlin.collections.sortedWith
+import kotlin.collections.sumOf
+import kotlin.collections.take
+import androidx.compose.material3.HorizontalDivider as Divider
+import io.fabric8.kubernetes.api.model.Config as KubeConfigModel
 
 // TODO: check NS filter for all resources (e.g. Pods)
 
@@ -115,9 +130,27 @@ val resourceTreeData: Map<String, List<String>> = mapOf(
     "Access Control" to listOf("ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings")
 )
 val resourceLeafNodes: Set<String> = setOf(
-    "Namespaces", "Nodes", "Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs",
-    "Services", "Ingresses", "PersistentVolumes", "PersistentVolumeClaims", "StorageClasses", "ConfigMaps", "Secrets",
-    "ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"
+    "Namespaces",
+    "Nodes",
+    "Pods",
+    "Deployments",
+    "StatefulSets",
+    "DaemonSets",
+    "ReplicaSets",
+    "Jobs",
+    "CronJobs",
+    "Services",
+    "Ingresses",
+    "PersistentVolumes",
+    "PersistentVolumeClaims",
+    "StorageClasses",
+    "ConfigMaps",
+    "Secrets",
+    "ServiceAccounts",
+    "Roles",
+    "RoleBindings",
+    "ClusterRoles",
+    "ClusterRoleBindings"
 )
 
 // Мапа для визначення, чи є ресурс неймспейсним (спрощено)
@@ -157,9 +190,7 @@ var ICON_RESOURCE = FeatherIcons.Aperture
 var ICON_NF = Icons.Filled.Place
 
 class EksTokenProvider(
-    private val clusterName: String,
-    private val region: String,
-    private val awsProfile: String? = null
+    private val clusterName: String, private val region: String, private val awsProfile: String? = null
 ) : OAuthTokenProvider {
 
     private val logger = LoggerFactory.getLogger(EksTokenProvider::class.java)
@@ -177,9 +208,7 @@ class EksTokenProvider(
     private val signer = AwsV4aHttpSigner.create()
 
     // Форматер для дати в заголовку X-Amz-Date
-    private val amzDateFormatter = DateTimeFormatter
-        .ofPattern("yyyyMMdd'T'HHmmss'Z'")
-        .withZone(ZoneId.of("UTC"))
+    private val amzDateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneId.of("UTC"))
 
     /**
      * Отримує токен для аутентифікації з кластером EKS.
@@ -194,18 +223,15 @@ class EksTokenProvider(
             // Поточний час для генерації підпису
             val now = Instant.now()
             val formattedDate = amzDateFormatter.format(now)
-            val datestamp = formattedDate.substring(0, 8)
+            //val datestamp = formattedDate.substring(0, 8)
 
             // Створюємо базовий запит STS GetCallerIdentity
             val host = "sts.$region.amazonaws.com"
-            val requestBuilder = SdkHttpFullRequest.builder()
-                .method(SdkHttpMethod.GET)
-                .uri(URI.create("https://$host/"))
-                .putRawQueryParameter("Action", "GetCallerIdentity")
-                .putRawQueryParameter("Version", "2011-06-15")
-                .appendHeader("host", host)
-                .appendHeader("x-k8s-aws-id", clusterName)
-                .appendHeader("x-amz-date", formattedDate)
+            val requestBuilder =
+                SdkHttpFullRequest.builder().method(SdkHttpMethod.GET).uri(URI.create("https://$host/"))
+                    .putRawQueryParameter("Action", "GetCallerIdentity").putRawQueryParameter("Version", "2011-06-15")
+                    .appendHeader("host", host).appendHeader("x-k8s-aws-id", clusterName)
+                    .appendHeader("x-amz-date", formattedDate)
 
             // Додаємо токен сесії, якщо присутній
             if (credentials is AwsSessionCredentials) {
@@ -220,8 +246,7 @@ class EksTokenProvider(
                 b.request(request)
                 // Створюємо ідентичність AWS з облікових даних
                 val identity = AwsCredentialsIdentity.create(
-                    credentials.accessKeyId(),
-                    credentials.secretAccessKey()
+                    credentials.accessKeyId(), credentials.secretAccessKey()
                 )
                 b.identity(identity)
                 // Додаємо інші необхідні властивості з використанням констант
@@ -235,8 +260,8 @@ class EksTokenProvider(
             val signedUrl = signedRequest.request().getUri().toString()
 
             // Кодуємо URL в Base64 та форматуємо токен
-            val base64SignedUrl = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(signedUrl.toByteArray(StandardCharsets.UTF_8))
+            val base64SignedUrl =
+                Base64.getUrlEncoder().withoutPadding().encodeToString(signedUrl.toByteArray(StandardCharsets.UTF_8))
 
             return "k8s-aws-v1.$base64SignedUrl"
 
@@ -261,15 +286,17 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
             val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) {
                 logger.info("[IO] Створення базового конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
                 // 1. Отримуємо оброблену конфігурацію
-                val resolvedConfig: io.fabric8.kubernetes.client.Config = io.fabric8.kubernetes.client.Config.autoConfigure(targetContext)
-                    ?: throw KubernetesClientException("Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'")
+                val resolvedConfig: Config =
+                    Config.autoConfigure(targetContext) ?: throw KubernetesClientException(
+                        "Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'"
+                    )
 
                 // --- Починаємо аналіз сирого KubeConfig для перевірки ExecConfig ---
                 try {
                     // Створюємо власну логіку для отримання та аналізу KubeConfig
                     // Стандартні місця розташування kubeconfig
-                    val kubeConfigPath = System.getenv("KUBECONFIG")
-                        ?: "${System.getProperty("user.home")}/.kube/config"
+                    val kubeConfigPath =
+                        System.getenv("KUBECONFIG") ?: "${System.getProperty("user.home")}/.kube/config"
 
                     val kubeConfigFile = File(kubeConfigPath)
                     if (!kubeConfigFile.exists()) {
@@ -289,14 +316,16 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 
                     // 4. Знаходимо NamedContext у сирій моделі
                     val namedContext: NamedContext? = kubeConfigModel.contexts?.find { it.name == actualContextName }
-                    val contextInfo = namedContext?.context ?: throw KubernetesClientException("Не знайдено деталей для контексту '$actualContextName' у KubeConfig моделі")
+                    val contextInfo = namedContext?.context
+                        ?: throw KubernetesClientException("Не знайдено деталей для контексту '$actualContextName' у KubeConfig моделі")
 
                     // 5. Отримуємо ім'я користувача з контексту
                     val userName: String? = contextInfo.user
 
                     if (userName != null) {
                         // 6. Отримуємо список користувачів (NamedAuthInfo) з сирої моделі
-                        val usersList: List<NamedAuthInfo> = kubeConfigModel.users ?: emptyList() // У моделі поле називається 'users'
+                        val usersList: List<NamedAuthInfo> =
+                            kubeConfigModel.users ?: emptyList() // У моделі поле називається 'users'
 
                         // 7. Знаходимо NamedAuthInfo для нашого користувача
                         val namedAuthInfo: NamedAuthInfo? = usersList.find { it.name == userName }
@@ -310,19 +339,26 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                             logger.info("Виявлено EKS конфігурацію з exec command: '${execConfig.command}'. Спроба використання кастомного TokenProvider.")
 
                             val execArgs: List<String> = execConfig.args ?: emptyList()
-                            val execEnv: List<io.fabric8.kubernetes.api.model.ExecEnvVar> = execConfig.env ?: emptyList() // Тип з моделі
+                            val execEnv: List<ExecEnvVar> =
+                                execConfig.env ?: emptyList() // Тип з моделі
 
                             // Функції findArgumentValue/findEnvValue потрібно буде адаптувати під List<ExecEnvVar> з моделі
-                            val clusterName = findArgumentValue(execArgs, "--cluster-name")
-                                ?: findEnvValueModel(execEnv, "AWS_CLUSTER_NAME") // Використовуємо адаптовану функцію
-                                ?: throw KubernetesClientException("Не вдалося знайти 'cluster-name' в exec config для '$userName'")
+                            val clusterName = findArgumentValue(execArgs, "--cluster-name") ?: findEnvValueModel(
+                                execEnv,
+                                "AWS_CLUSTER_NAME"
+                            ) // Використовуємо адаптовану функцію
+                            ?: throw KubernetesClientException("Не вдалося знайти 'cluster-name' в exec config для '$userName'")
 
-                            val region = findArgumentValue(execArgs, "--region")
-                                ?: findEnvValueModel(execEnv, "AWS_REGION") // Використовуємо адаптовану функцію
-                                ?: throw KubernetesClientException("Не вдалося знайти 'region' в exec config для '$userName'")
+                            val region = findArgumentValue(execArgs, "--region") ?: findEnvValueModel(
+                                execEnv,
+                                "AWS_REGION"
+                            ) // Використовуємо адаптовану функцію
+                            ?: throw KubernetesClientException("Не вдалося знайти 'region' в exec config для '$userName'")
 
-                            val awsProfile = findArgumentValue(execArgs, "--profile")
-                                ?: findEnvValueModel(execEnv, "AWS_PROFILE") // Використовуємо адаптовану функцію
+                            val awsProfile = findArgumentValue(execArgs, "--profile") ?: findEnvValueModel(
+                                execEnv,
+                                "AWS_PROFILE"
+                            ) // Використовуємо адаптовану функцію
 
                             logger.info("Параметри для EKS TokenProvider: cluster='$clusterName', region='$region', profile='${awsProfile ?: "(default)"}'")
 
@@ -379,7 +415,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 }
 
 // Потрібно адаптувати або створити нову функцію для роботи з List<io.fabric8.kubernetes.api.model.ExecEnvVar>
-fun findEnvValueModel(envVars: List<io.fabric8.kubernetes.api.model.ExecEnvVar>, key: String): String? {
+fun findEnvValueModel(envVars: List<ExecEnvVar>, key: String): String? {
     return envVars.find { it.name == key }?.value
 }
 
@@ -401,7 +437,6 @@ fun findArgumentValue(args: List<String>, argName: String): String? {
 private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
     return envList?.find { it.name == key }?.value
 }
-
 
 
 // Calculate optimal column widths based on content
@@ -427,8 +462,7 @@ fun calculateColumnWidths(
         headers.forEachIndexed { index, header ->
             val textWidth = measureTextWidth(textMeasurer, header, headerStyle)
             widths[index] = maxOf(
-                widths[index],
-                (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
+                widths[index], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
             )
         }
 
@@ -439,8 +473,7 @@ fun calculateColumnWidths(
                 val cellData = getCellData(item, colIndex, resourceType)
                 val textWidth = measureTextWidth(textMeasurer, cellData, cellStyle)
                 widths[colIndex] = maxOf(
-                    widths[colIndex],
-                    (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
+                    widths[colIndex], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
                 )
             }
         }
@@ -456,10 +489,10 @@ fun convertJsonToYaml(jsonString: String): String {
         val jsonObject = jsonMapper.readValue(jsonString, Any::class.java)
 
         // Convert object to YAML
-        val yamlMapper = ObjectMapper(YAMLFactory()
-            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES))
-            .registerKotlinModule()
+        val yamlMapper = ObjectMapper(
+            YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+        ).registerKotlinModule()
 
         return yamlMapper.writeValueAsString(jsonObject)
     } catch (e: Exception) {
@@ -470,13 +503,10 @@ fun convertJsonToYaml(jsonString: String): String {
 
 // Helper function to measure text width
 private fun measureTextWidth(
-    textMeasurer: TextMeasurer,
-    text: String,
-    style: TextStyle
+    textMeasurer: TextMeasurer, text: String, style: TextStyle
 ): Int {
     val textLayoutResult = textMeasurer.measure(
-        text = text,
-        style = style
+        text = text, style = style
     )
     return textLayoutResult.size.width
 }
@@ -517,7 +547,7 @@ fun formatAge(creationTimestamp: String?): String {
 }
 
 fun formatPodContainers(statuses: List<ContainerStatus>?): String {
-    val total = statuses?.size ?: 0;
+    val total = statuses?.size ?: 0
     val ready = statuses?.count { it.ready == true } ?: 0; return "$ready/$total"
 }
 
@@ -598,8 +628,7 @@ fun formatJobDuration(status: JobStatus?): String {
     val end = status?.completionTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     return when {
         start == null -> "<pending>"; end == null -> Duration.between(
-            start,
-            OffsetDateTime.now(start.offset)
+            start, OffsetDateTime.now(start.offset)
         ).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s"
     }
 }
@@ -621,25 +650,11 @@ fun getHeadersForType(resourceType: String): List<String> {
         "Services" -> listOf("Namespace", "Name", "Type", "ClusterIP", "ExternalIP", "Ports", "Age")
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
         "PersistentVolumes" -> listOf(
-            "Name",
-            "Capacity",
-            "Access Modes",
-            "Reclaim Policy",
-            "Status",
-            "Claim",
-            "StorageClass",
-            "Age"
+            "Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age"
         )
 
         "PersistentVolumeClaims" -> listOf(
-            "Namespace",
-            "Name",
-            "Status",
-            "Volume",
-            "Capacity",
-            "Access Modes",
-            "StorageClass",
-            "Age"
+            "Namespace", "Name", "Status", "Volume", "Capacity", "Access Modes", "StorageClass", "Age"
         )
 
         "StorageClasses" -> listOf("Name", "Provisioner", "Reclaim Policy", "Binding Mode", "Allow Expand", "Age")
@@ -852,9 +867,7 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 }
 
 suspend fun <T> fetchK8sResource(
-    client: KubernetesClient?,
-    resourceType: String,
-    namespace: String?, // Додано параметр неймспейсу
+    client: KubernetesClient?, resourceType: String, namespace: String?, // Додано параметр неймспейсу
     apiCall: (KubernetesClient, String?) -> List<T>? // Лямбда тепер приймає клієнт і неймспейс
 ): Result<List<T>> {
     if (client == null) return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
@@ -862,14 +875,13 @@ suspend fun <T> fetchK8sResource(
     val nsLog = targetNamespace ?: "all"
     logger.info("Завантаження списку $resourceType (Namespace: $nsLog)...")
     return try {
-        val items = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        val items = withContext(Dispatchers.IO) {
             logger.info("[IO] Виклик API для $resourceType (Namespace: $nsLog)...")
             apiCall(client, targetNamespace) ?: emptyList() // Передаємо неймспейс у лямбду
         }
         logger.info("Завантажено ${items.size} $resourceType (Namespace: $nsLog).")
         try {
-            @Suppress("UNCHECKED_CAST")
-            val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
+            @Suppress("UNCHECKED_CAST") val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
             Result.success(sortedItems)
         } catch (e: Exception) {
             logger.warn("Не вдалося сортувати $resourceType: ${e.message}")
@@ -946,9 +958,7 @@ suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client,
 } // Cluster-scoped
 
 suspend fun loadPVCsFabric8(client: KubernetesClient?, namespace: String?) = fetchK8sResource(
-    client,
-    "PersistentVolumeClaims",
-    namespace
+    client, "PersistentVolumeClaims", namespace
 ) { cl, ns ->
     if (ns == null) cl.persistentVolumeClaims().inAnyNamespace().list().items else cl.persistentVolumeClaims()
         .inNamespace(ns).list().items
@@ -997,19 +1007,14 @@ suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) =
 
 // Function to load endpoints for a service
 suspend fun loadEndpointsForService(
-    client: KubernetesClient?,
-    namespace: String?,
-    serviceName: String?
+    client: KubernetesClient?, namespace: String?, serviceName: String?
 ): Result<Endpoints> {
     if (client == null || namespace.isNullOrEmpty() || serviceName.isNullOrEmpty()) {
         return Result.failure(IllegalArgumentException("Client, namespace, and service name are required"))
     }
 
     return try {
-        val endpoints = client.endpoints()
-            .inNamespace(namespace)
-            .withName(serviceName)
-            .get()
+        val endpoints = client.endpoints().inNamespace(namespace).withName(serviceName).get()
 
         Result.success(endpoints)
     } catch (e: Exception) {
@@ -1020,15 +1025,11 @@ suspend fun loadEndpointsForService(
 
 @Composable
 fun KubeTableHeaderRow(
-    headers: List<String>,
-    columnWidths: List<Int> // Add column widths parameter
+    headers: List<String>, columnWidths: List<Int> // Add column widths parameter
 ) {
     Row(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant).fillMaxWidth()
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically
     ) {
         headers.forEachIndexed { index, header ->
             val width = if (index < columnWidths.size) columnWidths[index] else 100
@@ -1036,9 +1037,7 @@ fun KubeTableHeaderRow(
                 text = header,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .width(width.dp)
-                    .padding(horizontal = 8.dp),
+                modifier = Modifier.width(width.dp).padding(horizontal = 8.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1048,27 +1047,17 @@ fun KubeTableHeaderRow(
 
 @Composable
 fun <T : HasMetadata> KubeTableRow(
-    item: T,
-    headers: List<String>,
-    resourceType: String,
-    columnWidths: List<Int>, // Add column widths parameter
+    item: T, headers: List<String>, resourceType: String, columnWidths: List<Int>, // Add column widths parameter
     onRowClick: (T) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onRowClick(item) }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().clickable { onRowClick(item) }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         headers.forEachIndexed { colIndex, _ ->
             val width = if (colIndex < columnWidths.size) columnWidths[colIndex] else 100
             Text(
                 text = getCellData(item, colIndex, resourceType),
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .width(width.dp)
-                    .padding(horizontal = 8.dp),
+                modifier = Modifier.width(width.dp).padding(horizontal = 8.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1085,8 +1074,7 @@ fun DetailRow(label: String, value: String?) {
             modifier = Modifier.width(150.dp)
         )
         Text( // M3 Text
-            text = value ?: "<none>",
-            style = MaterialTheme.typography.bodyMedium, // M3 Typography
+            text = value ?: "<none>", style = MaterialTheme.typography.bodyMedium, // M3 Typography
             modifier = Modifier.weight(1f)
         )
     }
@@ -1095,38 +1083,28 @@ fun DetailRow(label: String, value: String?) {
 // === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА (M3) ===
 @Composable
 fun ContainerSelectionDialog(
-    containers: List<String>,
-    onDismiss: () -> Unit,
-    onContainerSelected: (String) -> Unit
+    containers: List<String>, onDismiss: () -> Unit, onContainerSelected: (String) -> Unit
 ) {
     var selectedOption by remember { mutableStateOf(containers.firstOrNull() ?: "") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Container") },
-        text = {
-            Column {
-                containers.forEach { containerName ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable { selectedOption = containerName }.padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (containerName == selectedOption),
-                            onClick = { selectedOption = containerName })
-                        Spacer(Modifier.width(8.dp))
-                        Text(containerName)
-                    }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Select Container") }, text = {
+        Column {
+            containers.forEach { containerName ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { selectedOption = containerName }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = (containerName == selectedOption), onClick = { selectedOption = containerName })
+                    Spacer(Modifier.width(8.dp))
+                    Text(containerName)
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onContainerSelected(selectedOption) },
-                enabled = selectedOption.isNotEmpty()
-            ) { Text("View Logs") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
+        }
+    }, confirmButton = {
+        Button(
+            onClick = { onContainerSelected(selectedOption) }, enabled = selectedOption.isNotEmpty()
+        ) { Text("View Logs") }
+    }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }
 
 // ===
@@ -1171,8 +1149,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                 onContainerSelected = { containerName ->
                     showContainerDialog.value = false
                     onShowLogsRequest(containerName)
-                }
-            )
+                })
         }
         // --- Кінець логіки логів ---
 
@@ -1227,9 +1204,7 @@ fun NamespaceDetailsView(ns: Namespace) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Labels (${labels.size})",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 8.dp)
+                "Labels (${labels.size})", fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp)
             )
             Spacer(Modifier.weight(1f))
             Icon(
@@ -1343,16 +1318,10 @@ fun NodeDetailsView(node: Node) {
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Capacity & Allocatable Resources section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showCapacity.value = !showCapacity.value }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { showCapacity.value = !showCapacity.value }
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT,
-                contentDescription = "Expand Capacity"
+                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Capacity"
             )
             Text(
                 text = "Capacity & Allocatable Resources",
@@ -1362,9 +1331,7 @@ fun NodeDetailsView(node: Node) {
 
         if (showCapacity.value) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -1434,13 +1401,8 @@ fun NodeDetailsView(node: Node) {
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Conditions section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showConditions.value = !showConditions.value }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { showConditions.value = !showConditions.value }
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = if (showConditions.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Conditions"
@@ -1453,26 +1415,21 @@ fun NodeDetailsView(node: Node) {
 
         if (showConditions.value) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     node.status?.conditions?.forEach { condition ->
                         val statusColor = when (condition.status) {
                             "True" -> MaterialTheme.colorScheme.primary
-                            "False" -> if (condition.type == "Ready")
-                                MaterialTheme.colorScheme.error
+                            "False" -> if (condition.type == "Ready") MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.primary
 
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
 
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -1519,16 +1476,10 @@ fun NodeDetailsView(node: Node) {
         // Labels section
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showLabels.value = !showLabels.value }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { showLabels.value = !showLabels.value }
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT,
-                contentDescription = "Expand Labels"
+                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Labels"
             )
             Text(
                 text = "Labels",
@@ -1538,17 +1489,13 @@ fun NodeDetailsView(node: Node) {
 
         if (showLabels.value) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     node.metadata?.labels?.entries?.forEach { (key, value) ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                         ) {
                             Text(
                                 text = key,
@@ -1579,20 +1526,13 @@ fun NodeDetailsView(node: Node) {
 @Composable
 fun ResourceRow(name: String, capacity: Quantity?, allocatable: Quantity?) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = name,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
+            text = name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f)
         )
         Text(
-            text = capacity?.amount ?: "-",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
+            text = capacity?.amount ?: "-", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f)
         )
         Text(
             text = allocatable?.amount ?: "-",
@@ -1628,10 +1568,8 @@ fun DeploymentDetailsView(dep: Deployment) {
         Text("Conditions:", style = MaterialTheme.typography.titleMedium)
         dep.status?.conditions?.forEach { condition ->
             Column(
-                modifier = Modifier
-                    .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    .padding(4.dp)
+                modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
             ) {
                 DetailRow("  Type", condition.type)
                 DetailRow("  Status", condition.status)
@@ -1651,7 +1589,8 @@ fun DeploymentDetailsView(dep: Deployment) {
 
         // Template labels
         Text(
-            "  Labels:", style = MaterialTheme.typography.titleSmall,
+            "  Labels:",
+            style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(start = 8.dp, top = 4.dp)
         )
         dep.spec?.template?.metadata?.labels?.forEach { (key, value) ->
@@ -1663,15 +1602,14 @@ fun DeploymentDetailsView(dep: Deployment) {
 
         // Template containers
         Text(
-            "  Containers:", style = MaterialTheme.typography.titleSmall,
+            "  Containers:",
+            style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(start = 8.dp, top = 4.dp)
         )
         dep.spec?.template?.spec?.containers?.forEach { container ->
             Column(
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    .padding(4.dp)
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
             ) {
                 DetailRow("Name", container.name)
                 DetailRow("Image", container.image)
@@ -1680,13 +1618,13 @@ fun DeploymentDetailsView(dep: Deployment) {
                 // Container ports
                 if (!container.ports.isNullOrEmpty()) {
                     Text(
-                        "Ports:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        "Ports:",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     container.ports.forEach { port ->
                         DetailRow(
-                            "  ${port.name ?: port.containerPort}",
-                            "${port.containerPort}/${port.protocol ?: "TCP"}"
+                            "  ${port.name ?: port.containerPort}", "${port.containerPort}/${port.protocol ?: "TCP"}"
                         )
                     }
                 }
@@ -1694,7 +1632,8 @@ fun DeploymentDetailsView(dep: Deployment) {
                 // Resource requirements
                 container.resources?.let { resources ->
                     Text(
-                        "Resources:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        "Resources:",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     resources.limits?.forEach { (key, value) ->
@@ -1708,20 +1647,18 @@ fun DeploymentDetailsView(dep: Deployment) {
                 // Environment variables
                 if (!container.env.isNullOrEmpty()) {
                     Text(
-                        "Environment:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        "Environment:",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     container.env.forEach { env ->
                         val valueText = when {
                             env.value != null -> env.value
-                            env.valueFrom?.configMapKeyRef != null ->
-                                "ConfigMap: ${env.valueFrom?.configMapKeyRef?.name}.${env.valueFrom?.configMapKeyRef?.key}"
+                            env.valueFrom?.configMapKeyRef != null -> "ConfigMap: ${env.valueFrom?.configMapKeyRef?.name}.${env.valueFrom?.configMapKeyRef?.key}"
 
-                            env.valueFrom?.secretKeyRef != null ->
-                                "Secret: ${env.valueFrom?.secretKeyRef?.name}.${env.valueFrom?.secretKeyRef?.key}"
+                            env.valueFrom?.secretKeyRef != null -> "Secret: ${env.valueFrom?.secretKeyRef?.name}.${env.valueFrom?.secretKeyRef?.key}"
 
-                            env.valueFrom?.fieldRef != null ->
-                                "Field: ${env.valueFrom?.fieldRef?.fieldPath}"
+                            env.valueFrom?.fieldRef != null -> "Field: ${env.valueFrom?.fieldRef?.fieldPath}"
 
                             else -> "<complex>"
                         }
@@ -1749,15 +1686,14 @@ fun DeploymentDetailsView(dep: Deployment) {
         // Volumes
         if (!dep.spec?.template?.spec?.volumes.isNullOrEmpty()) {
             Text(
-                "  Volumes:", style = MaterialTheme.typography.titleSmall,
+                "  Volumes:",
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp)
             )
             dep.spec?.template?.spec?.volumes?.forEach { volume ->
                 Column(
-                    modifier = Modifier
-                        .padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
                 ) {
                     DetailRow("Name", volume.name)
                     // Determine volume type and details
@@ -1843,16 +1779,10 @@ fun ServiceDetailsView(svc: Service) {
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Ports section (expandable)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showPorts.value = !showPorts.value }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { showPorts.value = !showPorts.value }
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (showPorts.value) ICON_DOWN else ICON_RIGHT,
-                contentDescription = "Expand Ports"
+                imageVector = if (showPorts.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Ports"
             )
             Text(
                 text = "Ports (${svc.spec?.ports?.size ?: 0})",
@@ -1862,9 +1792,7 @@ fun ServiceDetailsView(svc: Service) {
 
         if (showPorts.value && !svc.spec?.ports.isNullOrEmpty()) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -1902,9 +1830,7 @@ fun ServiceDetailsView(svc: Service) {
                     // Port rows
                     svc.spec?.ports?.forEach { port ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -2014,16 +1940,10 @@ fun ServiceDetailsView(svc: Service) {
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Labels section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showLabels.value = !showLabels.value }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { showLabels.value = !showLabels.value }
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT,
-                contentDescription = "Expand Labels"
+                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Labels"
             )
             Text(
                 text = "Labels (${svc.metadata?.labels?.size ?: 0})",
@@ -2033,17 +1953,13 @@ fun ServiceDetailsView(svc: Service) {
 
         if (showLabels.value) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     svc.metadata?.labels?.entries?.forEach { (key, value) ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                         ) {
                             Text(
                                 text = key,
@@ -2072,13 +1988,8 @@ fun ServiceDetailsView(svc: Service) {
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Annotations section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showAnnotations.value = !showAnnotations.value }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clickable { showAnnotations.value = !showAnnotations.value }
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = if (showAnnotations.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Annotations"
@@ -2091,17 +2002,13 @@ fun ServiceDetailsView(svc: Service) {
 
         if (showAnnotations.value) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     svc.metadata?.annotations?.entries?.forEach { (key, value) ->
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
                             Text(
                                 text = key,
@@ -2158,7 +2065,7 @@ fun SecretDetailsView(secret: Secret) {
                     // Decode base64 first
                     // cat hr3.txt | base64 -d | base64 -d | gzip -d
                     val decodedBytes =
-                        java.util.Base64.getDecoder().decode(java.util.Base64.getDecoder().decode(releaseData))
+                        Base64.getDecoder().decode(Base64.getDecoder().decode(releaseData))
 
                     // Decompress GZIP data
                     val bais = ByteArrayInputStream(decodedBytes)
@@ -2167,7 +2074,9 @@ fun SecretDetailsView(secret: Secret) {
 
                     // Parse JSON data
                     val mapper = ObjectMapper().registerKotlinModule()
-                    val helmData = mapper.readValue(decompressedData, Map::class.java) as Map<String, Any?>
+
+                    @Suppress("UNCHECKED_CAST") val helmData =
+                        mapper.readValue(decompressedData, Map::class.java) as Map<String, Any?>
                     helmReleaseInfo = helmData
                 }
             } catch (e: Exception) {
@@ -2178,8 +2087,7 @@ fun SecretDetailsView(secret: Secret) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
             //.fillMaxSize()
             //.verticalScroll(rememberScrollState())
         ) {
@@ -2262,20 +2170,17 @@ fun SecretDetailsView(secret: Secret) {
 
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = "Values copied to clipboard",
-                                            duration = SnackbarDuration.Short
+                                            message = "Values copied to clipboard", duration = SnackbarDuration.Short
                                         )
                                     }
                                 } catch (e: Exception) {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = "Error copying: ${e.message}",
-                                            duration = SnackbarDuration.Short
+                                            message = "Error copying: ${e.message}", duration = SnackbarDuration.Short
                                         )
                                     }
                                 }
-                            }
-                        ) {
+                            }) {
                             Icon(
                                 imageVector = ICON_COPY,
                                 contentDescription = "Copy values",
@@ -2283,20 +2188,15 @@ fun SecretDetailsView(secret: Secret) {
                             )
                         }
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
                                 SelectionContainer(
-                                    modifier = Modifier
-                                        .padding(16.dp),
+                                    modifier = Modifier.padding(16.dp),
                                 ) {
                                     Text(
                                         softWrap = true,
@@ -2350,20 +2250,17 @@ fun SecretDetailsView(secret: Secret) {
 
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = "Values copied to clipboard",
-                                            duration = SnackbarDuration.Short
+                                            message = "Values copied to clipboard", duration = SnackbarDuration.Short
                                         )
                                     }
                                 } catch (e: Exception) {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = "Error copying: ${e.message}",
-                                            duration = SnackbarDuration.Short
+                                            message = "Error copying: ${e.message}", duration = SnackbarDuration.Short
                                         )
                                     }
                                 }
-                            }
-                        ) {
+                            }) {
                             Icon(
                                 imageVector = ICON_COPY,
                                 contentDescription = "Copy valuesGlobal",
@@ -2371,20 +2268,15 @@ fun SecretDetailsView(secret: Secret) {
                             )
                         }
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
                                 SelectionContainer(
-                                    modifier = Modifier
-                                        .padding(16.dp),
+                                    modifier = Modifier.padding(16.dp),
                                 ) {
                                     Text(
                                         softWrap = true,
@@ -2423,9 +2315,7 @@ fun SecretDetailsView(secret: Secret) {
                     var decodedValue by remember { mutableStateOf("") }
 
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Key
@@ -2468,13 +2358,11 @@ fun SecretDetailsView(secret: Secret) {
                                     // Сповіщаємо про помилку
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = "Error copying: ${e.message}",
-                                            duration = SnackbarDuration.Short
+                                            message = "Error copying: ${e.message}", duration = SnackbarDuration.Short
                                         )
                                     }
                                 }
-                            }
-                        ) {
+                            }) {
                             Icon(
                                 imageVector = ICON_COPY,
                                 contentDescription = "Copy value",
@@ -2489,7 +2377,7 @@ fun SecretDetailsView(secret: Secret) {
                                 if (!isDecoded) {
                                     try {
                                         // Decode from Base64
-                                        decodedValue = String(java.util.Base64.getDecoder().decode(encodedValue))
+                                        decodedValue = String(Base64.getDecoder().decode(encodedValue))
                                         isDecoded = true
                                     } catch (e: Exception) {
                                         decodedValue = "Error decoding: ${e.message}"
@@ -2500,8 +2388,7 @@ fun SecretDetailsView(secret: Secret) {
                                     // Повертаємося в закодований вигляд
                                     isDecoded = false
                                 }
-                            }
-                        ) {
+                            }) {
                             Icon(
                                 imageVector = if (isDecoded) ICON_EYEOFF else ICON_EYE,
                                 contentDescription = if (isDecoded) "Hide decoded value" else "Decode value",
@@ -2522,9 +2409,7 @@ fun SecretDetailsView(secret: Secret) {
 
                         stringData.forEach { (key, value) ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -2561,8 +2446,7 @@ fun SecretDetailsView(secret: Secret) {
                                                 )
                                             }
                                         }
-                                    }
-                                ) {
+                                    }) {
                                     Icon(
                                         imageVector = ICON_COPY,
                                         contentDescription = "Copy value",
@@ -2576,9 +2460,7 @@ fun SecretDetailsView(secret: Secret) {
 
                 // If no data in the secret
                 // Якщо немає даних у секреті
-                if ((secret.data == null || secret.data!!.isEmpty()) &&
-                    (secret.stringData == null || secret.stringData!!.isEmpty())
-                ) {
+                if ((secret.data == null || secret.data!!.isEmpty()) && (secret.stringData == null || secret.stringData!!.isEmpty())) {
                     Text(
                         text = "No data in this Secret",
                         style = MaterialTheme.typography.bodyMedium,
@@ -2591,10 +2473,7 @@ fun SecretDetailsView(secret: Secret) {
         // Snackbar for displaying notifications
         // Snackbar для відображення сповіщень
         SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
+            hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
         )
     }
 }
@@ -2620,10 +2499,7 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
             // Відображення ключів та їх значень
             cm.data?.forEach { (key, cmValue) ->
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.Top
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.Top
                 ) {
                     Text(
                         text = "$key:",
@@ -2631,9 +2507,7 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
                         modifier = Modifier.width(150.dp)
                     )
                     Text(
-                        text = cmValue,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
+                        text = cmValue, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f)
                     )
                     IconButton(
                         onClick = {
@@ -2651,13 +2525,11 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
                             } catch (e: Exception) {
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
-                                        message = "Error copying: ${e.message}",
-                                        duration = SnackbarDuration.Short
+                                        message = "Error copying: ${e.message}", duration = SnackbarDuration.Short
                                     )
                                 }
                             }
-                        }
-                    ) {
+                        }) {
                         Icon(
                             imageVector = ICON_COPY,
                             contentDescription = "Copy value",
@@ -2670,10 +2542,7 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
         }
         // Snackbar для відображення сповіщень
         SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
+            hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
         )
     }
 }
@@ -2696,10 +2565,8 @@ fun PVDetailsView(pv: PersistentVolume) {
         Text("Volume Source:", style = MaterialTheme.typography.titleMedium)
 
         Column(
-            modifier = Modifier
-                .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                .padding(4.dp)
+            modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
         ) {
             pv.spec?.let { spec ->
                 when {
@@ -2832,7 +2699,8 @@ fun PVDetailsView(pv: PersistentVolume) {
                     else -> {
                         DetailRow("Type", "<unknown>")
                         Text(
-                            "No volume source details available", style = MaterialTheme.typography.bodyMedium,
+                            "No volume source details available",
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
@@ -2897,7 +2765,8 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
                 // Match Labels
                 if (!selector.matchLabels.isNullOrEmpty()) {
                     Text(
-                        "Match Labels:", style = MaterialTheme.typography.titleSmall,
+                        "Match Labels:",
+                        style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     selector.matchLabels.forEach { (key, value) ->
@@ -2908,7 +2777,8 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
                 // Match Expressions
                 if (!selector.matchExpressions.isNullOrEmpty()) {
                     Text(
-                        "Match Expressions:", style = MaterialTheme.typography.titleSmall,
+                        "Match Expressions:",
+                        style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     selector.matchExpressions.forEach { expr ->
@@ -2949,10 +2819,8 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
 
             pvc.status?.conditions?.forEach { condition ->
                 Column(
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
                 ) {
                     DetailRow("Type", condition.type)
                     DetailRow("Status", condition.status)
@@ -2971,10 +2839,8 @@ fun PVCDetailsView(pvc: PersistentVolumeClaim) {
 
             pvc.metadata?.ownerReferences?.forEach { owner ->
                 Column(
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
                 ) {
                     DetailRow("Kind", owner.kind)
                     DetailRow("Name", owner.name)
@@ -3099,10 +2965,8 @@ fun IngressDetailsView(ing: Ingress) {
             Text("Load Balancer Status:", style = MaterialTheme.typography.titleMedium)
             ing.status?.loadBalancer?.ingress?.forEachIndexed { _, ingress ->
                 Column(
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
                 ) {
                     DetailRow("  IP", ingress.ip)
                     DetailRow("  Hostname", ingress.hostname)
@@ -3110,7 +2974,8 @@ fun IngressDetailsView(ing: Ingress) {
                     // Ports (in newer API versions)
                     if (!ingress.ports.isNullOrEmpty()) {
                         Text(
-                            "  Ports:", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            "  Ports:",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         ingress.ports.forEach { port ->
@@ -3136,10 +3001,8 @@ fun IngressDetailsView(ing: Ingress) {
 
             conditions.forEach { condition ->
                 Column(
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
                 ) {
                     // Use safe access or set default values
                     val type = condition?.let { if (it is Map<*, *>) it["type"] as? String else null }
@@ -3168,10 +3031,8 @@ fun IngressDetailsView(ing: Ingress) {
 
             ing.metadata?.ownerReferences?.forEach { owner ->
                 Column(
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
                 ) {
                     DetailRow("Kind", owner.kind)
                     DetailRow("Name", owner.name)
@@ -3240,13 +3101,10 @@ fun ResourceDetailPanel(
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в PodDetailsView
                     "Pods" -> if (resource is Pod) PodDetailsView(
-                        pod = resource,
-                        onShowLogsRequest = { containerName ->
+                        pod = resource, onShowLogsRequest = { containerName ->
                             (resource as? HasMetadata)?.metadata?.let { meta ->
                                 onShowLogsRequest(
-                                    meta.namespace,
-                                    meta.name,
-                                    containerName
+                                    meta.namespace, meta.name, containerName
                                 )
                             } ?: logger.error("Metadata is null for Pod.")
                         }) else Text("Invalid Pod data")
@@ -3280,11 +3138,7 @@ fun ResourceDetailPanel(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogViewerPanel(
-    namespace: String,
-    podName: String,
-    containerName: String,
-    client: KubernetesClient?,
-    onClose: () -> Unit
+    namespace: String, podName: String, containerName: String, client: KubernetesClient?, onClose: () -> Unit
 ) {
     val logState = remember { mutableStateOf("Завантаження логів...") }
     val scrollState = rememberScrollState()
@@ -3328,13 +3182,8 @@ fun LogViewerPanel(
                     // Створюємо watchLog без sinceTime - просто слідкуємо за новими логами
                     // Робимо окремий запит для отримання тільки нових логів
                     val newLogs = withContext(Dispatchers.IO) {
-                        val logs = client?.pods()?.inNamespace(namespace)
-                            ?.withName(podName)
-                            ?.inContainer(containerName)
-                            ?.sinceSeconds(sinceSeconds)
-                            ?.tailingLines(100)
-                            ?.withPrettyOutput()
-                            ?.log
+                        val logs = client?.pods()?.inNamespace(namespace)?.withName(podName)?.inContainer(containerName)
+                            ?.sinceSeconds(sinceSeconds)?.tailingLines(100)?.withPrettyOutput()?.log
 
                         // Debug log to verify if we're getting logs from Kubernetes
                         if (logs != null && logs.isNotEmpty()) {
@@ -3402,12 +3251,8 @@ fun LogViewerPanel(
                 // Спочатку отримуємо тільки останні N рядків
                 // 1. Отримання початкових логів
                 val initialLogs = withContext(Dispatchers.IO) {
-                    client?.pods()?.inNamespace(namespace)
-                        ?.withName(podName)
-                        ?.inContainer(containerName)
-                        ?.tailingLines(LOG_LINES_TO_TAIL)
-                        ?.withPrettyOutput()
-                        ?.log
+                    client?.pods()?.inNamespace(namespace)?.withName(podName)?.inContainer(containerName)
+                        ?.tailingLines(LOG_LINES_TO_TAIL)?.withPrettyOutput()?.log
                 } ?: "Failed to load logs."
 
                 logger.info("Initial logs fetched: ${initialLogs.length} characters")
@@ -3428,14 +3273,7 @@ fun LogViewerPanel(
                 if (followLogs.value) {
                     // Fix: Call the regular function instead of an extension function
                     startLogPolling(
-                        coroutineScope,
-                        namespace,
-                        podName,
-                        containerName,
-                        client,
-                        logState,
-                        scrollState,
-                        followLogs
+                        coroutineScope, namespace, podName, containerName, client, logState, scrollState, followLogs
                     )
                 }
 
@@ -3461,8 +3299,7 @@ fun LogViewerPanel(
         if (followLogs.value && logJob == null) {
             // Fix: Call the regular function with the scope as a parameter
             startLogPolling(
-                coroutineScope, namespace, podName, containerName,
-                client, logState, scrollState, followLogs
+                coroutineScope, namespace, podName, containerName, client, logState, scrollState, followLogs
             )
         } else if (!followLogs.value) {
             logJob?.cancel()
@@ -3495,9 +3332,7 @@ fun LogViewerPanel(
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)
         Box(
-            modifier = Modifier
-                .weight(1f)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
         ) {
 
@@ -3519,17 +3354,13 @@ fun LogViewerPanel(
                 // Use a more explicit text container to ensure visibility
                 Box(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
                     Text(
-                        text = logState.value,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.padding(8.dp)
+                        text = logState.value, style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurface
+                        ), modifier = Modifier.padding(8.dp)
                     )
                 }
                 VerticalScrollbar(
-                    modifier = Modifier.fillMaxHeight(),
-                    adapter = rememberScrollbarAdapter(scrollState)
+                    modifier = Modifier.fillMaxHeight(), adapter = rememberScrollbarAdapter(scrollState)
                 )
             }
         }
@@ -3595,18 +3426,18 @@ fun App() {
             emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList =
             emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList =
             emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList =
-            emptyList(); clusterRoleBindingsList = emptyList();
+            emptyList(); clusterRoleBindingsList = emptyList()
     }
     // ---
 
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
-        isLoading = true; connectionStatus = "Завантаження Kubeconfig...";
+        isLoading = true; connectionStatus = "Завантаження Kubeconfig..."
         var loadError: Exception? = null
         var loadedContextNames: List<String>
         try {
-            loadedContextNames = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            loadedContextNames = withContext(Dispatchers.IO) {
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
                 val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
                 val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
@@ -3634,9 +3465,9 @@ fun App() {
             val nsResult = loadNamespacesFabric8(activeClient) // Викликаємо завантаження
             nsResult.onSuccess { loadedNs ->
                 // Додаємо опцію "All" і сортуємо
-                allNamespaces = (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(
-                    compareBy { it != ALL_NAMESPACES_OPTION } // "<All>" завжди зверху
-                )
+                allNamespaces =
+                    (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(compareBy { it != ALL_NAMESPACES_OPTION } // "<All>" завжди зверху
+                    )
                 connectionStatus = "Підключено до: $selectedContext" // Повертаємо статус
                 logger.info("Loaded ${allNamespaces.size - 1} namespaces for filter.")
             }.onFailure {
@@ -3654,8 +3485,7 @@ fun App() {
     // --- Діалогове вікно помилки (M3) ---
     if (showErrorDialog.value) {
         AlertDialog( // M3 AlertDialog
-            onDismissRequest = { showErrorDialog.value = false },
-            title = { Text("Помилка Підключення") }, // M3 Text
+            onDismissRequest = { showErrorDialog.value = false }, title = { Text("Помилка Підключення") }, // M3 Text
             text = { Text(dialogErrorMessage.value) }, // M3 Text
             confirmButton = { Button(onClick = { showErrorDialog.value = false }) { Text("OK") } } // M3 Button, M3 Text
         )
@@ -3669,8 +3499,7 @@ fun App() {
                     // --- Ліва панель ---
                     Column(modifier = Modifier.fillMaxHeight().width(300.dp).padding(16.dp)) {
                         Text(
-                            "Контексти Kubernetes:",
-                            style = MaterialTheme.typography.titleMedium
+                            "Kubernetes Contexts:", style = MaterialTheme.typography.titleMedium
                         ); Spacer(modifier = Modifier.height(8.dp)) // M3 Text + Typography
                         Box(
                             modifier = Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -3680,8 +3509,7 @@ fun App() {
                             } // M3 Indicator
                             else if (!isLoading && contexts.isEmpty()) {
                                 Text(
-                                    errorMessage ?: "Контексти не знайдено",
-                                    modifier = Modifier.align(Alignment.Center)
+                                    errorMessage ?: "Контексти не знайдено", modifier = Modifier.align(Alignment.Center)
                                 )
                             } // M3 Text
                             else {
@@ -3689,14 +3517,12 @@ fun App() {
                                     items(contexts) { contextName ->
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable(enabled = !isLoading) {
+                                            modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
                                                     if (selectedContext != contextName) {
-                                                        logger.info("Клікнуто на контекст: $contextName. Запуск connectWithRetries...")
+                                                        logger.info("Click on context: $contextName. Launching connectWithRetries...")
                                                         coroutineScope.launch {
                                                             isLoading = true
-                                                            connectionStatus = "Підключення до '$contextName'..."
+                                                            connectionStatus = "Connection to '$contextName'..."
                                                             activeClient?.close()
                                                             activeClient = null
                                                             selectedResourceType = null
@@ -3715,36 +3541,31 @@ fun App() {
                                                                 activeClient = newClient
                                                                 selectedContext = contextName
                                                                 connectionStatus =
-                                                                    "Підключено до: $contextName (v$serverVersion)"
+                                                                    "Connected to: $contextName (v$serverVersion)"
                                                                 errorMessage = null
                                                                 logger.info("UI State updated on Success for $contextName")
-                                                            }
-                                                                .onFailure { error ->
+                                                            }.onFailure { error ->
                                                                     connectionStatus =
-                                                                        "Помилка підключення до '$contextName'"
+                                                                        "Connection Error to '$contextName'"
                                                                     errorMessage =
-                                                                        error.localizedMessage ?: "Невід. помилка"
+                                                                        error.localizedMessage ?: "Unknown error"
                                                                     logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
                                                                     dialogErrorMessage.value =
-                                                                        "Не вдалося підключитися до '$contextName' після $MAX_CONNECT_RETRIES спроб:\n${error.message}"
+                                                                        "Failed to connect to '$contextName' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
                                                                     showErrorDialog.value = true
                                                                     activeClient = null
                                                                     selectedContext = null
                                                                 }
-                                                            logger.info("Спроба підключення до '$contextName' завершена (результат оброблено).")
+                                                            logger.info("Attempting to connect to '$contextName' Completed (the result is processed).")
                                                         }
                                                     }
-                                                }
-                                                .padding(horizontal = 8.dp, vertical = 6.dp)
-                                        ) {
+                                                }.padding(horizontal = 8.dp, vertical = 6.dp)) {
                                             // Додаємо іконку
                                             Icon(
                                                 imageVector = ICON_CONTEXT, // Ви можете змінити цю іконку на іншу
                                                 contentDescription = "Kubernetes Context",
-                                                tint = if (contextName == selectedContext)
-                                                    MaterialTheme.colorScheme.primary
-                                                else
-                                                    MaterialTheme.colorScheme.onSurface,
+                                                tint = if (contextName == selectedContext) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
 
@@ -3752,10 +3573,8 @@ fun App() {
                                             Text(
                                                 text = formatContextNameForDisplay(contextName),
                                                 fontSize = 14.sp,
-                                                color = if (contextName == selectedContext)
-                                                    MaterialTheme.colorScheme.primary
-                                                else
-                                                    MaterialTheme.colorScheme.onSurface
+                                                color = if (contextName == selectedContext) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
@@ -3763,8 +3582,7 @@ fun App() {
                             }
                         } // Кінець Box списку
                         Spacer(modifier = Modifier.height(16.dp)); Text(
-                        "Ресурси Кластера:",
-                        style = MaterialTheme.typography.titleMedium
+                        "Cluster Resources:", style = MaterialTheme.typography.titleMedium
                     ); Spacer(modifier = Modifier.height(8.dp)) // M3 Text
                         Box(
                             modifier = Modifier.weight(2f).border(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -3773,20 +3591,20 @@ fun App() {
                                 rootIds = resourceTreeData[""] ?: emptyList(),
                                 expandedNodes = expandedNodes,
                                 onNodeClick = { nodeId, isLeaf ->
-                                    logger.info("Клікнуто на вузол: $nodeId, Це листок: $isLeaf")
+                                    logger.info("Clicking on a node: $nodeId, It's a leaflet: $isLeaf")
                                     if (isLeaf) {
                                         if (activeClient != null && !isLoading) {
                                             // Скидаємо показ деталей/логів при виборі нового типу ресурсу
                                             detailedResource = null; detailedResourceType = null; showLogViewer.value =
-                                                false; logViewerParams.value = null;
+                                                false; logViewerParams.value = null
                                             selectedResourceType = nodeId; resourceLoadError =
                                                 null; clearResourceLists()
-                                            connectionStatus = "Завантаження $nodeId..."; isLoading = true
+                                            connectionStatus = "Loading $nodeId..."; isLoading = true
                                             coroutineScope.launch {
-                                                var loadOk = false;
+                                                var loadOk = false
                                                 var errorMsg: String? = null
                                                 val currentFilter =
-                                                    selectedNamespaceFilter // Беремо поточне значення фільтра
+                                                    selectedNamespaceFilter // We take the current filter value
 
                                                 // Визначаємо, чи ресурс неймспейсний, щоб знати, чи передавати фільтр
                                                 val namespaceToUse =
@@ -3802,56 +3620,47 @@ fun App() {
                                                     }.onFailure { errorMsg = it.message }
 
                                                     "Pods" -> loadPodsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { podsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Deployments" -> loadDeploymentsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { deploymentsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "StatefulSets" -> loadStatefulSetsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { statefulSetsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "DaemonSets" -> loadDaemonSetsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { daemonSetsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "ReplicaSets" -> loadReplicaSetsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { replicaSetsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Jobs" -> loadJobsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { jobsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "CronJobs" -> loadCronJobsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { cronJobsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Services" -> loadServicesFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { servicesList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Ingresses" -> loadIngressesFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { ingressesList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
@@ -3860,8 +3669,7 @@ fun App() {
                                                     }.onFailure { errorMsg = it.message }
 
                                                     "PersistentVolumeClaims" -> loadPVCsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { pvcsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
@@ -3870,32 +3678,27 @@ fun App() {
                                                     }.onFailure { errorMsg = it.message }
 
                                                     "ConfigMaps" -> loadConfigMapsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { configMapsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Secrets" -> loadSecretsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { secretsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "ServiceAccounts" -> loadServiceAccountsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { serviceAccountsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Roles" -> loadRolesFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { rolesList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "RoleBindings" -> loadRoleBindingsFabric8(
-                                                        activeClient,
-                                                        namespaceToUse
+                                                        activeClient, namespaceToUse
                                                     ).onSuccess { roleBindingsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
@@ -3908,23 +3711,23 @@ fun App() {
                                                     }.onFailure { errorMsg = it.message }
 
                                                     else -> {
-                                                        logger.warn("Обробник '$nodeId' не реалізовано."); loadOk =
-                                                            false; errorMsg = "Не реалізовано"
+                                                        logger.warn("The handler '$nodeId' not realized."); loadOk =
+                                                            false; errorMsg = "Not realized"
                                                     }
                                                 }
                                                 // Оновлюємо статус після завершення
                                                 if (loadOk) {
                                                     connectionStatus =
-                                                        "Завантажено $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                        "Loaded $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
                                                 } else {
-                                                    resourceLoadError = "Помилка $nodeId: $errorMsg"; connectionStatus =
-                                                        "Помилка $nodeId"
+                                                    resourceLoadError = "Error $nodeId: $errorMsg"; connectionStatus =
+                                                        "Error $nodeId"
                                                 }
                                                 isLoading = false
                                             }
                                         } else if (activeClient == null) {
-                                            logger.warn("Немає підключення."); connectionStatus =
-                                                "Підключіться до кластера!"; selectedResourceType = null
+                                            logger.warn("No connection."); connectionStatus =
+                                                "Connect to the cluster,pls!"; selectedResourceType = null
                                         }
                                     } else {
                                         expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
@@ -3986,67 +3789,60 @@ fun App() {
                                 )
                                 ExposedDropdownMenu(
                                     expanded = isNamespaceDropdownExpanded,
-                                    onDismissRequest = { isNamespaceDropdownExpanded = false }
-                                ) {
+                                    onDismissRequest = { isNamespaceDropdownExpanded = false }) {
                                     allNamespaces.forEach { nsName ->
-                                        DropdownMenuItem(
-                                            text = { Text(nsName) },
-                                            onClick = {
-                                                if (selectedNamespaceFilter != nsName) {
-                                                    selectedNamespaceFilter = nsName
-                                                    isNamespaceDropdownExpanded = false
-                                                    // Перезавантаження даних спрацює через LaunchedEffect в onNodeClick,
-                                                    // але нам треба його "тригернути", якщо тип ресурсу вже вибрано.
-                                                    // Найпростіше - знову викликати логіку завантаження поточного ресурсу
-                                                    if (selectedResourceType != null) {
-                                                        // Повторно викликаємо ту саму логіку, що й в onNodeClick
-                                                        resourceLoadError = null; clearResourceLists()
-                                                        connectionStatus =
-                                                            "Завантаження $selectedResourceType (фільтр)..."; isLoading =
-                                                            true
-                                                        coroutineScope.launch {
-                                                            var loadOk = false;
-                                                            var errorMsg: String? = null
-                                                            val namespaceToUse =
-                                                                if (namespacedResources.contains(selectedResourceType)) selectedNamespaceFilter else null
-                                                            when (selectedResourceType) { // Повторний виклик з новим фільтром
-                                                                "Pods" -> loadPodsFabric8(
-                                                                    activeClient,
-                                                                    namespaceToUse
-                                                                ).onSuccess { podsList = it; loadOk = true }
-                                                                    .onFailure { errorMsg = it.message }
+                                        DropdownMenuItem(text = { Text(nsName) }, onClick = {
+                                            if (selectedNamespaceFilter != nsName) {
+                                                selectedNamespaceFilter = nsName
+                                                isNamespaceDropdownExpanded = false
+                                                // Перезавантаження даних спрацює через LaunchedEffect в onNodeClick,
+                                                // але нам треба його "тригернути", якщо тип ресурсу вже вибрано.
+                                                // Найпростіше - знову викликати логіку завантаження поточного ресурсу
+                                                if (selectedResourceType != null) {
+                                                    // Повторно викликаємо ту саму логіку, що й в onNodeClick
+                                                    resourceLoadError = null; clearResourceLists()
+                                                    connectionStatus =
+                                                        "Loading $selectedResourceType (filter)..."; isLoading =
+                                                        true
+                                                    coroutineScope.launch {
+                                                        var loadOk = false
+                                                        var errorMsg: String? = null
+                                                        val namespaceToUse =
+                                                            if (namespacedResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                        when (selectedResourceType) { // Повторний виклик з новим фільтром
+                                                            "Pods" -> loadPodsFabric8(
+                                                                activeClient, namespaceToUse
+                                                            ).onSuccess { podsList = it; loadOk = true }
+                                                                .onFailure { errorMsg = it.message }
 
-                                                                "Deployments" -> loadDeploymentsFabric8(
-                                                                    activeClient,
-                                                                    namespaceToUse
-                                                                ).onSuccess { deploymentsList = it; loadOk = true }
-                                                                    .onFailure { errorMsg = it.message }
-                                                                // ... додати ВСІ неймспейсні ресурси ...
-                                                                "Namespaces" -> {
-                                                                    loadNamespacesFabric8(activeClient).onSuccess {
-                                                                        namespacesList = it; loadOk = true
-                                                                    }.onFailure { errorMsg = it.message }
-                                                                } // Namespaces не фільтруємо
-                                                                // ... решта ...
-                                                                else -> {
-                                                                    loadOk = false; errorMsg =
-                                                                        "Фільтр не застосовується"
-                                                                }
+                                                            "Deployments" -> loadDeploymentsFabric8(
+                                                                activeClient, namespaceToUse
+                                                            ).onSuccess { deploymentsList = it; loadOk = true }
+                                                                .onFailure { errorMsg = it.message }
+                                                            // ... додати ВСІ неймспейсні ресурси ...
+                                                            "Namespaces" -> {
+                                                                loadNamespacesFabric8(activeClient).onSuccess {
+                                                                    namespacesList = it; loadOk = true
+                                                                }.onFailure { errorMsg = it.message }
+                                                            } // Namespaces не фільтруємо
+                                                            // ... решта ...
+                                                            else -> {
+                                                                loadOk = false; errorMsg = "The filter is not used"
                                                             }
-                                                            if (loadOk) {
-                                                                connectionStatus =
-                                                                    "Завантажено $selectedResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
-                                                            } else {
-                                                                resourceLoadError =
-                                                                    "Помилка $selectedResourceType: $errorMsg"; connectionStatus =
-                                                                    "Помилка $selectedResourceType"
-                                                            }
-                                                            isLoading = false
                                                         }
+                                                        if (loadOk) {
+                                                            connectionStatus =
+                                                                "Loaded $selectedResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                        } else {
+                                                            resourceLoadError =
+                                                                "Error $selectedResourceType: $errorMsg"; connectionStatus =
+                                                                "Error $selectedResourceType"
+                                                        }
+                                                        isLoading = false
                                                     }
                                                 }
                                             }
-                                        )
+                                        })
                                     }
                                 }
                             }
@@ -4086,7 +3882,7 @@ fun App() {
                                     } else {
                                         // Стан коли прапорець showLogViewer ще true, але параметри вже скинуті
                                         Text(
-                                            "Завантаження параметрів логів...",
+                                            "Loading logs...",
                                             modifier = Modifier.align(Alignment.Center)
                                         )
                                         LaunchedEffect(Unit) { showLogViewer.value = false } // Скидаємо прапорець
@@ -4104,8 +3900,7 @@ fun App() {
                                             detailedResource = null // Закриваємо деталі
                                             detailedResourceType = null
                                             showLogViewer.value = true // Показуємо лог вьювер
-                                        }
-                                    )
+                                        })
                                 }
 
                                 "table" -> {
@@ -4124,7 +3919,7 @@ fun App() {
                                             }
                                         } // M3 Indicator, M3 Text
                                         currentErrorMessageForPanel != null -> {
-                                            androidx.compose.material3.Text(
+                                            Text(
                                                 text = currentErrorMessageForPanel,
                                                 color = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.align(Alignment.Center)
@@ -4168,7 +3963,7 @@ fun App() {
                                                 Box(
                                                     modifier = Modifier.fillMaxSize(),
                                                     contentAlignment = Alignment.Center
-                                                ) { Text("Немає ресурсів типу '$currentResourceType'") }
+                                                ) { Text("No type resources '$currentResourceType'") }
                                             } // M3 Text
                                             else if (headers.isNotEmpty()) {
                                                 // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
@@ -4185,8 +3980,7 @@ fun App() {
                                                         Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                                                             Column {
                                                                 KubeTableHeaderRow(
-                                                                    headers = headers,
-                                                                    columnWidths = columnWidths
+                                                                    headers = headers, columnWidths = columnWidths
                                                                 )
                                                                 Divider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -4205,8 +3999,7 @@ fun App() {
                                                                                     currentResourceType
                                                                                 showLogViewer.value = false
                                                                                 logViewerParams.value = null
-                                                                            }
-                                                                        )
+                                                                            })
                                                                         Divider(
                                                                             color = MaterialTheme.colorScheme.outlineVariant.copy(
                                                                                 alpha = 0.5f
@@ -4222,20 +4015,20 @@ fun App() {
                                                 Box(
                                                     modifier = Modifier.fillMaxSize(),
                                                     contentAlignment = Alignment.Center
-                                                ) { Text("Немає колонок для '$currentResourceType'") }
+                                                ) { Text("No columns for '$currentResourceType'") }
                                             } // M3 Text
                                         }
                                         // --- Стани за замовчуванням (M3 Text) ---
                                         activeClient != null -> {
-                                            androidx.compose.material3.Text(
-                                                "Підключено до $selectedContext.\nВиберіть тип ресурсу.",
+                                            Text(
+                                                "Connected to $selectedContext.\nChoose a resource type.",
                                                 modifier = Modifier.align(Alignment.Center)
                                             )
                                         }
 
                                         else -> {
-                                            androidx.compose.material3.Text(
-                                                errorMessage ?: "Виберіть контекст.",
+                                            Text(
+                                                errorMessage ?: "Choose a context.",
                                                 modifier = Modifier.align(Alignment.Center)
                                             )
                                         }
@@ -4251,7 +4044,7 @@ fun App() {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    androidx.compose.material3.Text(
+                    Text(
                         text = connectionStatus,
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelSmall
@@ -4276,10 +4069,7 @@ fun ResourceTreeView(
         rootIds.forEach { nodeId ->
             item {
                 ResourceTreeNode(
-                    nodeId = nodeId,
-                    level = 0,
-                    expandedNodes = expandedNodes,
-                    onNodeClick = onNodeClick
+                    nodeId = nodeId, level = 0, expandedNodes = expandedNodes, onNodeClick = onNodeClick
                 )
             }
         }
@@ -4297,14 +4087,8 @@ fun ResourceTreeNode(
     val children = resourceTreeData[nodeId]
     val isExpanded = expandedNodes[nodeId] ?: false
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = (level * 16).dp)
-            .clickable { onNodeClick(nodeId, isLeaf) }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(start = (level * 16).dp).clickable { onNodeClick(nodeId, isLeaf) }
+        .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         val icon = when {
             !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) ICON_DOWN else ICON_RIGHT
             !isLeaf -> ICON_NF
@@ -4319,10 +4103,7 @@ fun ResourceTreeNode(
         Column {
             children.sorted().forEach { childId ->
                 ResourceTreeNode(
-                    nodeId = childId,
-                    level = level + 1,
-                    expandedNodes = expandedNodes,
-                    onNodeClick = onNodeClick
+                    nodeId = childId, level = level + 1, expandedNodes = expandedNodes, onNodeClick = onNodeClick
                 )
             }
         }
