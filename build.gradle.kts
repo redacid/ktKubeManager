@@ -60,6 +60,16 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "KotlinKubeManager"
             packageVersion = "1.0.0"
+            macOS {
+                iconFile.set(project.file("kubernetes_manager_icon.png"))
+            }
+            windows {
+                iconFile.set(project.file("kubernetes_manager_icon.png"))
+            }
+            linux {
+                iconFile.set(project.file("kubernetes_manager_icon.png"))
+            }
+
         }
     }
 }
