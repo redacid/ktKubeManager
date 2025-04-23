@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
@@ -4111,5 +4114,21 @@ fun ResourceTreeNode(
 }
 
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Kotlin Kube Manager") { App() }
+    // Створюємо іконку з Base64-даних для вікна
+    val iconPainter = IconsBase64.getIcon(32)?.let {
+        BitmapPainter(it.toComposeImageBitmap())
+    }
+
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Kotlin Kube Manager",
+        icon = iconPainter // Встановлюємо іконку
+    ) {
+        LaunchedEffect(Unit) {
+            val awtWindow = java.awt.Window.getWindows().firstOrNull()
+            awtWindow?.let { IconsBase64.setWindowIcon(it) }
+        }
+
+        App()
+    }
 }
