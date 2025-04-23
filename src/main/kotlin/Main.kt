@@ -197,10 +197,10 @@ class EksTokenProvider(
 
     // Провайдер AWS облікових даних
     private val credentialsProvider: AwsCredentialsProvider = if (awsProfile != null) {
-        logger.info("Використання AWS профілю '$awsProfile' для EKS автентифікації")
+        logger.info("Using AWS profile '$awsProfile' for eks authentication")
         ProfileCredentialsProvider.builder().profileName(awsProfile).build()
     } else {
-        logger.info("Використання стандартного ланцюжка провайдерів AWS для EKS автентифікації")
+        logger.info("Using the standard AWS providers' chain for EKS authentication")
         DefaultCredentialsProvider.create()
     }
 
@@ -215,7 +215,7 @@ class EksTokenProvider(
      */
     override fun getToken(): String {
         try {
-            logger.debug("Генерація нового EKS токена для кластера '$clusterName' в регіоні '$region'")
+            logger.debug("Generation of a new EKS token for cluster '$clusterName' in the region '$region'")
 
             // Отримуємо облікові дані AWS
             val credentials = credentialsProvider.resolveCredentials()
@@ -266,7 +266,7 @@ class EksTokenProvider(
             return "k8s-aws-v1.$base64SignedUrl"
 
         } catch (e: Exception) {
-            val errorMsg = "Не вдалося згенерувати EKS токен: ${e.message}"
+            val errorMsg = "Failed to generate eks token: ${e.message}"
             logger.error(errorMsg, e)
             throw RuntimeException(errorMsg, e)
         }
@@ -870,27 +870,27 @@ suspend fun <T> fetchK8sResource(
     client: KubernetesClient?, resourceType: String, namespace: String?, // Додано параметр неймспейсу
     apiCall: (KubernetesClient, String?) -> List<T>? // Лямбда тепер приймає клієнт і неймспейс
 ): Result<List<T>> {
-    if (client == null) return Result.failure(IllegalStateException("Клієнт Kubernetes не ініціалізовано"))
+    if (client == null) return Result.failure(IllegalStateException("Kubernetes client is not initialized"))
     val targetNamespace = if (namespace == ALL_NAMESPACES_OPTION) null else namespace
     val nsLog = targetNamespace ?: "all"
-    logger.info("Завантаження списку $resourceType (Namespace: $nsLog)...")
+    logger.info("Loading the list $resourceType (Namespace: $nsLog)...")
     return try {
         val items = withContext(Dispatchers.IO) {
-            logger.info("[IO] Виклик API для $resourceType (Namespace: $nsLog)...")
+            logger.info("[IO] Call API for $resourceType (Namespace: $nsLog)...")
             apiCall(client, targetNamespace) ?: emptyList() // Передаємо неймспейс у лямбду
         }
-        logger.info("Завантажено ${items.size} $resourceType (Namespace: $nsLog).")
+        logger.info("Loaded ${items.size} $resourceType (Namespace: $nsLog).")
         try {
             @Suppress("UNCHECKED_CAST") val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
             Result.success(sortedItems)
         } catch (e: Exception) {
-            logger.warn("Не вдалося сортувати $resourceType: ${e.message}")
+            logger.warn("Failed sort $resourceType: ${e.message}")
             Result.success(items)
         }
     } catch (e: KubernetesClientException) {
         logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
     } catch (e: Exception) {
-        logger.error("Помилка $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
+        logger.error("Error $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
     }
 }
 
@@ -1130,7 +1130,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Button(onClick = {
                 when (containers.size) {
-                    0 -> logger.warn("Под ${pod.metadata?.name} немає контейнерів.")
+                    0 -> logger.warn("Pod ${pod.metadata?.name} has no containers.")
                     1 -> onShowLogsRequest(containers.first().name)
                     else -> showContainerDialog.value = true
                 }
