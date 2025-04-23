@@ -2,8 +2,10 @@
 import java.awt.*
 import java.awt.geom.*
 import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.imageio.ImageIO
+import java.util.Base64
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -718,7 +720,7 @@ fun addButtonHighlight(g2d: Graphics2D, buttonX: Int, buttonY: Int, buttonWidth:
  */
 fun generateKubernetesIcon(
     filePath: String = "kubernetes_manager_icon.png",
-    size: Int = 512
+    size: Int = 64
 ) {
     val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
     val g2d = initializeGraphics(image)
@@ -851,13 +853,13 @@ fun resizeImage(sourceImagePath: String, outputPath: String, targetSize: Int) {
 fun generateAllIcons() {
     // Шлях до основної іконки
     val mainIconPath = "kubernetes_manager_icon.png"
-    val mainIconSize = 512
+    val mainIconSize = 64
 
     // Спочатку генеруємо головну іконку високої якості
     generateKubernetesIcon(mainIconPath, mainIconSize)
 
     // Додаткові розміри
-    val sizes = listOf(16, 32, 64, 128, 256)
+    val sizes = listOf(16, 32)
 
     // Тепер створюємо масштабовані версії з основної іконки
     for (size in sizes) {
@@ -906,13 +908,203 @@ fun createMacOSIcon() {
     println("   icon_16x16.png, icon_16x16@2x.png, icon_32x32.png, icon_32x32@2x.png, ...")
     println("3. Виконайте команду: iconutil -c icns MyIcon.iconset")
 }
+/**
+ * Конвертує зображення іконки у Base64-представлення для вбудовування в код.
+ *
+ * @param imagePath шлях до файлу зображення
+ * @return String Base64-представлення зображення
+ */
+fun imageToBase64(imagePath: String): String {
+    try {
+        val file = File(imagePath)
+        val image = ImageIO.read(file)
+        val outputStream = ByteArrayOutputStream()
+        ImageIO.write(image, "png", outputStream)
+        val imageBytes = outputStream.toByteArray()
+        return Base64.getEncoder().encodeToString(imageBytes)
+    } catch (e: Exception) {
+        println("Помилка при конвертації зображення в Base64: ${e.message}")
+        e.printStackTrace()
+        return ""
+    }
+}
+fun generateIconsBase64Code(generateToFile: Boolean = false, outputFilePath: String = "IconsBase64.kt") {
+    // Шлях до основної іконки
+    val mainIconPath = "kubernetes_manager_icon.png"
+    val mainIconSize = 64
+
+    // Якщо іконки ще не згенеровані, генеруємо їх
+    if (!File(mainIconPath).exists()) {
+        generateKubernetesIcon(mainIconPath, mainIconSize)
+
+        // Додаткові розміри
+        val sizes = listOf(16, 32)
+
+        // Створюємо масштабовані версії з основної іконки
+        for (size in sizes) {
+            val outputPath = "kubernetes_manager_icon_${size}x${size}.png"
+            resizeImage(mainIconPath, outputPath, size)
+        }
+    }
+
+    val sb = StringBuilder()
+    sb.appendLine("/**")
+    sb.appendLine(" * Файл з Base64 представленнями іконок додатку для вбудовування в код.")
+    sb.appendLine(" * Автоматично згенеровано за допомогою IconGenerator.")
+    sb.appendLine(" */")
+    sb.appendLine("")
+    sb.appendLine("object IconsBase64 {")
+
+    // Генеруємо Base64 для основної іконки
+    val mainIconBase64 = imageToBase64(mainIconPath)
+    sb.appendLine("    /** Base64 основної іконки 64x64. */")
+    sb.appendLine("    const val ICON_64 = \"$mainIconBase64\"")
+    sb.appendLine("")
+
+    // Генеруємо Base64 для різних розмірів
+    val sizes = listOf(16, 32)
+    for (size in sizes) {
+        val iconPath = "kubernetes_manager_icon_${size}x${size}.png"
+        if (File(iconPath).exists()) {
+            val iconBase64 = imageToBase64(iconPath)
+            sb.appendLine("    /** Base64 іконки ${size}x${size}. */")
+            sb.appendLine("    const val ICON_$size = \"$iconBase64\"")
+            sb.appendLine("")
+        }
+    }
+
+    // Додаємо допоміжні методи для декодування
+    sb.appendLine("    /**")
+    sb.appendLine("     * Декодує Base64-рядок у BufferedImage.")
+    sb.appendLine("     * @param base64 Base64-рядок із зображенням")
+    sb.appendLine("     * @return BufferedImage об'єкт зображення або null при помилці")
+    sb.appendLine("     */")
+    sb.appendLine("    fun decodeToImage(base64: String): java.awt.image.BufferedImage? {")
+    sb.appendLine("        return try {")
+    sb.appendLine("            val imageBytes = java.util.Base64.getDecoder().decode(base64)")
+    sb.appendLine("            val inputStream = java.io.ByteArrayInputStream(imageBytes)")
+    sb.appendLine("            javax.imageio.ImageIO.read(inputStream)")
+    sb.appendLine("        } catch (e: Exception) {")
+    sb.appendLine("            e.printStackTrace()")
+    sb.appendLine("            null")
+    sb.appendLine("        }")
+    sb.appendLine("    }")
+    sb.appendLine("    ")
+    sb.appendLine("    /**")
+    sb.appendLine("     * Отримує іконку вказаного розміру. Якщо запитаний розмір недоступний,")
+    sb.appendLine("     * повертає найближчий доступний розмір або null при помилці.")
+    sb.appendLine("     * @param size бажаний розмір іконки")
+    sb.appendLine("     * @return BufferedImage зображення або null при помилці")
+    sb.appendLine("     */")
+    sb.appendLine("    fun getIcon(size: Int): java.awt.image.BufferedImage? {")
+    sb.appendLine("        return when (size) {")
+    sb.appendLine("            16 -> decodeToImage(ICON_16)")
+    sb.appendLine("            32 -> decodeToImage(ICON_32)")
+    sb.appendLine("            64 -> decodeToImage(ICON_64)")
+    sb.appendLine("            else -> {")
+    sb.appendLine("                // Повертаємо найближчий доступний розмір")
+    sb.appendLine("                when {")
+    sb.appendLine("                    size < 16 -> decodeToImage(ICON_16)")
+    sb.appendLine("                    size < 32 -> decodeToImage(ICON_16)")
+    sb.appendLine("                    size < 64 -> decodeToImage(ICON_32)")
+    sb.appendLine("                    else -> decodeToImage(ICON_32)")
+    sb.appendLine("                }")
+    sb.appendLine("            }")
+    sb.appendLine("        }")
+    sb.appendLine("    }")
+    sb.appendLine("    ")
+    sb.appendLine("    /**")
+    sb.appendLine("     * Встановлює іконку додатку для вікна Swing/AWT з Base64.")
+    sb.appendLine("     * @param window вікно, для якого встановлюється іконка")
+    sb.appendLine("     */")
+    sb.appendLine("    fun setWindowIcon(window: java.awt.Window) {")
+    sb.appendLine("        try {")
+    sb.appendLine("            // Створюємо список іконок різних розмірів")
+    sb.appendLine("            val icons = listOf(16, 32, 64)")
+    sb.appendLine("                .mapNotNull { size -> getIcon(size) }")
+    sb.appendLine("            ")
+    sb.appendLine("            // Встановлюємо іконки для вікна")
+    sb.appendLine("            if (icons.isNotEmpty()) {")
+    sb.appendLine("                window.iconImages = icons")
+    sb.appendLine("            }")
+    sb.appendLine("        } catch (e: Exception) {")
+    sb.appendLine("            println(\"Помилка при встановленні іконки: \${e.message}\")")
+    sb.appendLine("        }")
+    sb.appendLine("    }")
+    sb.appendLine("}")
+
+    val generatedCode = sb.toString()
+
+    // Виводимо результат у консоль
+    println("\n--- Початок згенерованого коду ---")
+    println(generatedCode)
+    println("--- Кінець згенерованого коду ---\n")
+
+    // Зберігаємо у файл, якщо потрібно
+    if (generateToFile) {
+        try {
+            File(outputFilePath).writeText(generatedCode)
+            println("Код успішно збережено у файл: $outputFilePath")
+        } catch (e: Exception) {
+            println("Помилка при збереженні коду у файл: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Функція для використання вбудованих іконок в коді додатку.
+ * Використовується як приклад того, як можна використовувати IconsBase64.
+ */
+fun setupAppIconFromBase64() {
+    println("Приклад коду для встановлення іконки з вбудованого Base64:")
+    println("""
+        // У вашому основному коді додатку:
+        import androidx.compose.ui.window.Window
+        import androidx.compose.ui.window.application
+        
+        fun main() = application {
+            Window(
+                onCloseRequest = ::exitApplication,
+                title = "Kubernetes Manager"
+            ) {
+                // Встановлюємо іконку з Base64
+                val window = java.awt.Window.getWindows().firstOrNull()
+                window?.let { IconsBase64.setWindowIcon(it) }
+                
+                // Альтернативно для Compose Window:
+                // val iconImage = IconsBase64.getIcon(64)
+                // val iconPainter = iconImage?.let { androidx.compose.ui.graphics.ImageBitmap.create(it) }
+                // Window(..., icon = iconPainter)
+                
+                // Ваш контент програми
+            }
+        }
+    """.trimIndent())
+}
+
+/**
+ * Функція для генерації всіх іконок і створення Base64-рядків
+ */
+fun generateAllIconsWithBase64() {
+    // Генеруємо всі іконки
+    generateAllIcons()
+
+    // Генеруємо Base64-код
+    generateIconsBase64Code(true)
+
+    // Показуємо приклад використання
+    setupAppIconFromBase64()
+
+    println("Всі іконки і Base64-код успішно згенеровано!")
+}
 
 
 /**
  * Для тестування
  */
 fun main() {
-    generateAllIcons()
+    //generateAllIcons()
+    generateAllIconsWithBase64()
     println("Всі іконки успішно згенеровано!")
-    generatePlatformIcons()
+    //generatePlatformIcons()
 }
