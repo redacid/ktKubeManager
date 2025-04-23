@@ -103,6 +103,30 @@ data class KubernetesColors(
             return KubernetesColors(k8sBlue, k8sLightBlue, k8sDarkBlue, accentColors, colorGroups)
         }
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as KubernetesColors
+
+        if (k8sBlue != other.k8sBlue) return false
+        if (k8sLightBlue != other.k8sLightBlue) return false
+        if (k8sDarkBlue != other.k8sDarkBlue) return false
+        if (!accentColors.contentEquals(other.accentColors)) return false
+        if (colorGroups != other.colorGroups) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = k8sBlue.hashCode()
+        result = 31 * result + k8sLightBlue.hashCode()
+        result = 31 * result + k8sDarkBlue.hashCode()
+        result = 31 * result + accentColors.contentHashCode()
+        result = 31 * result + colorGroups.hashCode()
+        return result
+    }
 }
 
 /**
@@ -234,7 +258,7 @@ fun drawSpokesAndStars(
     colors: KubernetesColors
 ) {
     // Промальовуємо асиметричні промені з контрастними кольорами зірок
-    for (i in 0 until innerPoints.size) {
+    for (i in innerPoints.indices) {
         val innerX = innerPoints[i].x
         val innerY = innerPoints[i].y
         val outerX = outerPoints[i].x
@@ -403,7 +427,7 @@ fun drawNetworkSymbol(
     centerX: Int,
     centerY: Int,
     symbolSize: Float,
-    spokeWidth: Int,
+    //spokeWidth: Int,
     colors: KubernetesColors
 ) {
     // Перевіряємо, що symbolSize достатньо велика
@@ -761,7 +785,7 @@ fun generateKubernetesIcon(
 
         // Малюємо мережевий символ
         val symbolSize = centerPolygonRadius * 1.2f
-        drawNetworkSymbol(g2d, centerX, centerY, symbolSize, spokeWidth, colors)
+        drawNetworkSymbol(g2d, centerX, centerY, symbolSize, /*spokeWidth,*/ colors)
 
         // Малюємо кнопку з текстом тільки якщо розмір достатньо великий
         if (size >= 64) {
@@ -780,18 +804,109 @@ fun generateKubernetesIcon(
 }
 
 /**
- * Функція для створення іконок різних розмірів
+ * Зменшує оригінальне зображення до вказаного розміру із застосуванням якісної інтерполяції
+ * та зберігає результат у файл
+ *
+ * @param sourceImagePath шлях до вихідного зображення
+ * @param outputPath шлях для збереження зменшеного зображення
+ * @param targetSize необхідний розмір зображення (ширина і висота)
+ */
+fun resizeImage(sourceImagePath: String, outputPath: String, targetSize: Int) {
+    try {
+        // Завантажуємо оригінальне зображення
+        val sourceFile = File(sourceImagePath)
+        val sourceImage = ImageIO.read(sourceFile)
+
+        // Створюємо новий BufferedImage потрібного розміру
+        val resizedImage = BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_ARGB)
+
+        // Отримуємо графічний контекст
+        val g2d = resizedImage.createGraphics()
+
+        // Встановлюємо налаштування для найвищої якості масштабування
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+
+        // Масштабуємо зображення
+        g2d.drawImage(sourceImage, 0, 0, targetSize, targetSize, null)
+        g2d.dispose()
+
+        // Зберігаємо результат
+        File(outputPath).parentFile?.mkdirs()
+        ImageIO.write(resizedImage, "PNG", File(outputPath))
+
+        println("Створено зменшену версію ${targetSize}x${targetSize}: $outputPath")
+    } catch (e: Exception) {
+        println("Помилка при масштабуванні зображення: ${e.message}")
+        e.printStackTrace()
+    }
+}
+
+
+/**
+ * Удосконалена функція для створення іконок різних розмірів.
+ * Генерує одну іконку високої якості, а потім масштабує її до інших розмірів.
  */
 fun generateAllIcons() {
-    // Основна іконка
-    generateKubernetesIcon("kubernetes_manager_icon.png", 512)
+    // Шлях до основної іконки
+    val mainIconPath = "kubernetes_manager_icon.png"
+    val mainIconSize = 512
+
+    // Спочатку генеруємо головну іконку високої якості
+    generateKubernetesIcon(mainIconPath, mainIconSize)
 
     // Додаткові розміри
     val sizes = listOf(16, 32, 64, 128, 256)
+
+    // Тепер створюємо масштабовані версії з основної іконки
     for (size in sizes) {
-        generateKubernetesIcon("kubernetes_manager_icon_${size}x${size}.png", size)
+        val outputPath = "kubernetes_manager_icon_${size}x${size}.png"
+        resizeImage(mainIconPath, outputPath, size)
     }
+
+    // Створюємо іконку розміром 1024x1024 для використання в App Store (якщо потрібно)
+    // resizeImage(mainIconPath, "kubernetes_manager_icon_1024x1024.png", 1024)
+
+    println("Всі іконки успішно згенеровано!")
 }
+/**
+ * Створює набір іконок для додатку для різних платформ
+ */
+fun generatePlatformIcons() {
+    // Генеруємо основну іконку
+    generateAllIcons()
+
+    // Додаткові дії для ICO (Windows)
+    createWindowsIcon()
+
+    // Додаткові дії для ICNS (macOS)
+    createMacOSIcon()
+
+    println("Згенеровано іконки для всіх платформ")
+}
+/**
+ * Створення ICO файлу для Windows (спрощено, на практиці потрібна додаткова бібліотека)
+ */
+fun createWindowsIcon() {
+    // Тут мало б бути об'єднання PNG файлів у формат ICO
+    // Це вимагає зовнішньої бібліотеки або утиліти командного рядка
+    println("Для повноцінного створення ICO файлу потрібно використовувати додаткову бібліотеку, наприклад ImageMagick")
+    println("Команда ImageMagick: convert kubernetes_manager_icon_16x16.png kubernetes_manager_icon_32x32.png kubernetes_manager_icon_48x48.png kubernetes_manager_icon_256x256.png kubernetes_manager_icon.ico")
+}
+
+/**
+ * Створення ICNS файлу для macOS (спрощено, на практиці потрібна додаткова утиліта)
+ */
+fun createMacOSIcon() {
+    // На macOS використовується утиліта iconutil для створення .icns файлів
+    println("Для повноцінного створення ICNS файлу на macOS потрібно використовувати iconutil")
+    println("1. Створіть папку MyIcon.iconset")
+    println("2. Розмістіть PNG файли з правильними іменами:")
+    println("   icon_16x16.png, icon_16x16@2x.png, icon_32x32.png, icon_32x32@2x.png, ...")
+    println("3. Виконайте команду: iconutil -c icns MyIcon.iconset")
+}
+
 
 /**
  * Для тестування
@@ -799,4 +914,5 @@ fun generateAllIcons() {
 fun main() {
     generateAllIcons()
     println("Всі іконки успішно згенеровано!")
+    generatePlatformIcons()
 }
