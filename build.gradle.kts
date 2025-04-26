@@ -46,10 +46,9 @@ dependencies {
     implementation("software.amazon.awssdk:http-client-spi:${awssdkVersion}") // Інтерфейси HTTP
     //implementation("software.amazon.awssdk:apache-client:${awssdkVersion}") // Конкретна реалізація HTTP клієнта (або інша)
     implementation("software.amazon.awssdk:sdk-core:${awssdkVersion}")
-    // Ключова залежність для підписувача:
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}") // Потрібно для http-auth-aws
-    //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}")
+    //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}") // DONT ENABLE IT, CONNECT TO CONTEXT NOT WORKED
     testImplementation(kotlin("test"))
 }
 
