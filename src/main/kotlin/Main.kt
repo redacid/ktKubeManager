@@ -7,6 +7,9 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
@@ -27,6 +30,11 @@ import androidx.compose.ui.window.application
 //import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontStyle
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
@@ -34,7 +42,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
 import compose.icons.feathericons.*
-import compose.icons.simpleicons.Kubernetes
+import compose.icons.simpleicons.*
 import io.fabric8.kubernetes.api.model.*
 import io.fabric8.kubernetes.api.model.apps.DaemonSet
 import io.fabric8.kubernetes.api.model.apps.Deployment
@@ -57,12 +65,12 @@ import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.KubernetesClientException
 import io.fabric8.kubernetes.client.OAuthTokenProvider
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Job as coroJob
 import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
-import software.amazon.awssdk.endpoints.Endpoint
 import software.amazon.awssdk.http.SdkHttpFullRequest
 import software.amazon.awssdk.http.SdkHttpMethod
 import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner
@@ -637,6 +645,72 @@ fun formatJobDuration(status: JobStatus?): String {
         ).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s"
     }
 }
+// Форматування тривалості для відображення
+private fun formatDuration(duration: Duration): String {
+    val hours = duration.toHours()
+    val minutes = duration.toMinutes() % 60
+
+    return when {
+        hours > 0 -> "${hours}h ${minutes}m"
+        else -> "${minutes}m"
+    }
+}
+
+// Допоміжна функція для обчислення наступного запуску Cron
+private fun calculateNextCronRun(cronExpression: String): String? {
+    // Спрощена реалізація для оцінки наступного запуску
+    // У реальній системі тут потрібна була б повноцінна бібліотека для обробки Cron виразів
+
+    // Розділяємо вираз на компоненти
+    val components = cronExpression.split(" ")
+    if (components.size < 5) return null
+
+    val now = OffsetDateTime.now()
+
+    // Оцінка - наступний запуск приблизно через годину
+    // Це звичайно дуже спрощено, але для UI цього може бути достатньо
+    val estimated = now.plusHours(1)
+
+    return "through ~${formatDuration(Duration.between(now, estimated))}"
+}
+
+// Допоміжна функція для обчислення тривалості поза композебл функцією
+private fun calculateJobDuration(startTimeStr: String?, completionTimeStr: String?): String {
+    if (startTimeStr == null || completionTimeStr == null) {
+        return "Не вдалося розрахувати"
+    }
+
+    return try {
+        val start = OffsetDateTime.parse(startTimeStr)
+        val end = OffsetDateTime.parse(completionTimeStr)
+        val duration = Duration.between(start, end)
+
+        val days = duration.toDays()
+        val hours = duration.toHours() % 24
+        val minutes = duration.toMinutes() % 60
+        val seconds = duration.seconds % 60
+
+        when {
+            days > 0 -> "${days}d ${hours}h ${minutes}m ${seconds}s"
+            hours > 0 -> "${hours}h ${minutes}m ${seconds}s"
+            minutes > 0 -> "${minutes}m ${seconds}s"
+            else -> "${seconds}s"
+        }
+    } catch (e: Exception) {
+        "Не вдалося розрахувати"
+    }
+}
+
+// Безпечна функція для обчислення наступного запуску Cron
+private fun safeCalculateNextCronRun(cronExpression: String): String? {
+    return try {
+        calculateNextCronRun(cronExpression)
+    } catch (e: Exception) {
+        // Ігнорувати помилки при розрахунку наступного запуску
+        null
+    }
+}
+
 
 //fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
 //    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
@@ -3396,6 +3470,6593 @@ fun EndpointsDetailsView(endpoint: Endpoints) {
     }
 }
 
+@Composable
+fun StatefulSetDetailsView(sts: StatefulSet) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "StatefulSet Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", sts.metadata?.name)
+        DetailRow("Namespace", sts.metadata?.namespace)
+        DetailRow("Created", formatAge(sts.metadata?.creationTimestamp))
+        DetailRow("Replicas", "${sts.status?.replicas ?: 0} / ${sts.spec?.replicas ?: 0}")
+        DetailRow("Ready Replicas", "${sts.status?.readyReplicas ?: 0}")
+        DetailRow("Service Name", sts.spec?.serviceName)
+        DetailRow("Update Strategy", sts.spec?.updateStrategy?.type)
+        DetailRow("Pod Management Policy", sts.spec?.podManagementPolicy)
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція контейнерів
+        val containerState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Containers (${sts.spec?.template?.spec?.containers?.size ?: 0})", expanded = containerState)
+
+        if (containerState.value) {
+            sts.spec?.template?.spec?.containers?.forEachIndexed { index, container ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "${index + 1}. ${container.name}",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text("Image: ${container.image}")
+                        container.ports?.let { ports ->
+                            if (ports.isNotEmpty()) {
+                                Text("Ports: ${ports.joinToString { "${it.containerPort}/${it.protocol ?: "TCP"}" }}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція томів
+        val volumesState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Volume Claims (${sts.spec?.volumeClaimTemplates?.size ?: 0})", expanded = volumesState)
+
+        if (volumesState.value) {
+            sts.spec?.volumeClaimTemplates?.forEach { pvc ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = pvc.metadata?.name ?: "",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text("Storage Class: ${pvc.spec?.storageClassName ?: "default"}")
+                        Text("Access Modes: ${pvc.spec?.accessModes?.joinToString(", ") ?: ""}")
+                        pvc.spec?.resources?.requests?.get("storage")?.let { storage ->
+                            Text("Storage: $storage")
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            // Мітки
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text("Labels:", fontWeight = FontWeight.Bold)
+                    if (sts.metadata?.labels.isNullOrEmpty()) {
+                        Text("No labels")
+                    } else {
+                        sts.metadata?.labels?.forEach { (key, value) ->
+                            Text("$key: $value")
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text("Annotations:", fontWeight = FontWeight.Bold)
+                    if (sts.metadata?.annotations.isNullOrEmpty()) {
+                        Text("No annotations")
+                    } else {
+                        sts.metadata?.annotations?.forEach { (key, value) ->
+                            Text("$key: $value")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DaemonSetDetailsView(ds: DaemonSet) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "DaemonSet Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", ds.metadata?.name)
+        DetailRow("Namespace", ds.metadata?.namespace)
+        DetailRow("Created", formatAge(ds.metadata?.creationTimestamp))
+        DetailRow("Desired Nodes", ds.status?.desiredNumberScheduled?.toString())
+        DetailRow("Current Nodes", ds.status?.currentNumberScheduled?.toString())
+        DetailRow("Ready Nodes", ds.status?.numberReady?.toString())
+        DetailRow("Available Nodes", ds.status?.numberAvailable?.toString())
+        DetailRow("Update Strategy", ds.spec?.updateStrategy?.type)
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція селектора
+        val selectorState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Selector", expanded = selectorState)
+
+        if (selectorState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    ds.spec?.selector?.matchLabels?.let { matchLabels ->
+                        if (matchLabels.isNotEmpty()) {
+                            Text("Match Labels:", fontWeight = FontWeight.Bold)
+                            matchLabels.forEach { (key, value) ->
+                                Text("$key: $value")
+                            }
+                        }
+                    }
+
+                    ds.spec?.selector?.matchExpressions?.let { expressions ->
+                        if (expressions.isNotEmpty()) {
+                            Text("Match Expressions:", fontWeight = FontWeight.Bold)
+                            expressions.forEach { expr ->
+                                Text("${expr.key} ${expr.operator} [${expr.values?.joinToString(", ") ?: ""}]")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція контейнерів - покращена
+        val containerState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Containers (${ds.spec?.template?.spec?.containers?.size ?: 0})", expanded = containerState)
+
+        if (containerState.value) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                items(ds.spec?.template?.spec?.containers ?: emptyList()) { container ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            // Заголовок контейнера з іконкою
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Box,
+                                    contentDescription = "Container",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = container.name,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // Базова інформація
+                            SelectionContainer {
+                                Text("Image: ${container.image}")
+                            }
+
+                            // Порти - виведення у компактній формі
+                            container.ports?.let { ports ->
+                                if (ports.isNotEmpty()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Server,
+                                            contentDescription = "Ports",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = "Ports: ${ports.joinToString { "${it.containerPort}/${it.protocol ?: "TCP"}" }}"
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Команда з можливістю копіювання
+                            container.command?.let { command ->
+                                if (command.isNotEmpty()) {
+                                    Row(
+                                        verticalAlignment = Alignment.Top,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Terminal,
+                                            contentDescription = "Command",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Column {
+                                            Text("Command:", fontWeight = FontWeight.Medium)
+                                            SelectionContainer {
+                                                Text(
+                                                    text = command.joinToString(" "),
+                                                    style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Змінні середовища з оформленням
+                            if (!container.env.isNullOrEmpty()) {
+                                var envExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { envExpanded = !envExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (envExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Environment Variables",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Environment (${container.env?.size ?: 0})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (envExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.env?.forEach { env ->
+                                                Row {
+                                                    Text(
+                                                        text = "${env.name}:",
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(180.dp)
+                                                    )
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = env.value ?: "(from source)",
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Монтування томів з іконками
+                            if (!container.volumeMounts.isNullOrEmpty()) {
+                                var volumeExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { volumeExpanded = !volumeExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (volumeExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Volume Mounts",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Volume Mounts (${container.volumeMounts?.size ?: 0})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (volumeExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.volumeMounts?.forEach { mount ->
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = FeatherIcons.HardDrive,
+                                                        contentDescription = "Volume",
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text(
+                                                        text = mount.name,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(100.dp)
+                                                    )
+                                                    Text(" → ")
+                                                    SelectionContainer {
+                                                        Text(mount.mountPath)
+                                                    }
+                                                    if (mount.readOnly == true) {
+                                                        Spacer(Modifier.width(4.dp))
+                                                        Text(
+                                                            text = "(ro)",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.error
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція томів
+        val volumesState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Volumes (${ds.spec?.template?.spec?.volumes?.size ?: 0})", expanded = volumesState)
+
+        if (volumesState.value) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 300.dp)
+            ) {
+                items(ds.spec?.template?.spec?.volumes ?: emptyList()) { volume ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = FeatherIcons.Database,
+                                    contentDescription = "Volume",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = volume.name,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            // Визначаємо тип тому і його деталі
+                            when {
+                                volume.configMap != null -> {
+                                    Text("Type: ConfigMap")
+                                    Text("Name: ${volume.configMap?.name ?: ""}")
+                                    if (volume.configMap?.optional == true) {
+                                        Text("Optional: true")
+                                    }
+                                }
+                                volume.secret != null -> {
+                                    Text("Type: Secret")
+                                    Text("Name: ${volume.secret?.secretName ?: ""}")
+                                    if (volume.secret?.optional == true) {
+                                        Text("Optional: true")
+                                    }
+                                }
+                                volume.persistentVolumeClaim != null -> {
+                                    Text("Type: PersistentVolumeClaim")
+                                    Text("Claim Name: ${volume.persistentVolumeClaim?.claimName ?: ""}")
+                                    if (volume.persistentVolumeClaim?.readOnly == true) {
+                                        Text("Read Only: true")
+                                    }
+                                }
+                                volume.hostPath != null -> {
+                                    Text("Type: HostPath")
+                                    Text("Path: ${volume.hostPath?.path ?: ""}")
+                                    Text("Type: ${volume.hostPath?.type ?: "Directory"}")
+                                }
+                                volume.emptyDir != null -> {
+                                    Text("Type: EmptyDir")
+                                    volume.emptyDir?.medium?.let { Text("Medium: $it") }
+                                    volume.emptyDir?.sizeLimit?.let { Text("Size Limit: $it") }
+                                }
+                                else -> Text("Type: Other volume type")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації - покращений вивід
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${ds.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (ds.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                ds.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${ds.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (ds.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                ds.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Умови (conditions)
+        val conditionsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Conditions", expanded = conditionsState)
+
+        if (conditionsState.value) {
+            if (ds.status?.conditions.isNullOrEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("No conditions available")
+                    }
+                }
+            } else {
+                ds.status?.conditions?.forEach { condition ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (condition.status) {
+                                "True" -> MaterialTheme.colorScheme.surfaceVariant
+                                "False" -> MaterialTheme.colorScheme.errorContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (condition.status == "True") ICON_SUCCESS else ICON_ERROR,
+                                    contentDescription = "Condition Status",
+                                    tint = if (condition.status == "True")
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.error
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = condition.type ?: "",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text("Status: ${condition.status}")
+                            Text("Last Transition: ${formatAge(condition.lastTransitionTime)}")
+                            condition.message?.let { Text("Message: $it") }
+                            condition.reason?.let { Text("Reason: $it") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "Job Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", job.metadata?.name)
+        DetailRow("Namespace", job.metadata?.namespace)
+        DetailRow("Created", formatAge(job.metadata?.creationTimestamp))
+
+        // Статус завершення
+        val completions = job.spec?.completions ?: 1
+        val succeeded = job.status?.succeeded ?: 0
+        val isCompleted = succeeded >= completions
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            Text(
+                text = "Completion Status: ",
+                fontWeight = FontWeight.SemiBold
+            )
+            Icon(
+                imageVector = if (isCompleted) ICON_SUCCESS else FeatherIcons.Clock,
+                contentDescription = "Completion Status",
+                tint = if (isCompleted)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = if (isCompleted) "Completed" else "In Progress",
+                color = if (isCompleted)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        DetailRow("Completions", "$succeeded / $completions")
+        DetailRow("Parallelism", job.spec?.parallelism?.toString() ?: "1")
+        DetailRow("Active", job.status?.active?.toString() ?: "0")
+        DetailRow("Failed", job.status?.failed?.toString() ?: "0")
+
+        // Політика завершення
+        job.spec?.backoffLimit?.let { backoffLimit ->
+            DetailRow("Backoff Limit", backoffLimit.toString())
+        }
+
+        job.spec?.activeDeadlineSeconds?.let { deadline ->
+            DetailRow("Active Deadline", "${deadline}s")
+        }
+
+        DetailRow("Completion Mode", job.spec?.completionMode ?: "NonIndexed")
+        DetailRow("Restart Policy", job.spec?.template?.spec?.restartPolicy ?: "Never")
+
+        Spacer(Modifier.height(16.dp))
+
+        // Селектор
+        val selectorState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Selector", expanded = selectorState)
+
+        if (selectorState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    job.spec?.selector?.matchLabels?.let { matchLabels ->
+                        if (matchLabels.isNotEmpty()) {
+                            Text("Match Labels:", fontWeight = FontWeight.Bold)
+                            matchLabels.forEach { (key, value) ->
+                                Text("$key: $value")
+                            }
+                        }
+                    }
+
+                    job.spec?.selector?.matchExpressions?.let { expressions ->
+                        if (expressions.isNotEmpty()) {
+                            Text("Match Expressions:", fontWeight = FontWeight.Bold)
+                            expressions.forEach { expr ->
+                                Text("${expr.key} ${expr.operator} [${expr.values?.joinToString(", ") ?: ""}]")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція шаблону Pod - контейнери
+        val containerState = remember { mutableStateOf(false) }
+        val containerCount = job.spec?.template?.spec?.containers?.size ?: 0
+        DetailSectionHeader(
+            title = "Containers ($containerCount)",
+            expanded = containerState
+        )
+
+        if (containerState.value) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                items(job.spec?.template?.spec?.containers ?: emptyList()) { container ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            // Заголовок контейнера
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Box,
+                                    contentDescription = "Container",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = container.name,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // Образ
+                            SelectionContainer {
+                                Text("Image: ${container.image}")
+                            }
+
+                            // Команда та аргументи
+                            if (!container.command.isNullOrEmpty()) {
+                                var commandExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { commandExpanded = !commandExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (commandExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Command",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Column {
+                                        Text("Command:", fontWeight = FontWeight.Medium)
+                                        if (commandExpanded) {
+                                            SelectionContainer {
+                                                Text(
+                                                    text = container.command?.joinToString(" ") ?: "",
+                                                    style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                )
+                                            }
+
+                                            // Аргументи
+                                            if (!container.args.isNullOrEmpty()) {
+                                                Spacer(Modifier.height(2.dp))
+                                                Text("Arguments:", fontWeight = FontWeight.Medium)
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = container.args?.joinToString(" ") ?: "",
+                                                        style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            val commandPreview = (container.command?.joinToString(" ") ?: "").let {
+                                                if (it.length > 40) it.take(40) + "..." else it
+                                            }
+                                            Text(commandPreview)
+                                        }
+                                    }
+                                }
+                            } else if (!container.args.isNullOrEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Terminal,
+                                        contentDescription = "Arguments",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Column {
+                                        Text("Arguments:", fontWeight = FontWeight.Medium)
+                                        SelectionContainer {
+                                            Text(
+                                                text = container.args?.joinToString(" ") ?: "",
+                                                style = TextStyle(fontFamily = FontFamily.Monospace)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Змінні середовища
+                            if (!container.env.isNullOrEmpty()) {
+                                var envExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { envExpanded = !envExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (envExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Environment Variables",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Environment (${container.env?.size ?: 0})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (envExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.env?.forEach { env ->
+                                                Row {
+                                                    Text(
+                                                        text = "${env.name}:",
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(120.dp)
+                                                    )
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = env.value ?: env.valueFrom?.let { "(from source)" } ?: "",
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Монтування томів
+                            if (!container.volumeMounts.isNullOrEmpty()) {
+                                var volumeExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { volumeExpanded = !volumeExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (volumeExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Volume Mounts",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Volume Mounts (${container.volumeMounts?.size ?: 0})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (volumeExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.volumeMounts?.forEach { mount ->
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = FeatherIcons.HardDrive,
+                                                        contentDescription = "Volume",
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text(
+                                                        text = mount.name,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(100.dp)
+                                                    )
+                                                    Text(" → ")
+                                                    SelectionContainer {
+                                                        Text(mount.mountPath)
+                                                    }
+                                                    if (mount.readOnly == true) {
+                                                        Spacer(Modifier.width(4.dp))
+                                                        Text(
+                                                            text = "(ro)",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.error
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Ресурси
+                            container.resources?.let { resources ->
+                                var resourcesExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { resourcesExpanded = !resourcesExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (resourcesExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Resources",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Resources",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (resourcesExpanded && (resources.requests?.isNotEmpty() == true || resources.limits?.isNotEmpty() == true)) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            resources.requests?.let { requests ->
+                                                if (requests.isNotEmpty()) {
+                                                    Text("Requests:", fontWeight = FontWeight.Bold)
+                                                    requests.forEach { (key, value) ->
+                                                        Text("  $key: $value")
+                                                    }
+                                                }
+                                            }
+
+                                            resources.limits?.let { limits ->
+                                                if (limits.isNotEmpty()) {
+                                                    Spacer(Modifier.height(4.dp))
+                                                    Text("Limits:", fontWeight = FontWeight.Bold)
+                                                    limits.forEach { (key, value) ->
+                                                        Text("  $key: $value")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Поди
+        val podsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Status Timeline",
+            expanded = podsState
+        )
+
+        if (podsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Row {
+                        // Графічне представлення статусу
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.width(120.dp)
+                        ) {
+                            Text("Status", fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+
+                            val status = job.status
+                            val startTime = status?.startTime
+                            val completionTime = status?.completionTime
+
+                            // Status timeline
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = CircleShape
+                                        )
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .height(2.dp)
+                                        .weight(1f)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(
+                                            color = if (completionTime != null)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.outline,
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
+
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Start",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.width(60.dp)
+                                )
+                                Text(
+                                    text = "Finish",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.width(60.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.width(16.dp))
+
+                        // Деталі часу
+                        Column {
+                            Text("Timing", fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+
+                            DetailRow("Start Time", formatAge(job.status?.startTime))
+
+                            if (job.status?.completionTime != null) {
+                                DetailRow("Completion Time", formatAge(job.status?.completionTime))
+
+                                // Розрахунок тривалості - без try-catch навколо composable функцій
+                                val durationText = calculateJobDuration(job.status?.startTime, job.status?.completionTime)
+                                DetailRow("Duration", durationText)
+                            } else {
+                                DetailRow("Completion Time", "Не завершено")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${job.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (job.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                job.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${job.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (job.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                job.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Умови (conditions)
+        val conditionsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Conditions", expanded = conditionsState)
+
+        if (conditionsState.value) {
+            if (job.status?.conditions.isNullOrEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("No conditions available")
+                    }
+                }
+            } else {
+                job.status?.conditions?.forEach { condition ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (condition.status) {
+                                "True" -> MaterialTheme.colorScheme.surfaceVariant
+                                "False" -> MaterialTheme.colorScheme.errorContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (condition.status == "True") ICON_SUCCESS else ICON_ERROR,
+                                    contentDescription = "Condition Status",
+                                    tint = if (condition.status == "True")
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.error
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = condition.type ?: "",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text("Status: ${condition.status}")
+                            Text("Last Transition: ${formatAge(condition.lastTransitionTime)}")
+                            condition.message?.let { Text("Message: $it") }
+                            condition.reason?.let { Text("Reason: $it") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CronJobDetailsView(cronJob: io.fabric8.kubernetes.api.model.batch.v1.CronJob) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "CronJob Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", cronJob.metadata?.name)
+        DetailRow("Namespace", cronJob.metadata?.namespace)
+        DetailRow("Created", formatAge(cronJob.metadata?.creationTimestamp))
+
+        // Розклад
+        val schedule = cronJob.spec?.schedule ?: "* * * * *"
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            Icon(
+                imageVector = FeatherIcons.Clock,
+                contentDescription = "Schedule",
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Schedule: ",
+                fontWeight = FontWeight.SemiBold
+            )
+            SelectionContainer {
+                Text(schedule)
+            }
+        }
+
+        // Статус призупинення
+        val suspended = cronJob.spec?.suspend ?: false
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            Icon(
+                imageVector = if (suspended) FeatherIcons.Pause else FeatherIcons.Play,
+                contentDescription = "Suspension Status",
+                tint = if (suspended)
+                    MaterialTheme.colorScheme.error
+                else
+                    MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Status: ",
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = if (suspended) "Suspended" else "Active",
+                color = if (suspended)
+                    MaterialTheme.colorScheme.error
+                else
+                    MaterialTheme.colorScheme.primary
+            )
+        }
+
+        // Додаткові параметри
+        DetailRow("Concurrency Policy", cronJob.spec?.concurrencyPolicy ?: "Allow")
+
+        cronJob.spec?.startingDeadlineSeconds?.let { deadline ->
+            DetailRow("Starting Deadline", "${deadline}s")
+        }
+
+        cronJob.spec?.successfulJobsHistoryLimit?.let { limit ->
+            DetailRow("Successful Jobs History Limit", limit.toString())
+        }
+
+        cronJob.spec?.failedJobsHistoryLimit?.let { limit ->
+            DetailRow("Failed Jobs History Limit", limit.toString())
+        }
+
+        // Останній запуск
+        cronJob.status?.lastScheduleTime?.let { lastScheduleTime ->
+            DetailRow("Last Schedule Time", formatAge(lastScheduleTime))
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція історії запуску
+        val historyState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Status Timeline",
+            expanded = historyState
+        )
+
+        if (historyState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Останні запуски
+                    val lastScheduled = cronJob.status?.lastScheduleTime
+                    val creationTime = cronJob.metadata?.creationTimestamp
+
+                    Text("Timeline", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+
+                    if (lastScheduled != null) {
+                        // Часова лінія з останнім запуском
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    )
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .height(2.dp)
+                                    .width(40.dp)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    )
+                            )
+
+                            Spacer(Modifier.width(16.dp))
+                            Text("Last Schedule: ${formatAge(lastScheduled)}")
+                        }
+
+                        // Наступне виконання (приблизно) - обробка помилок винесена за межі композабельної функції
+                        val nextRun = safeCalculateNextCronRun(schedule)
+                        if (nextRun != null) {
+                            Spacer(Modifier.height(16.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = CircleShape
+                                        )
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .height(2.dp)
+                                        .width(40.dp)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.outline,
+                                            shape = CircleShape
+                                        )
+                                )
+
+                                Spacer(Modifier.width(16.dp))
+                                Text(
+                                    text = "Next Run: $nextRun (estimated)",
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    } else {
+                        Text("No schedule history available")
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Статистика активних/останніх запусків
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = MaterialTheme.shapes.small
+                                )
+                                .padding(8.dp)
+                                .weight(1f)
+                        ) {
+                            Text(
+                                text = cronJob.status?.active?.size?.toString() ?: "0",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Active Jobs",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                        Spacer(Modifier.width(16.dp))
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = MaterialTheme.shapes.small
+                                )
+                                .padding(8.dp)
+                                .weight(1f)
+                        ) {
+                            Text(
+                                text = (cronJob.spec?.successfulJobsHistoryLimit ?: 3).toString(),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "History Limit",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція шаблону Job
+        val jobTemplateState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Job Template", expanded = jobTemplateState)
+
+        if (jobTemplateState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Деякі базові параметри шаблону Job
+                    DetailRow(
+                        "Parallelism",
+                        cronJob.spec?.jobTemplate?.spec?.parallelism?.toString() ?: "1"
+                    )
+
+                    DetailRow(
+                        "Completions",
+                        cronJob.spec?.jobTemplate?.spec?.completions?.toString() ?: "1"
+                    )
+
+                    DetailRow(
+                        "Backoff Limit",
+                        cronJob.spec?.jobTemplate?.spec?.backoffLimit?.toString() ?: "6"
+                    )
+
+                    cronJob.spec?.jobTemplate?.spec?.activeDeadlineSeconds?.let { deadline ->
+                        DetailRow("Active Deadline", "${deadline}s")
+                    }
+
+                    cronJob.spec?.jobTemplate?.spec?.ttlSecondsAfterFinished?.let { ttl ->
+                        DetailRow("TTL After Finished", "${ttl}s")
+                    }
+
+                    DetailRow(
+                        "Restart Policy",
+                        cronJob.spec?.jobTemplate?.spec?.template?.spec?.restartPolicy ?: "Never"
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція шаблону Pod - контейнери
+        val containerState = remember { mutableStateOf(false) }
+        val containerCount = cronJob.spec?.jobTemplate?.spec?.template?.spec?.containers?.size ?: 0
+        DetailSectionHeader(
+            title = "Containers ($containerCount)",
+            expanded = containerState
+        )
+
+        if (containerState.value) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                items(cronJob.spec?.jobTemplate?.spec?.template?.spec?.containers ?: emptyList()) { container ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            // Заголовок контейнера
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Box,
+                                    contentDescription = "Container",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = container.name,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // Образ
+                            SelectionContainer {
+                                Text("Image: ${container.image}")
+                            }
+
+                            // Команда та аргументи
+                            if (!container.command.isNullOrEmpty()) {
+                                var commandExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { commandExpanded = !commandExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (commandExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Command",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Column {
+                                        Text("Command:", fontWeight = FontWeight.Medium)
+                                        if (commandExpanded) {
+                                            SelectionContainer {
+                                                Text(
+                                                    text = container.command?.joinToString(" ") ?: "",
+                                                    style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                )
+                                            }
+
+                                            // Аргументи
+                                            if (!container.args.isNullOrEmpty()) {
+                                                Spacer(Modifier.height(2.dp))
+                                                Text("Arguments:", fontWeight = FontWeight.Medium)
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = container.args?.joinToString(" ") ?: "",
+                                                        style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            val commandPreview = (container.command?.joinToString(" ") ?: "").let {
+                                                if (it.length > 40) it.take(40) + "..." else it
+                                            }
+                                            Text(commandPreview)
+                                        }
+                                    }
+                                }
+                            } else if (!container.args.isNullOrEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Terminal,
+                                        contentDescription = "Arguments",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Column {
+                                        Text("Arguments:", fontWeight = FontWeight.Medium)
+                                        SelectionContainer {
+                                            Text(
+                                                text = container.args?.joinToString(" ") ?: "",
+                                                style = TextStyle(fontFamily = FontFamily.Monospace)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Змінні середовища
+                            if (!container.env.isNullOrEmpty()) {
+                                var envExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { envExpanded = !envExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (envExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Environment Variables",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Environment (${container.env?.size ?: 0})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (envExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.env?.forEach { env ->
+                                                Row {
+                                                    Text(
+                                                        text = "${env.name}:",
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(120.dp)
+                                                    )
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = env.value ?: env.valueFrom?.let { "(from source)" } ?: "",
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Ресурси
+                            container.resources?.let { resources ->
+                                var resourcesExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { resourcesExpanded = !resourcesExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (resourcesExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Resources",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Resources",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (resourcesExpanded && (resources.requests?.isNotEmpty() == true || resources.limits?.isNotEmpty() == true)) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            resources.requests?.let { requests ->
+                                                if (requests.isNotEmpty()) {
+                                                    Text("Requests:", fontWeight = FontWeight.Bold)
+                                                    requests.forEach { (key, value) ->
+                                                        Text("  $key: $value")
+                                                    }
+                                                }
+                                            }
+
+                                            resources.limits?.let { limits ->
+                                                if (limits.isNotEmpty()) {
+                                                    Spacer(Modifier.height(4.dp))
+                                                    Text("Limits:", fontWeight = FontWeight.Bold)
+                                                    limits.forEach { (key, value) ->
+                                                        Text("  $key: $value")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Активні завдання
+        val activeJobsState = remember { mutableStateOf(false) }
+        val activeJobsCount = cronJob.status?.active?.size ?: 0
+        DetailSectionHeader(
+            title = "Active Jobs ($activeJobsCount)",
+            expanded = activeJobsState
+        )
+
+        if (activeJobsState.value) {
+            if (activeJobsCount > 0) {
+                cronJob.status?.active?.forEach { activeJob ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Activity,
+                                contentDescription = "Active Job",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = activeJob.name ?: "Unknown Job",
+                                    fontWeight = FontWeight.Bold
+                                )
+                                activeJob.uid?.let { uid ->
+                                    Text(
+                                        text = "UID: $uid",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Check,
+                            contentDescription = "No Active Jobs",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text("No active jobs at the moment")
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${cronJob.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (cronJob.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                cronJob.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${cronJob.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (cronJob.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                cronJob.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReplicaSetDetailsView(replicaSet: io.fabric8.kubernetes.api.model.apps.ReplicaSet) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "ReplicaSet Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", replicaSet.metadata?.name)
+        DetailRow("Namespace", replicaSet.metadata?.namespace)
+        DetailRow("Created", formatAge(replicaSet.metadata?.creationTimestamp))
+
+        // Статус та кількість реплік
+        val desiredReplicas = replicaSet.spec?.replicas ?: 0
+        val availableReplicas = replicaSet.status?.availableReplicas ?: 0
+        val readyReplicas = replicaSet.status?.readyReplicas ?: 0
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 8.dp)
+        ) {
+            // Індикатор прогресу
+            val progress = if (desiredReplicas > 0) {
+                readyReplicas.toFloat() / desiredReplicas.toFloat()
+            } else {
+                1f
+            }
+
+            Box(
+                modifier = Modifier
+                    .width(48.dp)
+                    .height(48.dp)
+            ) {
+                CircularProgressIndicator(
+                    progress = 1f,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 4.dp
+                )
+                CircularProgressIndicator(
+                    progress = progress,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    color = if (progress >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    strokeWidth = 4.dp
+                )
+                Text(
+                    text = "$readyReplicas/$desiredReplicas",
+                    modifier = Modifier.align(Alignment.Center),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column {
+                Text(
+                    text = if (readyReplicas >= desiredReplicas && desiredReplicas > 0)
+                        "Ready"
+                    else
+                        "Scaling",
+                    fontWeight = FontWeight.Bold,
+                    color = if (readyReplicas >= desiredReplicas && desiredReplicas > 0)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.secondary
+                )
+
+                Row {
+                    Text("Desired: $desiredReplicas • ")
+                    Text("Available: $availableReplicas • ")
+                    Text("Ready: $readyReplicas")
+                }
+
+                if (replicaSet.status?.fullyLabeledReplicas != null) {
+                    Text("Fully Labeled: ${replicaSet.status?.fullyLabeledReplicas}")
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Власник
+        replicaSet.metadata?.ownerReferences?.firstOrNull()?.let { owner ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Link,
+                        contentDescription = "Owner",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Controlled by: ${owner.kind} ${owner.name}",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Row {
+                            Text(
+                                text = "Controller: ${owner.controller ?: false}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "UID: ${owner.uid}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція селекторів
+        val selectorState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Pod Selector", expanded = selectorState)
+
+        if (selectorState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    replicaSet.spec?.selector?.matchLabels?.let { matchLabels ->
+                        if (matchLabels.isNotEmpty()) {
+                            Text("Match Labels:", fontWeight = FontWeight.Bold)
+                            matchLabels.forEach { (key, value) ->
+                                Row {
+                                    SelectionContainer {
+                                        Text(
+                                            text = key,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.width(150.dp)
+                                        )
+                                    }
+                                    Text("= ")
+                                    SelectionContainer { Text(value) }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    replicaSet.spec?.selector?.matchExpressions?.let { expressions ->
+                        if (expressions.isNotEmpty()) {
+                            Text("Match Expressions:", fontWeight = FontWeight.Bold)
+                            expressions.forEach { expr ->
+                                Row {
+                                    SelectionContainer {
+                                        Text(
+                                            text = expr.key,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.width(150.dp)
+                                        )
+                                    }
+                                    Text("${expr.operator} ")
+                                    SelectionContainer {
+                                        Text(expr.values?.joinToString(", ") ?: "")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція шаблону Pod - контейнери
+        val containerState = remember { mutableStateOf(false) }
+        val containerCount = replicaSet.spec?.template?.spec?.containers?.size ?: 0
+        DetailSectionHeader(
+            title = "Pod Template Containers ($containerCount)",
+            expanded = containerState
+        )
+
+        if (containerState.value) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                items(replicaSet.spec?.template?.spec?.containers ?: emptyList()) { container ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            // Заголовок контейнера
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Box,
+                                    contentDescription = "Container",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = container.name,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // Образ
+                            SelectionContainer {
+                                Text("Image: ${container.image}")
+                            }
+
+                            // Порти
+                            if (!container.ports.isNullOrEmpty()) {
+                                var portsExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { portsExpanded = !portsExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (portsExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Ports",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Ports (${container.ports.size})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (portsExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.ports.forEach { port ->
+                                                Row {
+                                                    Text(
+                                                        text = port.name ?: "port",
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(100.dp)
+                                                    )
+                                                    Text("${port.containerPort}")
+                                                    port.protocol?.let { protocol ->
+                                                        Text(" ($protocol)")
+                                                    }
+                                                    port.hostPort?.let { hostPort ->
+                                                        Text(" → $hostPort (host)")
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Команда та аргументи
+                            if (!container.command.isNullOrEmpty()) {
+                                var commandExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { commandExpanded = !commandExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (commandExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Command",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Column {
+                                        Text("Command:", fontWeight = FontWeight.Medium)
+                                        if (commandExpanded) {
+                                            SelectionContainer {
+                                                Text(
+                                                    text = container.command.joinToString(" "),
+                                                    style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                )
+                                            }
+
+                                            // Аргументи
+                                            if (!container.args.isNullOrEmpty()) {
+                                                Spacer(Modifier.height(2.dp))
+                                                Text("Arguments:", fontWeight = FontWeight.Medium)
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = container.args.joinToString(" "),
+                                                        style = TextStyle(fontFamily = FontFamily.Monospace)
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            val commandPreview = (container.command.joinToString(" ")).let {
+                                                if (it.length > 40) it.take(40) + "..." else it
+                                            }
+                                            Text(commandPreview)
+                                        }
+                                    }
+                                }
+                            } else if (!container.args.isNullOrEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Terminal,
+                                        contentDescription = "Arguments",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Column {
+                                        Text("Arguments:", fontWeight = FontWeight.Medium)
+                                        SelectionContainer {
+                                            Text(
+                                                text = container.args.joinToString(" "),
+                                                style = TextStyle(fontFamily = FontFamily.Monospace)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Змінні середовища
+                            if (!container.env.isNullOrEmpty()) {
+                                var envExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { envExpanded = !envExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (envExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Environment Variables",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Environment (${container.env.size})",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (envExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.env.forEach { env ->
+                                                Row {
+                                                    Text(
+                                                        text = "${env.name}:",
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.width(120.dp)
+                                                    )
+                                                    SelectionContainer {
+                                                        val envValue = env.value ?: env.valueFrom?.let { "(from source)" } ?: ""
+                                                        Text(
+                                                            text = envValue,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Ресурси
+                            container.resources?.let { resources ->
+                                var resourcesExpanded by remember { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { resourcesExpanded = !resourcesExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (resourcesExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Resources",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Resources",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (resourcesExpanded) {
+                                    // Перевірка на null та непорожність для кожного поля
+                                    val hasRequests = resources.requests?.isNotEmpty() == true
+                                    val hasLimits = resources.limits?.isNotEmpty() == true
+
+                                    if (hasRequests || hasLimits) {
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 24.dp, top = 4.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surface
+                                            )
+                                        ) {
+                                            Column(modifier = Modifier.padding(8.dp)) {
+                                                if (hasRequests) {
+                                                    Text("Requests:", fontWeight = FontWeight.Bold)
+                                                    resources.requests!!.forEach { (key, value) ->
+                                                        Text("  $key: $value")
+                                                    }
+                                                }
+
+                                                if (hasLimits) {
+                                                    if (hasRequests) {
+                                                        Spacer(Modifier.height(4.dp))
+                                                    }
+                                                    Text("Limits:", fontWeight = FontWeight.Bold)
+                                                    resources.limits!!.forEach { (key, value) ->
+                                                        Text("  $key: $value")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Проби готовності/життєздатності
+                            var probesExpanded by remember { mutableStateOf(false) }
+                            val hasProbes = container.livenessProbe != null || container.readinessProbe != null || container.startupProbe != null
+
+                            if (hasProbes) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable { probesExpanded = !probesExpanded }
+                                ) {
+                                    Icon(
+                                        imageVector = if (probesExpanded) ICON_DOWN else ICON_RIGHT,
+                                        contentDescription = "Toggle Probes",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Health Probes",
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                if (probesExpanded) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 24.dp, top = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            container.livenessProbe?.let { probe ->
+                                                ProbeSummary("Liveness", probe)
+                                            }
+
+                                            container.readinessProbe?.let { probe ->
+                                                if (container.livenessProbe != null) {
+                                                    Spacer(Modifier.height(8.dp))
+                                                    Divider()
+                                                    Spacer(Modifier.height(8.dp))
+                                                }
+                                                ProbeSummary("Readiness", probe)
+                                            }
+
+                                            container.startupProbe?.let { probe ->
+                                                if (container.livenessProbe != null || container.readinessProbe != null) {
+                                                    Spacer(Modifier.height(8.dp))
+                                                    Divider()
+                                                    Spacer(Modifier.height(8.dp))
+                                                }
+                                                ProbeSummary("Startup", probe)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Умови
+        val conditionsState = remember { mutableStateOf(false) }
+        val conditionsCount = replicaSet.status?.conditions?.size ?: 0
+        DetailSectionHeader(
+            title = "Conditions ($conditionsCount)",
+            expanded = conditionsState
+        )
+
+        if (conditionsState.value) {
+            if (conditionsCount > 0) {
+                Column {
+                    replicaSet.status?.conditions?.forEach { condition ->
+                        val isPositive = condition.status == "True"
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isPositive)
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                else
+                                    MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (isPositive) ICON_SUCCESS else ICON_ERROR,
+                                        contentDescription = "Condition Status",
+                                        tint = if (isPositive)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = condition.type ?: "",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Text("Status: ${condition.status}")
+                                Text("Last Update: ${formatAge(condition.lastTransitionTime)}")
+
+                                condition.message?.let { message ->
+                                    Text("Message: $message")
+                                }
+
+                                condition.reason?.let { reason ->
+                                    Text("Reason: $reason")
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Check,
+                            contentDescription = "No Conditions",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text("No conditions reported")
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${replicaSet.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (replicaSet.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                replicaSet.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${replicaSet.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (replicaSet.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                replicaSet.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+// Допоміжна функція для відображення інформації про пробу (probe)
+@Composable
+private fun ProbeSummary(type: String, probe: io.fabric8.kubernetes.api.model.Probe) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = when (type) {
+                    "Liveness" -> FeatherIcons.Heart
+                    "Readiness" -> FeatherIcons.Check
+                    else -> FeatherIcons.Play
+                },
+                contentDescription = "$type Probe",
+                modifier = Modifier.size(16.dp),
+                tint = when (type) {
+                    "Liveness" -> MaterialTheme.colorScheme.error
+                    "Readiness" -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.secondary
+                }
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "$type Probe",
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        // Загальні параметри
+        val initialDelay = probe.initialDelaySeconds ?: 0
+        val timeout = probe.timeoutSeconds ?: 1
+        val period = probe.periodSeconds ?: 10
+        val success = probe.successThreshold ?: 1
+        val failure = probe.failureThreshold ?: 3
+
+        Row {
+            Column(modifier = Modifier.weight(1f)) {
+                DetailRow("Initial Delay", "${initialDelay}s")
+                DetailRow("Period", "${period}s")
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                DetailRow("Timeout", "${timeout}s")
+                DetailRow("Success Threshold", "$success")
+                DetailRow("Failure Threshold", "$failure")
+            }
+        }
+
+        // Тип перевірки
+        probe.httpGet?.let { httpGet ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = FeatherIcons.Globe,
+                    contentDescription = "HTTP Get",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "HTTP Get: ${httpGet.scheme ?: "HTTP"}://${httpGet.host ?: ""}:${httpGet.port?.intVal ?: httpGet.port?.strVal ?: ""}${httpGet.path ?: "/"}",
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            if (!httpGet.httpHeaders.isNullOrEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text("Headers:", fontWeight = FontWeight.Medium)
+                httpGet.httpHeaders.forEach { header ->
+                    Text("  ${header.name}: ${header.value}", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        probe.tcpSocket?.let { tcpSocket ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = FeatherIcons.Server,
+                    contentDescription = "TCP Socket",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "TCP Socket: ${tcpSocket.host ?: ""}:${tcpSocket.port?.intVal ?: tcpSocket.port?.strVal ?: ""}",
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        probe.exec?.let { exec ->
+            if (!exec.command.isNullOrEmpty()) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        imageVector = FeatherIcons.Terminal,
+                        contentDescription = "Exec",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Column {
+                        Text("Exec Command:", fontWeight = FontWeight.Medium)
+                        SelectionContainer {
+                            Text(
+                                text = exec.command.joinToString(" "),
+                                style = TextStyle(fontFamily = FontFamily.Monospace),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Додаткова інформація про probeHandler
+        probe.grpc?.let { grpc ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = FeatherIcons.Radio,
+                    contentDescription = "gRPC",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "gRPC: port=${grpc.port}${grpc.service?.let { " service=$it" } ?: ""}",
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun RoleDetailsView(role: io.fabric8.kubernetes.api.model.rbac.Role) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "Role Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", role.metadata?.name)
+        DetailRow("Namespace", role.metadata?.namespace)
+        DetailRow("Created", formatAge(role.metadata?.creationTimestamp))
+
+        Spacer(Modifier.height(16.dp))
+
+        // Правила доступу
+        val rulesCount = role.rules?.size ?: 0
+        Text(
+            text = "Rules ($rulesCount)",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (rulesCount > 0) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 500.dp)
+            ) {
+                itemsIndexed(role.rules ?: emptyList()) { index, rule ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            // Заголовок правила
+                            Text(
+                                text = "Rule #${index + 1}",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // API Groups
+                            val apiGroups = rule.apiGroups
+                            RuleSection(
+                                title = "API Groups",
+                                items = apiGroups,
+                                emptyMessage = "All API Groups (*)",
+                                defaultItem = "*"
+                            )
+
+                            // Resources
+                            val resources = rule.resources
+                            RuleSection(
+                                title = "Resources",
+                                items = resources,
+                                emptyMessage = "All Resources (*)",
+                                defaultItem = "*"
+                            )
+
+                            // Resource Names (специфічні імена ресурсів)
+                            val resourceNames = rule.resourceNames
+                            if (!resourceNames.isNullOrEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "Resource Names:",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                resourceNames.forEach { name ->
+                                    Text("• $name")
+                                }
+                            }
+
+                            // Verbs (дії)
+                            val verbs = rule.verbs
+                            RuleSection(
+                                title = "Verbs (Actions)",
+                                items = verbs,
+                                emptyMessage = "No actions defined",
+                                defaultItem = "*",
+                                highlightSpecialItems = true
+                            )
+
+                            // Кнопка "копіювати як YAML"
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                val yamlText = generateRuleYaml(rule)
+                                val clipboardManager = LocalClipboardManager.current
+
+                                Button(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(yamlText))
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Copy,
+                                        contentDescription = "Copy YAML",
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Copy as YAML", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Порожній набір правил
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.AlertTriangle,
+                        contentDescription = "Warning",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No rules defined for this role",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "This role doesn't grant any permissions",
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція для RoleBindings
+        val roleBindingsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Role Bindings",
+            expanded = roleBindingsState
+        )
+
+        if (roleBindingsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Тут мав би бути список RoleBindings, які посилаються на цю роль
+                    // Але для цього потрібен додатковий запит до API
+
+                    Icon(
+                        imageVector = FeatherIcons.Link,
+                        contentDescription = "Role Bindings",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Role Bindings information requires additional API calls",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "To see which subjects (users, groups, service accounts) have this role, please check RoleBindings in this namespace",
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${role.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (role.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                role.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${role.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (role.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                role.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Допоміжна функція для відображення секції правил
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RuleSection(
+    title: String,
+    items: List<String>?,
+    emptyMessage: String,
+    defaultItem: String,
+    highlightSpecialItems: Boolean = false
+) {
+    val hasItems = !items.isNullOrEmpty()
+    val hasWildcard = items?.contains(defaultItem) ?: false
+
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = "$title:",
+        fontWeight = FontWeight.SemiBold
+    )
+
+    if (!hasItems) {
+        Text(emptyMessage, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        if (hasWildcard && items?.size == 1) {
+            Text(
+                emptyMessage,
+                color = if (highlightSpecialItems) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (highlightSpecialItems) FontWeight.Bold else FontWeight.Normal
+            )
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items?.forEach { item ->
+                    val isSpecial = item == defaultItem
+
+                    Surface(
+                        color = if (isSpecial && highlightSpecialItems)
+                            MaterialTheme.colorScheme.errorContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isSpecial) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSpecial && highlightSpecialItems)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Функція для генерації YAML представлення правила
+private fun generateRuleYaml(rule: io.fabric8.kubernetes.api.model.rbac.PolicyRule): String {
+    val builder = StringBuilder()
+
+    builder.append("- apiGroups: ")
+    if (rule.apiGroups.isNullOrEmpty()) {
+        builder.append("['*']\n")
+    } else {
+        builder.append("[")
+        builder.append(rule.apiGroups.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    builder.append("  resources: ")
+    if (rule.resources.isNullOrEmpty()) {
+        builder.append("['*']\n")
+    } else {
+        builder.append("[")
+        builder.append(rule.resources.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    if (!rule.resourceNames.isNullOrEmpty()) {
+        builder.append("  resourceNames: [")
+        builder.append(rule.resourceNames.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    builder.append("  verbs: ")
+    if (rule.verbs.isNullOrEmpty()) {
+        builder.append("[]\n")
+    } else {
+        builder.append("[")
+        builder.append(rule.verbs.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    return builder.toString()
+}
+
+@Composable
+fun RoleBindingDetailsView(roleBinding: io.fabric8.kubernetes.api.model.rbac.RoleBinding) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "RoleBinding Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", roleBinding.metadata?.name)
+        DetailRow("Namespace", roleBinding.metadata?.namespace)
+        DetailRow("Created", formatAge(roleBinding.metadata?.creationTimestamp))
+
+        Spacer(Modifier.height(16.dp))
+
+        // RoleRef - посилання на роль, яка призначається
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Role Reference",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Тип ролі (Role або ClusterRole)
+                val roleType = roleBinding.roleRef?.kind ?: "Unknown"
+                val roleName = roleBinding.roleRef?.name ?: "Unknown"
+                val roleApiGroup = roleBinding.roleRef?.apiGroup ?: ""
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (roleType == "ClusterRole") FeatherIcons.Globe else FeatherIcons.Shield,
+                        contentDescription = "Role Type",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = roleName,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Row {
+                            Text(
+                                text = "Kind: $roleType",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            if (roleApiGroup.isNotEmpty()) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "API Group: $roleApiGroup",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Індикатор для ClusterRole
+                if (roleType == "ClusterRole") {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Info,
+                                contentDescription = "Info",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "This binding references a cluster-wide role, but applies only within this namespace",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Subjects - суб'єкти, яким призначається роль
+        val subjectsCount = roleBinding.subjects?.size ?: 0
+        Text(
+            text = "Subjects ($subjectsCount)",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (subjectsCount > 0) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                itemsIndexed(roleBinding.subjects ?: emptyList()) { index, subject ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            // Тип суб'єкта та іконка
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = when (subject.kind) {
+                                        "User" -> FeatherIcons.User
+                                        "Group" -> FeatherIcons.Users
+                                        "ServiceAccount" -> FeatherIcons.Server
+                                        else -> FeatherIcons.HelpCircle
+                                    },
+                                    contentDescription = "Subject Type",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "${subject.kind}: ${subject.name}",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            // Namespace (якщо застосовно)
+                            subject.namespace?.let { namespace ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Flag,
+                                        contentDescription = "Namespace",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Namespace: $namespace")
+                                }
+                            }
+
+                            // API Group (якщо є)
+                            subject.apiGroup?.let { apiGroup ->
+                                if (apiGroup.isNotEmpty()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Package,
+                                            contentDescription = "API Group",
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("API Group: $apiGroup")
+                                    }
+                                }
+                            }
+
+                            // Додаткова інформація для ServiceAccount
+                            if (subject.kind == "ServiceAccount" && subject.namespace != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Info,
+                                        contentDescription = "Info",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Full reference: system:serviceaccount:${subject.namespace}:${subject.name}",
+                                            fontStyle = FontStyle.Italic,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Додаткова інформація для Group
+                            if (subject.kind == "Group" && subject.name?.startsWith("system:") == true) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Info,
+                                        contentDescription = "System Group",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "This is a Kubernetes system group",
+                                        fontStyle = FontStyle.Italic,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Порожній список суб'єктів
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.AlertTriangle,
+                        contentDescription = "Warning",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No subjects defined for this role binding",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "This role binding doesn't assign permissions to any subject",
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${roleBinding.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (roleBinding.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                roleBinding.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${roleBinding.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (roleBinding.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                roleBinding.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Додатково - посилання на правила, які надає ця роль
+        Spacer(Modifier.height(16.dp))
+
+        val rulesInfoState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Role Rules Information",
+            expanded = rulesInfoState
+        )
+
+        if (rulesInfoState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Info,
+                        contentDescription = "Role Rules Info",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Rules defined in ${roleBinding.roleRef?.kind} '${roleBinding.roleRef?.name}'",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "To see the permissions granted by this RoleBinding, check the referenced ${
+                            roleBinding.roleRef?.kind?.lowercase() ?: "role"
+                        } details",
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Якщо це ClusterRole
+                    if (roleBinding.roleRef?.kind == "ClusterRole") {
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Note: ClusterRole rules are applied only within the '${roleBinding.metadata?.namespace}' namespace for this binding",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontStyle = FontStyle.Italic,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun ClusterRoleDetailsView(clusterRole: io.fabric8.kubernetes.api.model.rbac.ClusterRole) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "ClusterRole Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", clusterRole.metadata?.name)
+        DetailRow("Created", formatAge(clusterRole.metadata?.creationTimestamp))
+
+        // Спеціальний блок для системних ролей
+        if (clusterRole.metadata?.name?.startsWith("system:") == true) {
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Shield,
+                        contentDescription = "System Role",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "Kubernetes System Role",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            "This is a pre-defined system role used by Kubernetes components",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Aggregation Rules, якщо є
+        clusterRole.aggregationRule?.let { aggregationRule ->
+            val clusterRoleSelectors = aggregationRule.clusterRoleSelectors
+            if (!clusterRoleSelectors.isNullOrEmpty()) {
+                // Заголовок секції
+                Text(
+                    text = "Aggregation Rule",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "This ClusterRole aggregates permissions from other ClusterRoles",
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            text = "Cluster Role Selectors:",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        clusterRoleSelectors.forEachIndexed { index, selector ->
+                            val matchLabels = selector.matchLabels
+                            val matchExpressions = selector.matchExpressions
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text(
+                                        text = "Selector #${index + 1}",
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    // Match Labels
+                                    if (!matchLabels.isNullOrEmpty()) {
+                                        Text(
+                                            text = "Match Labels:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+
+                                        matchLabels.forEach { (key, value) ->
+                                            Row {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = key,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.width(120.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "= ",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = value,
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Match Expressions
+                                    if (!matchExpressions.isNullOrEmpty()) {
+                                        if (!matchLabels.isNullOrEmpty()) {
+                                            Spacer(Modifier.height(4.dp))
+                                        }
+
+                                        Text(
+                                            text = "Match Expressions:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+
+                                        matchExpressions.forEach { expr ->
+                                            Row {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = expr.key ?: "",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.tertiary,
+                                                        modifier = Modifier.width(120.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = expr.operator ?: "",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Spacer(Modifier.width(4.dp))
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = expr.values?.joinToString(", ") ?: "",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+
+        // Правила доступу
+        val rulesCount = clusterRole.rules?.size ?: 0
+        Text(
+            text = "Rules ($rulesCount)",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (rulesCount > 0) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 500.dp)
+            ) {
+                itemsIndexed(clusterRole.rules ?: emptyList()) { index, rule ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            // Заголовок правила
+                            Text(
+                                text = "Rule #${index + 1}",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // API Groups
+                            val apiGroups = rule.apiGroups
+                            ClusterRuleSection(
+                                title = "API Groups",
+                                items = apiGroups,
+                                emptyMessage = "All API Groups (*)",
+                                defaultItem = "*"
+                            )
+
+                            // Resources
+                            val resources = rule.resources
+                            ClusterRuleSection(
+                                title = "Resources",
+                                items = resources,
+                                emptyMessage = "All Resources (*)",
+                                defaultItem = "*"
+                            )
+
+                            // Resource Names (специфічні імена ресурсів)
+                            val resourceNames = rule.resourceNames
+                            if (!resourceNames.isNullOrEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "Resource Names:",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                resourceNames.forEach { name ->
+                                    Text("• $name")
+                                }
+                            }
+
+                            // Verbs (дії)
+                            val verbs = rule.verbs
+                            ClusterRuleSection(
+                                title = "Verbs (Actions)",
+                                items = verbs,
+                                emptyMessage = "No actions defined",
+                                defaultItem = "*",
+                                highlightSpecialItems = true
+                            )
+
+                            // Не-Ресурсні URL (NonResourceURLs) - специфічні для ClusterRole
+                            val nonResourceURLs = rule.nonResourceURLs
+                            if (!nonResourceURLs.isNullOrEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "Non-Resource URLs:",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        nonResourceURLs.forEach { url ->
+                                            SelectionContainer {
+                                                Text(
+                                                    text = url,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        }
+
+                                        // Інформаційне повідомлення про nonResourceURLs
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = "Non-resource URLs are API endpoints that don't correspond to Kubernetes objects",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontStyle = FontStyle.Italic,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Кнопка "копіювати як YAML"
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                val yamlText = generateClusterRuleYaml(rule)
+                                val clipboardManager = LocalClipboardManager.current
+
+                                Button(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(yamlText))
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Copy,
+                                        contentDescription = "Copy YAML",
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Copy as YAML", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Порожній набір правил
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.AlertTriangle,
+                        contentDescription = "Warning",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No rules defined for this cluster role",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "This cluster role doesn't grant any permissions",
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція для ClusterRoleBindings
+        val roleBindingsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Cluster Role Bindings",
+            expanded = roleBindingsState
+        )
+
+        if (roleBindingsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Тут мав би бути список ClusterRoleBindings, які посилаються на цю роль
+                    // Але для цього потрібен додатковий запит до API
+
+                    Icon(
+                        imageVector = FeatherIcons.Link,
+                        contentDescription = "Role Bindings",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Cluster Role Bindings information requires additional API calls",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "To see which subjects (users, groups, service accounts) have this cluster role, please check ClusterRoleBindings",
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Note: This cluster role might also be referenced by namespace-scoped RoleBindings",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontStyle = FontStyle.Italic,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${clusterRole.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (clusterRole.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                clusterRole.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${clusterRole.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (clusterRole.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                clusterRole.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+// Допоміжна функція для відображення секції правил в ClusterRole
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ClusterRuleSection(
+    title: String,
+    items: List<String>?,
+    emptyMessage: String,
+    defaultItem: String,
+    highlightSpecialItems: Boolean = false
+) {
+    val hasItems = !items.isNullOrEmpty()
+    val hasWildcard = items?.contains(defaultItem) ?: false
+
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = "$title:",
+        fontWeight = FontWeight.SemiBold
+    )
+
+    if (!hasItems) {
+        Text(emptyMessage, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        if (hasWildcard && items?.size == 1) {
+            Text(
+                emptyMessage,
+                color = if (highlightSpecialItems) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (highlightSpecialItems) FontWeight.Bold else FontWeight.Normal
+            )
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items?.forEach { item ->
+                    val isSpecial = item == defaultItem
+
+                    Surface(
+                        color = if (isSpecial && highlightSpecialItems)
+                            MaterialTheme.colorScheme.errorContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isSpecial) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSpecial && highlightSpecialItems)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Функція для генерації YAML представлення правила ClusterRole
+private fun generateClusterRuleYaml(rule: io.fabric8.kubernetes.api.model.rbac.PolicyRule): String {
+    val builder = StringBuilder()
+
+    builder.append("- apiGroups: ")
+    if (rule.apiGroups.isNullOrEmpty()) {
+        builder.append("['*']\n")
+    } else {
+        builder.append("[")
+        builder.append(rule.apiGroups.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    builder.append("  resources: ")
+    if (rule.resources.isNullOrEmpty()) {
+        builder.append("['*']\n")
+    } else {
+        builder.append("[")
+        builder.append(rule.resources.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    if (!rule.resourceNames.isNullOrEmpty()) {
+        builder.append("  resourceNames: [")
+        builder.append(rule.resourceNames.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    // NonResourceURLs (специфічні для ClusterRole)
+    if (!rule.nonResourceURLs.isNullOrEmpty()) {
+        builder.append("  nonResourceURLs: [")
+        builder.append(rule.nonResourceURLs.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    builder.append("  verbs: ")
+    if (rule.verbs.isNullOrEmpty()) {
+        builder.append("[]\n")
+    } else {
+        builder.append("[")
+        builder.append(rule.verbs.joinToString(", ") { "'$it'" })
+        builder.append("]\n")
+    }
+
+    return builder.toString()
+}
+
+@Composable
+fun ClusterRoleBindingDetailsView(clusterRoleBinding: io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "ClusterRoleBinding Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", clusterRoleBinding.metadata?.name)
+        DetailRow("Created", formatAge(clusterRoleBinding.metadata?.creationTimestamp))
+
+        // Спеціальний блок для системних ролей
+        if (clusterRoleBinding.metadata?.name?.startsWith("system:") == true) {
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Shield,
+                        contentDescription = "System Role Binding",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "Kubernetes System Role Binding",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            "This is a pre-defined system role binding used by Kubernetes components",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // RoleRef - посилання на роль, яка призначається
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Cluster Role Reference",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Тип ролі (повинен бути ClusterRole)
+                val roleType = clusterRoleBinding.roleRef?.kind ?: "Unknown"
+                val roleName = clusterRoleBinding.roleRef?.name ?: "Unknown"
+                val roleApiGroup = clusterRoleBinding.roleRef?.apiGroup ?: ""
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = FeatherIcons.Globe,
+                        contentDescription = "Cluster Role",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = roleName,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Row {
+                            Text(
+                                text = "Kind: $roleType",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            if (roleApiGroup.isNotEmpty()) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "API Group: $roleApiGroup",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Попередження, якщо роль не є ClusterRole
+                if (roleType != "ClusterRole") {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.AlertTriangle,
+                                contentDescription = "Warning",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Invalid configuration: ClusterRoleBinding should reference a ClusterRole, but found $roleType",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
+                // Інформація про глобальну область видимості
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Globe,
+                            contentDescription = "Cluster Wide",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "This binding grants permissions across the entire cluster",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Subjects - суб'єкти, яким призначається роль
+        val subjectsCount = clusterRoleBinding.subjects?.size ?: 0
+        Text(
+            text = "Subjects ($subjectsCount)",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (subjectsCount > 0) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                itemsIndexed(clusterRoleBinding.subjects ?: emptyList()) { index, subject ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            // Тип суб'єкта та іконка
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = when (subject.kind) {
+                                        "User" -> FeatherIcons.User
+                                        "Group" -> FeatherIcons.Users
+                                        "ServiceAccount" -> FeatherIcons.Server
+                                        else -> FeatherIcons.HelpCircle
+                                    },
+                                    contentDescription = "Subject Type",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "${subject.kind}: ${subject.name}",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            // Namespace (якщо застосовно)
+                            subject.namespace?.let { namespace ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Flag,
+                                        contentDescription = "Namespace",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Namespace: $namespace")
+                                }
+
+                                // Додаткова підказка для namespace в ClusterRoleBinding
+                                Spacer(Modifier.height(4.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Note: Even with namespace specified, this subject has cluster-wide permissions",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontStyle = FontStyle.Italic,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+
+                            // API Group (якщо є)
+                            subject.apiGroup?.let { apiGroup ->
+                                if (apiGroup.isNotEmpty()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Package,
+                                            contentDescription = "API Group",
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("API Group: $apiGroup")
+                                    }
+                                }
+                            }
+
+                            // Додаткова інформація для ServiceAccount
+                            if (subject.kind == "ServiceAccount" && subject.namespace != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Info,
+                                        contentDescription = "Info",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Full reference: system:serviceaccount:${subject.namespace}:${subject.name}",
+                                            fontStyle = FontStyle.Italic,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Додаткова інформація для Group
+                            if (subject.kind == "Group" && subject.name?.startsWith("system:") == true) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Info,
+                                        contentDescription = "System Group",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "This is a Kubernetes system group",
+                                        fontStyle = FontStyle.Italic,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+
+                            // Додаткова інформація для User, якщо це системний користувач
+                            if (subject.kind == "User" && subject.name?.startsWith("system:") == true) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Info,
+                                        contentDescription = "System User",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "This is a Kubernetes system user",
+                                        fontStyle = FontStyle.Italic,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+
+                            // Спеціальне повідомлення для суб'єктів, які стосуються всіх
+                            if ((subject.kind == "Group" && subject.name == "system:authenticated") ||
+                                (subject.kind == "Group" && subject.name == "system:unauthenticated")) {
+                                Spacer(Modifier.height(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = FeatherIcons.AlertTriangle,
+                                            contentDescription = "Warning",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = if (subject.name == "system:authenticated")
+                                                "This grants permissions to ALL authenticated users!"
+                                            else
+                                                "This grants permissions to ALL unauthenticated users!",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Порожній список суб'єктів
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.AlertTriangle,
+                        contentDescription = "Warning",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No subjects defined for this cluster role binding",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "This cluster role binding doesn't assign permissions to any subject",
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${clusterRoleBinding.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (clusterRoleBinding.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                clusterRoleBinding.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${clusterRoleBinding.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (clusterRoleBinding.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                clusterRoleBinding.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Додатково - посилання на правила, які надає ця роль
+        Spacer(Modifier.height(16.dp))
+
+        val rulesInfoState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Cluster Role Rules Information",
+            expanded = rulesInfoState
+        )
+
+        if (rulesInfoState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Info,
+                        contentDescription = "Role Rules Info",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Rules defined in ${clusterRoleBinding.roleRef?.kind} '${clusterRoleBinding.roleRef?.name}'",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "To see the permissions granted by this ClusterRoleBinding, check the referenced ${
+                            clusterRoleBinding.roleRef?.kind?.lowercase() ?: "role"
+                        } details",
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Спеціальне повідомлення про область дії кластера
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Globe,
+                                contentDescription = "Cluster Wide",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "These permissions are granted cluster-wide",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "Subjects listed in this binding have these permissions across all namespaces",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Інформація про безпеку
+        Spacer(Modifier.height(16.dp))
+
+        val securityInfoState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Security Considerations",
+            expanded = securityInfoState
+        )
+
+        if (securityInfoState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = FeatherIcons.Shield,
+                            contentDescription = "Security",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Cluster-Wide Permission Binding",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        "ClusterRoleBindings grant permissions across all namespaces in your cluster. " +
+                                "This can have significant security implications:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Column {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(
+                                "• ",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                "They can provide broad access to sensitive resources across your entire cluster",
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(
+                                "• ",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                "Consider using namespace-scoped RoleBindings whenever possible for better isolation",
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(
+                                "• ",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                "Review these bindings regularly, especially for production clusters",
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ServiceAccountDetailsView(serviceAccount: io.fabric8.kubernetes.api.model.ServiceAccount) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "ServiceAccount Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", serviceAccount.metadata?.name)
+        DetailRow("Namespace", serviceAccount.metadata?.namespace)
+        DetailRow("Created", formatAge(serviceAccount.metadata?.creationTimestamp))
+
+        // Спеціальний блок для відображення повної назви (для посилань в RBAC)
+        val namespace = serviceAccount.metadata?.namespace
+        val name = serviceAccount.metadata?.name
+        if (namespace != null && name != null) {
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "RBAC Reference Name",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(4.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "system:serviceaccount:$namespace:$name",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        Spacer(Modifier.width(8.dp))
+
+                        // Кнопка копіювання
+                        val clipboardManager = LocalClipboardManager.current
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString("system:serviceaccount:$namespace:$name"))
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Copy,
+                                contentDescription = "Copy Reference",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Use this full name when referring to this service account in RBAC rules",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція Secrets (токени)
+        val secretsCount = serviceAccount.secrets?.size ?: 0
+        Text(
+            text = "Secrets ($secretsCount)",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (secretsCount > 0) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 200.dp)
+            ) {
+                itemsIndexed(serviceAccount.secrets ?: emptyList()) { _, secret ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = FeatherIcons.Key,
+                                    contentDescription = "Secret",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = secret.name ?: "Unnamed Secret",
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    // Якщо є додаткова інформація про тип секрету
+                                    if (secret.kind != null || secret.apiVersion != null) {
+                                        Row {
+                                            secret.kind?.let {
+                                                Text(
+                                                    text = it,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    modifier = Modifier.padding(end = 8.dp)
+                                                )
+                                            }
+                                            secret.apiVersion?.let {
+                                                Text(
+                                                    text = it,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.secondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Інформація про автоматичне створення
+                            val isTokenSecret = secret.name?.contains("token") == true
+                            if (isTokenSecret) {
+                                Spacer(Modifier.height(4.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Info,
+                                            contentDescription = "Info",
+                                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = "Service account token for API authentication",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Info,
+                        contentDescription = "Info",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No secrets associated with this service account",
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "In Kubernetes 1.24+, service account tokens are created on-demand",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Image Pull Secrets
+        val imagePullSecretsCount = serviceAccount.imagePullSecrets?.size ?: 0
+        Text(
+            text = "Image Pull Secrets ($imagePullSecretsCount)",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (imagePullSecretsCount > 0) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    serviceAccount.imagePullSecrets?.forEach { pullSecret ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.Package,
+                                contentDescription = "Pull Secret",
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = pullSecret.name ?: "Unnamed Secret",
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "These secrets are used for pulling container images from private registries",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Package,
+                        contentDescription = "Pull Secrets",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No image pull secrets configured",
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "This service account will use default settings for container image pulling",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Секція для RBAC - призначення ролей
+        val rbacState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Role Bindings", expanded = rbacState)
+
+        if (rbacState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Тут мав би бути список RoleBindings, які посилаються на цей ServiceAccount
+                    // Але для цього потрібен додатковий запит до API
+
+                    Icon(
+                        imageVector = FeatherIcons.Unlock,
+                        contentDescription = "Role Bindings",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Role Bindings information requires additional API calls",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "To see which roles are assigned to this service account, check RoleBindings in this namespace or ClusterRoleBindings",
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+                    val namespace = serviceAccount.metadata?.namespace
+                    val name = serviceAccount.metadata?.name
+
+                    val subjectReference = if (namespace != null && name != null) {
+                        """
+                        subject:
+                          kind: ServiceAccount
+                          name: $name
+                          namespace: $namespace
+                        """.trimIndent()
+                    } else {
+                        "Subject reference not available"
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = "YAML Reference for RoleBinding:",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(4.dp))
+
+                            SelectionContainer {
+                                Text(
+                                    text = subjectReference,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            // Кнопка копіювання
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                val clipboardManager = LocalClipboardManager.current
+
+                                Button(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(subjectReference))
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Copy,
+                                        contentDescription = "Copy YAML",
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Copy", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Automount Service Account Token
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (serviceAccount.automountServiceAccountToken == false)
+                    MaterialTheme.colorScheme.errorContainer
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (serviceAccount.automountServiceAccountToken == false)
+                            FeatherIcons.Lock
+                        else
+                            FeatherIcons.Key,
+                        contentDescription = "Automount Token",
+                        tint = if (serviceAccount.automountServiceAccountToken == false)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Automount Service Account Token",
+                        fontWeight = FontWeight.Bold,
+                        color = if (serviceAccount.automountServiceAccountToken == false)
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(4.dp))
+
+                val statusText = when (serviceAccount.automountServiceAccountToken) {
+                    false -> "Disabled - Tokens will not be automatically mounted in pods"
+                    true -> "Enabled - Tokens will be automatically mounted in pods"
+                    null -> "Not specified - Uses namespace or cluster default setting"
+                }
+
+                val statusIcon = when (serviceAccount.automountServiceAccountToken) {
+                    false -> FeatherIcons.X
+                    true -> FeatherIcons.Check
+                    null -> FeatherIcons.HelpCircle
+                }
+
+                val statusColor = when (serviceAccount.automountServiceAccountToken) {
+                    false -> MaterialTheme.colorScheme.error
+                    true -> MaterialTheme.colorScheme.primary
+                    null -> MaterialTheme.colorScheme.secondary
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = "Status",
+                        tint = statusColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Spacer(Modifier.height(4.dp))
+
+                // Пояснення для кращого розуміння
+                val explanationText = when (serviceAccount.automountServiceAccountToken) {
+                    false -> "Pods using this service account will need to explicitly mount tokens if needed"
+                    true -> "Pods using this service account will automatically receive API access tokens"
+                    null -> "Default behavior depends on pod settings and Kubernetes version"
+                }
+
+                Text(
+                    text = explanationText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (serviceAccount.automountServiceAccountToken == false)
+                        MaterialTheme.colorScheme.onErrorContainer
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+
+                // Інформація про безпеку для автоматичного монтування
+                if (serviceAccount.automountServiceAccountToken != false) {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.AlertTriangle,
+                                contentDescription = "Security",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Security best practice: Disable token automounting when not required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${serviceAccount.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (serviceAccount.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                serviceAccount.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${serviceAccount.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (serviceAccount.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                serviceAccount.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storage.StorageClass) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "StorageClass Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", storageClass.metadata?.name)
+        DetailRow("Provisioner", storageClass.provisioner)
+        DetailRow("Created", formatAge(storageClass.metadata?.creationTimestamp))
+
+        Spacer(Modifier.height(8.dp))
+
+        // Секція статусу типу сховища
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = when {
+                    storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                        MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = when {
+                            storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                                FeatherIcons.Star
+                            else -> FeatherIcons.Database
+                        },
+                        contentDescription = "Storage Class Status",
+                        tint = when {
+                            storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else -> MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = when {
+                                storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                                    "Default Storage Class"
+                                else -> "Storage Class"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            color = when {
+                                storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Text(
+                            text = when {
+                                storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                                    "Used when no storage class is specified in PVCs"
+                                else -> "Must be explicitly selected in PVCs"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when {
+                                storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Provisioner section
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Storage Provisioner",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = getProvisionerIcon(storageClass.provisioner),
+                        contentDescription = "Provisioner",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    SelectionContainer {
+                        Text(
+                            text = storageClass.provisioner ?: "Unknown",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                getProvisionerDescription(storageClass.provisioner)?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Reclaim Policy
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Volume Reclaim Policy",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // Визначаємо колір індикатора для політики
+                val reclaimPolicy = storageClass.reclaimPolicy ?: "Delete"
+                val (reclaimIcon, reclaimColor, reclaimDescription) = when (reclaimPolicy) {
+                    "Retain" -> Triple(
+                        FeatherIcons.Lock,
+                        MaterialTheme.colorScheme.primary,
+                        "Manually reclaim the volume after the claim is deleted"
+                    )
+                    "Delete" -> Triple(
+                        FeatherIcons.Trash2,
+                        MaterialTheme.colorScheme.error,
+                        "Automatically delete the volume when the claim is deleted"
+                    )
+                    "Recycle" -> Triple(
+                        FeatherIcons.RefreshCw,
+                        MaterialTheme.colorScheme.tertiary,
+                        "Basic scrub and make available again (Deprecated)"
+                    )
+                    else -> Triple(
+                        FeatherIcons.HelpCircle,
+                        MaterialTheme.colorScheme.secondary,
+                        "Unknown reclaim policy"
+                    )
+                }
+
+                Surface(
+                    color = when (reclaimPolicy) {
+                        "Delete" -> MaterialTheme.colorScheme.errorContainer
+                        "Retain" -> MaterialTheme.colorScheme.primaryContainer
+                        "Recycle" -> MaterialTheme.colorScheme.tertiaryContainer
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = reclaimIcon,
+                            contentDescription = "Reclaim Policy",
+                            tint = reclaimColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = reclaimPolicy,
+                                fontWeight = FontWeight.Bold,
+                                color = when (reclaimPolicy) {
+                                    "Delete" -> MaterialTheme.colorScheme.onErrorContainer
+                                    "Retain" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    "Recycle" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    else -> MaterialTheme.colorScheme.onSecondaryContainer
+                                }
+                            )
+                            Text(
+                                text = reclaimDescription,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = when (reclaimPolicy) {
+                                    "Delete" -> MaterialTheme.colorScheme.onErrorContainer
+                                    "Retain" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    "Recycle" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    else -> MaterialTheme.colorScheme.onSecondaryContainer
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Додаткове попередження для політики Delete
+                if (reclaimPolicy == "Delete") {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.AlertTriangle,
+                                contentDescription = "Warning",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Caution: Data will be permanently deleted when PVCs are deleted",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // VolumeBindingMode
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Volume Binding Mode",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                val bindingMode = storageClass.volumeBindingMode ?: "Immediate"
+                val bindingModeIcon = if (bindingMode == "Immediate") FeatherIcons.Zap else FeatherIcons.Clock
+                val bindingModeDescription = if (bindingMode == "Immediate") {
+                    "Volume is provisioned immediately when PVC is created"
+                } else {
+                    "Volume is provisioned when first pod using the PVC is scheduled"
+                }
+
+                Surface(
+                    color = if (bindingMode == "Immediate")
+                        MaterialTheme.colorScheme.secondaryContainer
+                    else
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = bindingModeIcon,
+                            contentDescription = "Binding Mode",
+                            tint = if (bindingMode == "Immediate")
+                                MaterialTheme.colorScheme.secondary
+                            else
+                                MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = bindingMode,
+                                fontWeight = FontWeight.Bold,
+                                color = if (bindingMode == "Immediate")
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                text = bindingModeDescription,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (bindingMode == "Immediate")
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Allowed Topologies
+        if (!storageClass.allowedTopologies.isNullOrEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Allowed Topologies",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    storageClass.allowedTopologies?.forEachIndexed { index, topology ->
+                        if (index > 0) {
+                            Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        }
+
+                        Text(
+                            text = "Topology #${index + 1}",
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        topology.matchLabelExpressions?.forEach { expression ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    // Ключ виразу
+                                    Text(
+                                        text = expression.key ?: "",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    Spacer(Modifier.height(2.dp))
+
+                                    // Оператор і значення
+                                    Row {
+                                        Text(
+                                            text = "In: ",
+                                            fontStyle = FontStyle.Italic,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        )
+
+                                        expression.values?.joinToString(", ")?.let { values ->
+                                            SelectionContainer {
+                                                Text(
+                                                    text = values,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        } ?: Text("(none)")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Volumes will only be provisioned in the specified topology domains",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Parameters
+        val parametersCount = storageClass.parameters?.size ?: 0
+        if (parametersCount > 0) {
+            Text(
+                text = "Parameters ($parametersCount)",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    storageClass.parameters?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                        // Визначаємо, чи є це потенційно секретне значення
+                        val isSecret = key.contains("secret", ignoreCase = true) ||
+                                key.contains("password", ignoreCase = true) ||
+                                key.contains("key", ignoreCase = true)
+
+                        val isLongValue = value.length > 50
+                        var valueExpanded by remember { mutableStateOf(false) }
+
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            SelectionContainer {
+                                Text(
+                                    text = key,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.width(150.dp)
+                                )
+                            }
+
+                            Text(": ")
+
+                            if (isSecret) {
+                                var showValue by remember { mutableStateOf(false) }
+
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (showValue) {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        } else {
+                                            Text("••••••••")
+                                        }
+
+                                        Spacer(Modifier.width(8.dp))
+
+                                        IconButton(
+                                            onClick = { showValue = !showValue },
+                                            modifier = Modifier.size(16.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (showValue) FeatherIcons.EyeOff else FeatherIcons.Eye,
+                                                contentDescription = "Toggle Visibility",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            } else if (isLongValue) {
+                                Column {
+                                    SelectionContainer {
+                                        Text(
+                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                            modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                        )
+                                    }
+                                    if (!valueExpanded) {
+                                        Text(
+                                            text = "Click to expand",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.clickable { valueExpanded = true }
+                                        )
+                                    }
+                                }
+                            } else {
+                                SelectionContainer {
+                                    Text(value)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "These parameters are passed to the storage provisioner",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Allow Volume Expansion
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (storageClass.allowVolumeExpansion == true)
+                            FeatherIcons.Maximize2
+                        else
+                            FeatherIcons.Minimize2,
+                        contentDescription = "Volume Expansion",
+                        tint = if (storageClass.allowVolumeExpansion == true)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Volume Expansion",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(Modifier.height(4.dp))
+
+                val expansionStatus = if (storageClass.allowVolumeExpansion == true)
+                    "Allowed - Volumes can be expanded after creation"
+                else
+                    "Not Allowed - Volume size is fixed after creation"
+
+                val expansionIcon = if (storageClass.allowVolumeExpansion == true)
+                    FeatherIcons.Check
+                else
+                    FeatherIcons.X
+
+                val expansionColor = if (storageClass.allowVolumeExpansion == true)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.error
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = expansionIcon,
+                        contentDescription = "Status",
+                        tint = expansionColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = expansionStatus,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                // Додаткова інформація для користувачів
+                val additionalInfo = if (storageClass.allowVolumeExpansion == true) {
+                    "You can increase the size of PVCs that use this storage class"
+                } else {
+                    "To change volume size, you will need to create a new PVC and migrate data"
+                }
+
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = additionalInfo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Mount Options
+        val mountOptionsCount = storageClass.mountOptions?.size ?: 0
+        if (mountOptionsCount > 0) {
+            Text(
+                text = "Mount Options ($mountOptionsCount)",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 150.dp)
+                    ) {
+                        items(storageClass.mountOptions ?: emptyList()) { option ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Terminal,
+                                    contentDescription = "Mount Option",
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                SelectionContainer {
+                                    Text(
+                                        text = option,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "These options will be used when mounting volumes provisioned using this storage class",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${storageClass.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (storageClass.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                storageClass.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Annotations (${storageClass.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (annotationsExpanded) {
+                        if (storageClass.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                storageClass.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                    val isLongValue = value.length > 50
+                                    var valueExpanded by remember { mutableStateOf(false) }
+
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
+
+                                        Text(": ")
+
+                                        if (isLongValue) {
+                                            Column {
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = if (valueExpanded) value else value.take(50) + "...",
+                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
+                                                    )
+                                                }
+                                                if (!valueExpanded) {
+                                                    Text(
+                                                        text = "Click to expand",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.clickable { valueExpanded = true }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun getProvisionerIcon(provisioner: String?): ImageVector {
+    return when {
+        provisioner == null -> FeatherIcons.HelpCircle
+        provisioner.contains("aws") || provisioner.contains("ebs") -> SimpleIcons.Amazonaws
+        provisioner.contains("azure") || provisioner.contains("microsoft") -> SimpleIcons.Microsoftazure
+        provisioner.contains("gce") || provisioner.contains("gke") || provisioner.contains("google") -> SimpleIcons.Googlecloud
+        provisioner.contains("csi") -> FeatherIcons.HardDrive
+        provisioner.contains("ceph") -> SimpleIcons.Ceph
+        provisioner.contains("rbd") -> FeatherIcons.Database
+        provisioner.contains("nfs") -> FeatherIcons.Share2
+        provisioner.contains("iscsi") -> FeatherIcons.Server
+        provisioner.contains("hostpath") || provisioner.contains("local") -> FeatherIcons.Home
+        provisioner.contains("gluster") -> SimpleIcons.Glitch
+        provisioner.contains("vsphere") || provisioner.contains("vmware") -> SimpleIcons.Vmware
+        provisioner.contains("openstack") || provisioner.contains("cinder") -> SimpleIcons.Openstack
+        provisioner.contains("portworx") -> FeatherIcons.Box
+        provisioner.contains("flex") -> FeatherIcons.Shuffle
+        provisioner.contains("kubernetes.io") -> SimpleIcons.Kubernetes
+        provisioner.contains("longhorn") -> SimpleIcons.Rancher
+        provisioner.contains("digitalocean") -> SimpleIcons.Digitalocean
+        provisioner.contains("linode") -> SimpleIcons.Linode
+        provisioner.contains("scaleio") || provisioner.contains("dell") || provisioner.contains("emc") -> SimpleIcons.Dell
+        provisioner.contains("netapp") -> SimpleIcons.Netapp
+        provisioner.contains("openshift") || provisioner.contains("redhat") -> SimpleIcons.Redhat
+        provisioner.contains("oracle") -> SimpleIcons.Oracle
+        provisioner.contains("ibm") -> SimpleIcons.Ibm
+        else -> FeatherIcons.Database
+    }
+}
+
+// Function to get the description for the storage provisioner
+@Composable
+private fun getProvisionerDescription(provisioner: String?): String? {
+    return when {
+        provisioner == null -> null
+        provisioner.contains("kubernetes.io/aws-ebs") ->
+            "AWS Elastic Block Store - Block storage for EC2 instances"
+
+        provisioner.contains("ebs.csi.aws.com") ->
+            "AWS EBS CSI Driver - Modern Container Storage Interface driver for AWS EBS"
+
+        provisioner.contains("kubernetes.io/azure-disk") ->
+            "Azure Disk - Managed disk for Azure Virtual Machines"
+
+        provisioner.contains("disk.csi.azure.com") ->
+            "Azure Disk CSI Driver - CSI driver for Azure Disk"
+
+        provisioner.contains("kubernetes.io/azure-file") ->
+            "Azure File - File storage on Azure, with SMB protocol support"
+
+        provisioner.contains("file.csi.azure.com") ->
+            "Azure File CSI Driver - CSI driver for Azure File"
+
+        provisioner.contains("kubernetes.io/gce-pd") ->
+            "Google Compute Engine Persistent Disk - Block storage for GCE"
+
+        provisioner.contains("pd.csi.storage.gke.io") ->
+            "GCE Persistent Disk CSI Driver - CSI driver for GCE Persistent Disk"
+
+        provisioner.contains("kubernetes.io/cinder") ->
+            "OpenStack Cinder - Block storage for OpenStack"
+
+        provisioner.contains("cinder.csi.openstack.org") ->
+            "OpenStack Cinder CSI Driver - CSI driver for OpenStack Cinder"
+
+        provisioner.contains("kubernetes.io/vsphere-volume") ->
+            "VMware vSphere Volume - Volume for VMware vSphere"
+
+        provisioner.contains("csi.vsphere.vmware.com") ->
+            "vSphere CSI Driver - CSI driver for VMware vSphere"
+
+        provisioner.contains("kubernetes.io/glusterfs") ->
+            "GlusterFS - Open-source distributed file system"
+
+        provisioner.contains("kubernetes.io/rbd") ->
+            "Ceph RBD (RADOS Block Device) - Block storage in Ceph"
+
+        provisioner.contains("rbd.csi.ceph.com") ->
+            "Ceph RBD CSI Driver - CSI driver for Ceph RBD"
+
+        provisioner.contains("cephfs.csi.ceph.com") ->
+            "CephFS CSI Driver - CSI driver for Ceph File System"
+
+        provisioner.contains("kubernetes.io/nfs") ->
+            "NFS (Network File System) - Traditional network file system"
+
+        provisioner.contains("kubernetes.io/iscsi") ->
+            "iSCSI - Standard for IP-based storage networking"
+
+        provisioner.contains("kubernetes.io/portworx-volume") ->
+            "Portworx - Distributed block storage for containers"
+
+        provisioner.contains("kubernetes.io/no-provisioner") ->
+            "No dynamic provisioner - For static volumes"
+
+        provisioner.contains("kubernetes.io/hostpath") ->
+            "HostPath - Local path on the node (for development only)"
+
+        provisioner.contains("kubernetes.io/local-storage") ->
+            "Local Storage - Local disks without dynamic provisioning"
+
+        provisioner.contains("kubernetes.io/storageos") ->
+            "StorageOS - Software-defined storage for cloud infrastructure"
+
+        provisioner.contains("kubernetes.io/fc") ->
+            "Fibre Channel - High-speed network protocol for SAN"
+
+        provisioner.contains("longhorn.io") ->
+            "Longhorn - Distributed block storage for Kubernetes"
+
+        provisioner.contains("efs.csi.aws.com") ->
+            "Amazon EFS CSI Driver - CSI driver for Amazon Elastic File System"
+
+        provisioner.contains("fsx.csi.aws.com") ->
+            "Amazon FSx CSI Driver - CSI driver for Amazon FSx"
+
+        provisioner.contains("dobs.csi.digitalocean.com") ->
+            "DigitalOcean Block Storage CSI Driver - Block storage for DigitalOcean"
+
+        provisioner.contains("linode.com/block-storage") ->
+            "Linode Block Storage - Block storage for Linode"
+
+        provisioner.contains("csi.hetzner.cloud") ->
+            "Hetzner Cloud CSI - CSI driver for Hetzner Cloud"
+
+        provisioner.contains("io.juicedata.juicefs") ->
+            "JuiceFS - Distributed file system for the cloud"
+
+        provisioner.contains("nfs.csi.k8s.io") ->
+            "NFS CSI Driver - CSI driver for NFS"
+
+        provisioner.contains("openebs.io/local") ->
+            "OpenEBS Local PV - Local storage for OpenEBS"
+
+        provisioner.contains("openebs.io/jiva") ->
+            "OpenEBS Jiva - Containerized block storage for OpenEBS"
+
+        provisioner.contains("openebs.io/cstor") ->
+            "OpenEBS cStor - High-performance storage for OpenEBS"
+
+        provisioner.contains("flocker.io") ->
+            "Flocker - Volume management for Docker"
+
+        provisioner.contains("quobyte.com") ->
+            "Quobyte - Software-defined file system for data centers"
+
+        provisioner.contains("rancher.io/local-path") ->
+            "Rancher Local Path Provisioner - Simplified driver for local paths"
+
+        else -> "Third-party storage provider"
+    }
+}
+
+
+// TODO: use this in all detailView functions
+@Composable
+fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded.value = !expanded.value }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (expanded.value) ICON_DOWN else ICON_RIGHT,
+            contentDescription = "Toggle $title"
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+    }
+    Divider(
+        color = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
 
 @Composable
 fun ResourceDetailPanel(
@@ -3433,15 +10094,7 @@ fun ResourceDetailPanel(
                 // --- Виклик відповідного DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(
-                        pod = resource, onShowLogsRequest = { containerName ->
-                            (resource as? HasMetadata)?.metadata?.let { meta ->
-                                onShowLogsRequest(
-                                    meta.namespace, meta.name, containerName
-                                )
-                            } ?: logger.error("Metadata is null for Pod.")
-                        }) else Text("Invalid Pod data")
-
+                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName -> (resource as? HasMetadata)?.metadata?.let { meta -> onShowLogsRequest(meta.namespace, meta.name, containerName)} ?: logger.error("Metadata is null for Pod.")}) else Text("Invalid Pod data")
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -3452,7 +10105,22 @@ fun ResourceDetailPanel(
                     "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
-                    // TODO: Додати кейси для всіх інших типів ресурсів (StatefulSet, DaemonSet, Role, etc.)
+                    "StatefulSets" -> if (resource is StatefulSet) StatefulSetDetailsView(sts = resource) else Text("Invalid StatefulSet data")
+                    "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
+                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text("Invalid Job data")
+                    "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
+                    //"NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(netpol = resource) else Text("Invalid NetworkPolicy data")
+                    "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
+                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
+                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text("Invalid ClusterRole data")
+                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(clusterRoleBinding = resource) else Text("Invalid ClusterRoleBinding data")
+                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text("Invalid ServiceAccount data")
+                    //"Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
+                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text("Invalid StorageClass data")
+                    //"CustomResourceDefinitions" -> if (resource is CustomResourceDefinition) CRDDetailsView(crd = resource) else Text("Invalid CRD data")
+
+                    // TODO: Додати кейси для всіх інших типів ресурсів (NetworkPolicies, Events, CustomResourceDefinitions, etc.)
                     else -> {
                         Text("Simple detail view for '$resourceType'")
                         if (resource is HasMetadata) {
