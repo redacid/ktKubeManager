@@ -62,6 +62,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
+import software.amazon.awssdk.endpoints.Endpoint
 import software.amazon.awssdk.http.SdkHttpFullRequest
 import software.amazon.awssdk.http.SdkHttpMethod
 import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner
@@ -127,7 +128,7 @@ val resourceTreeData: Map<String, List<String>> = mapOf(
     "" to listOf("Cluster", "Workloads", "Network", "Storage", "Configuration", "Access Control"),
     "Cluster" to listOf("Namespaces", "Nodes"),
     "Workloads" to listOf("Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs"),
-    "Network" to listOf("Services", "Ingresses"),
+    "Network" to listOf("Services", "Ingresses", "Endpoints"),
     "Storage" to listOf("PersistentVolumes", "PersistentVolumeClaims", "StorageClasses"),
     "Configuration" to listOf("ConfigMaps", "Secrets"),
     "Access Control" to listOf("ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings")
@@ -144,6 +145,7 @@ val resourceLeafNodes: Set<String> = setOf(
     "CronJobs",
     "Services",
     "Ingresses",
+    "Endpoints",
     "PersistentVolumes",
     "PersistentVolumeClaims",
     "StorageClasses",
@@ -652,6 +654,7 @@ fun getHeadersForType(resourceType: String): List<String> {
         "CronJobs" -> listOf("Namespace", "Name", "Schedule", "Suspend", "Active", "Last Schedule", "Age")
         "Services" -> listOf("Namespace", "Name", "Type", "ClusterIP", "ExternalIP", "Ports", "Age")
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
+        "Endpoints" -> listOf("Namespace", "Name", "Endpoints", "Age")
         "PersistentVolumes" -> listOf(
             "Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age"
         )
@@ -776,6 +779,19 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
                     ?: "<none>"; 3 -> formatIngressHosts(resource.spec?.rules); 4 -> formatIngressAddress(resource.status?.loadBalancer?.ingress); 5 -> formatIngressPorts(
                     resource.spec?.tls
                 ); 6 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Endpoints" -> if (resource is Endpoints ) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na;
+                    1 -> resource.metadata?.name ?: na;
+                    2 -> resource.subsets?.flatMap { subset ->
+                        subset.ports?.map { port ->
+                            "${port.port} ${port.protocol ?: "TCP"}"
+                        } ?: emptyList()
+                    }?.distinct()?.joinToString(", ") ?: ""
+                    3 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
                 }
             } else ""
 
@@ -956,6 +972,12 @@ suspend fun loadIngressesFabric8(client: KubernetesClient?, namespace: String?) 
             .inNamespace(ns).list().items
     }
 
+suspend fun loadEndpointsFabric8(client: KubernetesClient?, namespace: String?) =
+    fetchK8sResource(client, "Endpoints", namespace) { cl, ns ->
+        if (ns == null) cl.endpoints().inAnyNamespace().list().items
+        else cl.endpoints().inNamespace(ns).list().items
+    }
+
 suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumes", null) { cl, _ ->
     cl.persistentVolumes().list().items
 } // Cluster-scoped
@@ -1008,23 +1030,7 @@ suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) =
         cl.rbac().clusterRoleBindings().list().items
     } // Cluster-scoped
 
-// Function to load endpoints for a service
-suspend fun loadEndpointsForService(
-    client: KubernetesClient?, namespace: String?, serviceName: String?
-): Result<Endpoints> {
-    if (client == null || namespace.isNullOrEmpty() || serviceName.isNullOrEmpty()) {
-        return Result.failure(IllegalArgumentException("Client, namespace, and service name are required"))
-    }
 
-    return try {
-        val endpoints = client.endpoints().inNamespace(namespace).withName(serviceName).get()
-
-        Result.success(endpoints)
-    } catch (e: Exception) {
-        logger.error("Failed to load endpoints for service $serviceName in namespace $namespace", e)
-        Result.failure(e)
-    }
-}
 
 @Composable
 fun KubeTableHeaderRow(
@@ -3396,6 +3402,7 @@ fun App() {
     var cronJobsList by remember { mutableStateOf<List<CronJob>>(emptyList()) }
     var servicesList by remember { mutableStateOf<List<Service>>(emptyList()) }
     var ingressesList by remember { mutableStateOf<List<Ingress>>(emptyList()) }
+    var endpointsList by remember { mutableStateOf<List<Endpoints>>(emptyList()) }
     var pvsList by remember { mutableStateOf<List<PersistentVolume>>(emptyList()) }
     var pvcsList by remember { mutableStateOf<List<PersistentVolumeClaim>>(emptyList()) }
     var storageClassesList by remember { mutableStateOf<List<StorageClass>>(emptyList()) }
@@ -3426,7 +3433,7 @@ fun App() {
         namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList =
             emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList =
             emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList =
-            emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList =
+            emptyList(); endpointsList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList =
             emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList =
             emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList =
             emptyList(); clusterRoleBindingsList = emptyList()
@@ -3667,6 +3674,11 @@ fun App() {
                                                     ).onSuccess { ingressesList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
+                                                    "Endpoints" -> loadEndpointsFabric8(
+                                                        activeClient, namespaceToUse
+                                                    ).onSuccess { endpointsList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
                                                     "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess {
                                                         pvsList = it; loadOk = true
                                                     }.onFailure { errorMsg = it.message }
@@ -3858,6 +3870,11 @@ fun App() {
                                                             ).onSuccess { ingressesList = it; loadOk = true }
                                                                 .onFailure { errorMsg = it.message }
 
+                                                            "Endpoints" -> loadEndpointsFabric8(
+                                                                activeClient, namespaceToUse
+                                                            ).onSuccess { endpointsList = it; loadOk = true }
+                                                                .onFailure { errorMsg = it.message }
+
                                                             "PersistentVolumeClaims" -> loadPVCsFabric8(
                                                                 activeClient, namespaceToUse
                                                             ).onSuccess { pvcsList = it; loadOk = true }
@@ -4035,6 +4052,7 @@ fun App() {
                                                 cronJobsList,
                                                 servicesList,
                                                 ingressesList,
+                                                endpointsList,
                                                 pvsList,
                                                 pvcsList,
                                                 storageClassesList,
@@ -4047,7 +4065,7 @@ fun App() {
                                                 clusterRoleBindingsList
                                             ) {
                                                 when (currentResourceType) {
-                                                    "Namespaces" -> namespacesList; "Nodes" -> nodesList; "Pods" -> podsList; "Deployments" -> deploymentsList; "StatefulSets" -> statefulSetsList; "DaemonSets" -> daemonSetsList; "ReplicaSets" -> replicaSetsList; "Jobs" -> jobsList; "CronJobs" -> cronJobsList; "Services" -> servicesList; "Ingresses" -> ingressesList; "PersistentVolumes" -> pvsList; "PersistentVolumeClaims" -> pvcsList; "StorageClasses" -> storageClassesList; "ConfigMaps" -> configMapsList; "Secrets" -> secretsList; "ServiceAccounts" -> serviceAccountsList; "Roles" -> rolesList; "RoleBindings" -> roleBindingsList; "ClusterRoles" -> clusterRolesList; "ClusterRoleBindings" -> clusterRoleBindingsList
+                                                    "Namespaces" -> namespacesList; "Nodes" -> nodesList; "Pods" -> podsList; "Deployments" -> deploymentsList; "StatefulSets" -> statefulSetsList; "DaemonSets" -> daemonSetsList; "ReplicaSets" -> replicaSetsList; "Jobs" -> jobsList; "CronJobs" -> cronJobsList; "Services" -> servicesList; "Ingresses" -> ingressesList; "Endpoints" -> endpointsList; "PersistentVolumes" -> pvsList; "PersistentVolumeClaims" -> pvcsList; "StorageClasses" -> storageClassesList; "ConfigMaps" -> configMapsList; "Secrets" -> secretsList; "ServiceAccounts" -> serviceAccountsList; "Roles" -> rolesList; "RoleBindings" -> roleBindingsList; "ClusterRoles" -> clusterRolesList; "ClusterRoleBindings" -> clusterRoleBindingsList
                                                     else -> emptyList()
                                                 }
                                             }
