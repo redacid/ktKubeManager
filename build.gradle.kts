@@ -29,6 +29,7 @@ kotlin {
 
 dependencies {
     implementation(compose.desktop.currentOs)
+    //implementation("androidx.compose.ui:ui-android:1.8.0")
     //implementation("androidx.compose.foundation:foundation-android:1.7.8")
     val fabric8Version = "6.13.5" // Ваша версія
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
