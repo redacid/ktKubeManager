@@ -786,11 +786,47 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
                 when (colIndex) {
                     0 -> resource.metadata?.namespace ?: na;
                     1 -> resource.metadata?.name ?: na;
-                    2 -> resource.subsets?.flatMap { subset ->
-                        subset.ports?.map { port ->
-                            "${port.port} ${port.protocol ?: "TCP"}"
-                        } ?: emptyList()
-                    }?.distinct()?.joinToString(", ") ?: ""
+                    2 -> {
+                        // Збираємо всі адреси (готові та неготові) з усіх підмножин
+                        val allAddresses = mutableListOf<String>()
+
+                        resource.subsets?.forEach { subset ->
+                            // Додаємо готові адреси
+                            subset.addresses?.forEach { address ->
+                                val addressText = address.ip ?: "unknown"
+
+                                // Додаємо інформацію про порти, якщо вони доступні
+                                val portsInfo = subset.ports?.joinToString(", ") { port ->
+                                    "${port.port} ${port.protocol ?: "TCP"}"
+                                } ?: ""
+
+                                if (portsInfo.isNotEmpty()) {
+                                    allAddresses.add("$addressText:$portsInfo")
+                                } else {
+                                    allAddresses.add(addressText)
+                                }
+                            }
+
+                            // Додаємо неготові адреси
+                            subset.notReadyAddresses?.forEach { address ->
+                                val addressText = "${address.ip ?: "unknown"} (NotReady)"
+
+                                // Додаємо інформацію про порти, якщо вони доступні
+                                val portsInfo = subset.ports?.joinToString(", ") { port ->
+                                    "${port.port} ${port.protocol ?: "TCP"}"
+                                } ?: ""
+
+                                if (portsInfo.isNotEmpty()) {
+                                    allAddresses.add("$addressText:$portsInfo")
+                                } else {
+                                    allAddresses.add(addressText)
+                                }
+                            }
+                        }
+
+                        // Повертаємо список адрес, розділених комами
+                        allAddresses.joinToString("; ")
+                    }
                     3 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
                 }
             } else ""
