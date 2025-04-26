@@ -3110,6 +3110,294 @@ fun IngressDetailsView(ing: Ingress) {
 }
 
 @Composable
+fun EndpointsDetailsView(endpoint: Endpoints) {
+    val showSubsets = remember { mutableStateOf(true) }
+    val showLabels = remember { mutableStateOf(false) }
+    val showAnnotations = remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "Endpoint Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", endpoint.metadata?.name)
+        DetailRow("Namespace", endpoint.metadata?.namespace)
+        DetailRow("Created", formatAge(endpoint.metadata?.creationTimestamp))
+
+        // Загальна кількість адрес
+        var totalAddresses = 0
+        var totalNotReadyAddresses = 0
+
+        endpoint.subsets?.forEach { subset ->
+            totalAddresses += subset.addresses?.size ?: 0
+            totalNotReadyAddresses += subset.notReadyAddresses?.size ?: 0
+        }
+
+        DetailRow("Total Ready Addresses", totalAddresses.toString())
+        DetailRow("Total Not Ready Addresses", totalNotReadyAddresses.toString())
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Секція підмножин (subsets)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showSubsets.value = !showSubsets.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showSubsets.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Toggle Subsets"
+            )
+            Text(
+                text = "Subsets (${endpoint.subsets?.size ?: 0})",
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+
+        if (showSubsets.value && !endpoint.subsets.isNullOrEmpty()) {
+            endpoint.subsets?.forEachIndexed { index, subset ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Subset ${index + 1}",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        // Порти
+                        if (!subset.ports.isNullOrEmpty()) {
+                            Text(
+                                text = "Ports:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            subset.ports?.forEach { port ->
+                                Row(
+                                    modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "• ${port.name ?: ""} ${port.port} ${port.protocol ?: "TCP"}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        // Готові адреси
+                        if (!subset.addresses.isNullOrEmpty()) {
+                            Text(
+                                text = "Ready Addresses (${subset.addresses?.size}):",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            subset.addresses?.forEach { address ->
+                                Row(
+                                    modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        ICON_SUCCESS,
+                                        contentDescription = "Ready",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+
+                                    val addressText = buildString {
+                                        append(address.ip ?: "unknown IP")
+                                        address.targetRef?.let { targetRef ->
+                                            append(" (${targetRef.kind ?: "Pod"}: ${targetRef.name})")
+                                        }
+                                    }
+
+                                    Text(
+                                        text = addressText,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        // Неготові адреси
+                        if (!subset.notReadyAddresses.isNullOrEmpty()) {
+                            Text(
+                                text = "Not Ready Addresses (${subset.notReadyAddresses?.size}):",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+
+                            subset.notReadyAddresses?.forEach { address ->
+                                Row(
+                                    modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        ICON_ERROR,
+                                        contentDescription = "Not Ready",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+
+                                    val addressText = buildString {
+                                        append(address.ip ?: "unknown IP")
+                                        address.targetRef?.let { targetRef ->
+                                            append(" (${targetRef.kind ?: "Pod"}: ${targetRef.name})")
+                                        }
+                                    }
+
+                                    Text(
+                                        text = addressText,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Секція міток
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showLabels.value = !showLabels.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Toggle Labels"
+            )
+            Text(
+                text = "Labels (${endpoint.metadata?.labels?.size ?: 0})",
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+
+        if (showLabels.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    endpoint.metadata?.labels?.entries?.forEach { (key, value) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = key,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.weight(0.4f)
+                            )
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.6f)
+                            )
+                        }
+                    }
+
+                    if (endpoint.metadata?.labels.isNullOrEmpty()) {
+                        Text(
+                            text = "No labels",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Секція анотацій
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showAnnotations.value = !showAnnotations.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showAnnotations.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Toggle Annotations"
+            )
+            Text(
+                text = "Annotations (${endpoint.metadata?.annotations?.size ?: 0})",
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+
+        if (showAnnotations.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    endpoint.metadata?.annotations?.entries?.forEach { (key, value) ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = key,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = 8.dp, top = 2.dp),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    if (endpoint.metadata?.annotations.isNullOrEmpty()) {
+                        Text(
+                            text = "No annotations",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
 fun ResourceDetailPanel(
     resource: Any?,
     resourceType: String?,
@@ -3161,11 +3449,9 @@ fun ResourceDetailPanel(
                     "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
-                        "Invalid PVC data"
-                    )
-
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
+                    "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
                     // TODO: Додати кейси для всіх інших типів ресурсів (StatefulSet, DaemonSet, Role, etc.)
                     else -> {
                         Text("Simple detail view for '$resourceType'")
