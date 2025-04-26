@@ -1,6 +1,11 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 //import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+tasks.wrapper {
+    gradleVersion = "8.14" // Використовуйте останню версію Gradle
+    distributionType = Wrapper.DistributionType.BIN
+}
+
 
 plugins {
     kotlin("jvm") version "1.9.23" // Або 1.9.23
@@ -48,7 +53,7 @@ dependencies {
     implementation("software.amazon.awssdk:sdk-core:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}") // Потрібно для http-auth-aws
-    //implementation("software.amazon.awssdk:eks:${awssdkVersion}")
+    implementation("software.amazon.awssdk:eks:${awssdkVersion}")
     //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}") // DONT ENABLE IT, CONNECT TO CONTEXT NOT WORKED
     testImplementation(kotlin("test"))
 }
@@ -59,7 +64,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "KotlinKubeManager"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
             macOS {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
             }
