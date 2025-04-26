@@ -48,6 +48,7 @@ dependencies {
     implementation("software.amazon.awssdk:sdk-core:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}") // Потрібно для http-auth-aws
+    //implementation("software.amazon.awssdk:eks:${awssdkVersion}")
     //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}") // DONT ENABLE IT, CONNECT TO CONTEXT NOT WORKED
     testImplementation(kotlin("test"))
 }
