@@ -134,7 +134,7 @@ import io.fabric8.kubernetes.api.model.Config as KubeConfigModel
 // --- Дані для дерева ресурсів ---
 val resourceTreeData: Map<String, List<String>> = mapOf(
     "" to listOf("Cluster", "Workloads", "Network", "Storage", "Configuration", "Access Control"),
-    "Cluster" to listOf("Namespaces", "Nodes"),
+    "Cluster" to listOf("Namespaces", "Nodes", "Events"),
     "Workloads" to listOf("Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs"),
     "Network" to listOf("Services", "Ingresses", "Endpoints"),
     "Storage" to listOf("PersistentVolumes", "PersistentVolumeClaims", "StorageClasses"),
@@ -144,6 +144,7 @@ val resourceTreeData: Map<String, List<String>> = mapOf(
 val resourceLeafNodes: Set<String> = setOf(
     "Namespaces",
     "Nodes",
+    "Events",
     "Pods",
     "Deployments",
     "StatefulSets",
@@ -708,6 +709,7 @@ fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
         "Namespaces" -> listOf("Name", "Status", "Age")
         "Nodes" -> listOf("Name", "Status", "Roles", "Version", "Taints", "Age")
+        "Events" -> listOf("Namespace", "Name", "Type", "Reason", "Object Type", "Object Name","Message", "Age")
         "Pods" -> listOf("Namespace", "Name", "Ready", "Status", "Restarts", "Node", "Age")
         "Deployments" -> listOf("Namespace", "Name", "Ready", "Up-to-date", "Available", "Age")
         "StatefulSets" -> listOf("Namespace", "Name", "Ready", "Age")
@@ -718,14 +720,8 @@ fun getHeadersForType(resourceType: String): List<String> {
         "Services" -> listOf("Namespace", "Name", "Type", "ClusterIP", "ExternalIP", "Ports", "Age")
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
         "Endpoints" -> listOf("Namespace", "Name", "Endpoints", "Age")
-        "PersistentVolumes" -> listOf(
-            "Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age"
-        )
-
-        "PersistentVolumeClaims" -> listOf(
-            "Namespace", "Name", "Status", "Volume", "Capacity", "Access Modes", "StorageClass", "Age"
-        )
-
+        "PersistentVolumes" -> listOf("Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age")
+        "PersistentVolumeClaims" -> listOf("Namespace", "Name", "Status", "Volume", "Capacity", "Access Modes", "StorageClass", "Age")
         "StorageClasses" -> listOf("Name", "Provisioner", "Reclaim Policy", "Binding Mode", "Allow Expand", "Age")
         "ConfigMaps" -> listOf("Namespace", "Name", "Data", "Age")
         "Secrets" -> listOf("Namespace", "Name", "Type", "Data", "Age")
@@ -752,9 +748,26 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 
             "Nodes" -> if (resource is Node) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name
-                        ?: na; 1 -> formatNodeStatus(resource.status?.conditions); 2 -> formatNodeRoles(resource.metadata?.labels); 3 -> resource.status?.nodeInfo?.kubeletVersion
-                    ?: na; 4 -> formatTaints(resource.spec?.taints); 5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                    0 -> resource.metadata?.name?: na;
+                    1 -> formatNodeStatus(resource.status?.conditions);
+                    2 -> formatNodeRoles(resource.metadata?.labels);
+                    3 -> resource.status?.nodeInfo?.kubeletVersion?: na;
+                    4 -> formatTaints(resource.spec?.taints);
+                    5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
+                }
+            } else ""
+
+            "Events" -> if (resource is Event) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.type ?: na
+                    3 -> resource.reason ?: na
+                    4 -> resource.involvedObject?.kind ?: na
+                    5 -> resource.involvedObject?.name ?: na
+                    6 -> resource.message ?: na
+                    7 -> formatAge(resource.lastTimestamp ?: resource.metadata?.creationTimestamp)
+                    else -> ""
                 }
             } else ""
 
@@ -1131,6 +1144,15 @@ suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) =
         cl.rbac().clusterRoleBindings().list().items
     } // Cluster-scoped
 
+suspend fun loadEventsFabric8(client: KubernetesClient?, namespace: String? = null) =
+    fetchK8sResource(client, "events", namespace) { c, ns ->
+        if (ns == null) {
+            c.v1().events().inAnyNamespace().list().items
+        } else {
+            c.v1().events().inNamespace(ns).list().items
+        }
+    }
+
 
 @Composable
 fun KubeTableHeaderRow(
@@ -1230,74 +1252,6 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
     DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
     DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
 }
-
-//@Composable
-//fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) { // Додано onShowLogsRequest
-//    val showContainerDialog = remember { mutableStateOf(false) }
-//    val containers = remember(pod) { pod.spec?.containers ?: emptyList() }
-//
-//    Column {
-//        // --- Кнопка та Діалог логів ---
-//        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-//            Button(onClick = {
-//                when (containers.size) {
-//                    0 -> logger.warn("Pod ${pod.metadata?.name} has no containers.")
-//                    1 -> onShowLogsRequest(containers.first().name)
-//                    else -> showContainerDialog.value = true
-//                }
-//            }) {
-//                Icon(ICON_LOGS, contentDescription = "View Logs")
-//                Spacer(Modifier.width(4.dp))
-//                Text("View Logs")
-//            }
-//        }
-//        Spacer(Modifier.height(8.dp))
-//
-//        if (showContainerDialog.value) {
-//            ContainerSelectionDialog(
-//                containers = containers.mapNotNull { it.name },
-//                onDismiss = { showContainerDialog.value = false },
-//                onContainerSelected = { containerName ->
-//                    showContainerDialog.value = false
-//                    onShowLogsRequest(containerName)
-//                })
-//        }
-//        // --- Кінець логіки логів ---
-//
-//        // --- Решта деталей пода ---
-//        DetailRow("Name", pod.metadata?.name)
-//        DetailRow("Namespace", pod.metadata?.namespace)
-//        DetailRow("Status", pod.status?.phase)
-//        DetailRow("Node", pod.spec?.nodeName)
-//        DetailRow("Pod IP", pod.status?.podIP)
-//        DetailRow("Service Account", pod.spec?.serviceAccountName ?: pod.spec?.serviceAccount)
-//        DetailRow("Created", formatAge(pod.metadata?.creationTimestamp))
-//        DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
-//        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-//        Text("Containers:", style = MaterialTheme.typography.titleMedium)
-//        pod.status?.containerStatuses?.forEach { cs ->
-//            Column(
-//                modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-//                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)).padding(4.dp)
-//            ) {
-//                DetailRow("  Name", cs.name)
-//                DetailRow("  Image", cs.image)
-//                DetailRow("  Ready", cs.ready?.toString())
-//                DetailRow("  Restarts", cs.restartCount?.toString())
-//                DetailRow("  State", cs.state?.let {
-//                    when {
-//                        it.running != null -> "Running"; it.waiting != null -> "Waiting (${it.waiting.reason})"; it.terminated != null -> "Terminated (${it.terminated.reason}, Exit: ${it.terminated.exitCode})"; else -> "?"
-//                    }
-//                })
-//                DetailRow("  Image ID", cs.imageID)
-//            }
-//        }
-//        if (pod.status?.containerStatuses.isNullOrEmpty()) {
-//            Text("  (No container statuses)", modifier = Modifier.padding(start = 8.dp))
-//        }
-//        // ---
-//    }
-//}
 
 @Composable
 fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) {
@@ -1891,246 +1845,6 @@ fun NamespaceDetailsView(ns: Namespace) {
         }
     }
 }
-
-//@Composable
-//fun NodeDetailsView(node: Node) {
-//    //val scrollState = rememberScrollState()
-//    val showCapacity = remember { mutableStateOf(false) }
-//    val showConditions = remember { mutableStateOf(false) }
-//    val showLabels = remember { mutableStateOf(false) }
-//
-//    Column(
-//        modifier = Modifier
-//            //.verticalScroll(scrollState)
-//            .padding(16.dp)
-//    ) {
-//        // Basic node information section
-//        Text(
-//            text = "Node Information",
-//            style = MaterialTheme.typography.titleMedium,
-//            modifier = Modifier.padding(bottom = 8.dp)
-//        )
-//        DetailRow("Name", node.metadata?.name)
-//        DetailRow("Status", formatNodeStatus(node.status?.conditions))
-//        DetailRow("Roles", formatNodeRoles(node.metadata?.labels))
-//        DetailRow("Age", formatAge(node.metadata?.creationTimestamp))
-//        DetailRow("Version", node.status?.nodeInfo?.kubeletVersion)
-//        DetailRow("OS Image", node.status?.nodeInfo?.osImage)
-//        DetailRow("Kernel Version", node.status?.nodeInfo?.kernelVersion)
-//        DetailRow("Container Runtime", node.status?.nodeInfo?.containerRuntimeVersion)
-//        DetailRow("Architecture", node.status?.nodeInfo?.architecture)
-//        DetailRow("Internal IP", node.status?.addresses?.find { it.type == "InternalIP" }?.address)
-//        DetailRow("External IP", node.status?.addresses?.find { it.type == "ExternalIP" }?.address)
-//        DetailRow("Hostname", node.status?.addresses?.find { it.type == "Hostname" }?.address)
-//        DetailRow("Taints", formatTaints(node.spec?.taints))
-//
-//        Divider(modifier = Modifier.padding(vertical = 8.dp))
-//
-//        // Capacity & Allocatable Resources section
-//        Row(modifier = Modifier.fillMaxWidth().clickable { showCapacity.value = !showCapacity.value }
-//            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-//            Icon(
-//                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Capacity"
-//            )
-//            Text(
-//                text = "Capacity & Allocatable Resources",
-//                style = MaterialTheme.typography.titleMedium,
-//            )
-//        }
-//
-//        if (showCapacity.value) {
-//            Card(
-//                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-//            ) {
-//                Column(modifier = Modifier.padding(16.dp)) {
-//                    // Create a table-like view for capacity and allocatable
-//                    Row(modifier = Modifier.fillMaxWidth()) {
-//                        Text(
-//                            text = "Resource",
-//                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-//                            modifier = Modifier.weight(1f)
-//                        )
-//                        Text(
-//                            text = "Capacity",
-//                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-//                            modifier = Modifier.weight(1f)
-//                        )
-//                        Text(
-//                            text = "Allocatable",
-//                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-//                            modifier = Modifier.weight(1f)
-//                        )
-//                    }
-//
-//                    Divider(modifier = Modifier.padding(vertical = 4.dp))
-//
-//                    // CPUs
-//                    ResourceRow(
-//                        name = "CPU",
-//                        capacity = node.status?.capacity?.get("cpu"),
-//                        allocatable = node.status?.allocatable?.get("cpu")
-//                    )
-//
-//                    // Memory
-//                    ResourceRow(
-//                        name = "Memory",
-//                        capacity = node.status?.capacity?.get("memory"),
-//                        allocatable = node.status?.allocatable?.get("memory")
-//                    )
-//
-//                    // Ephemeral Storage
-//                    ResourceRow(
-//                        name = "Ephemeral Storage",
-//                        capacity = node.status?.capacity?.get("ephemeral-storage"),
-//                        allocatable = node.status?.allocatable?.get("ephemeral-storage")
-//                    )
-//
-//                    // Pods
-//                    ResourceRow(
-//                        name = "Pods",
-//                        capacity = node.status?.capacity?.get("pods"),
-//                        allocatable = node.status?.allocatable?.get("pods")
-//                    )
-//
-//                    // Display other resources dynamically
-//                    node.status?.capacity?.entries?.filter {
-//                        !setOf("cpu", "memory", "ephemeral-storage", "pods").contains(it.key)
-//                    }?.forEach { entry ->
-//                        ResourceRow(
-//                            name = entry.key,
-//                            capacity = entry.value,
-//                            allocatable = node.status?.allocatable?.get(entry.key)
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//
-//        Divider(modifier = Modifier.padding(vertical = 8.dp))
-//
-//        // Conditions section
-//        Row(modifier = Modifier.fillMaxWidth().clickable { showConditions.value = !showConditions.value }
-//            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-//            Icon(
-//                imageVector = if (showConditions.value) ICON_DOWN else ICON_RIGHT,
-//                contentDescription = "Expand Conditions"
-//            )
-//            Text(
-//                text = "Conditions",
-//                style = MaterialTheme.typography.titleMedium,
-//            )
-//        }
-//
-//        if (showConditions.value) {
-//            Card(
-//                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-//            ) {
-//                Column(modifier = Modifier.padding(16.dp)) {
-//                    node.status?.conditions?.forEach { condition ->
-//                        val statusColor = when (condition.status) {
-//                            "True" -> MaterialTheme.colorScheme.primary
-//                            "False" -> if (condition.type == "Ready") MaterialTheme.colorScheme.error
-//                            else MaterialTheme.colorScheme.primary
-//
-//                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-//                        }
-//
-//                        Card(
-//                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-//                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-//                        ) {
-//                            Column(modifier = Modifier.padding(8.dp)) {
-//                                Row(verticalAlignment = Alignment.CenterVertically) {
-//                                    Icon(
-//                                        imageVector = when (condition.status) {
-//                                            "True" -> ICON_SUCCESS
-//                                            "False" -> ICON_ERROR
-//                                            else -> ICON_HELP
-//                                        },
-//                                        contentDescription = "Condition Status",
-//                                        tint = statusColor,
-//                                        modifier = Modifier.size(16.dp)
-//                                    )
-//                                    Spacer(modifier = Modifier.width(4.dp))
-//                                    Text(
-//                                        text = condition.type ?: "Unknown",
-//                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-//                                        color = statusColor
-//                                    )
-//                                    Spacer(modifier = Modifier.weight(1f))
-//                                    Text(
-//                                        text = condition.status ?: "Unknown",
-//                                        style = MaterialTheme.typography.bodyMedium,
-//                                        color = statusColor
-//                                    )
-//                                }
-//
-//                                Spacer(modifier = Modifier.height(4.dp))
-//                                DetailRow("Last Transition", formatAge(condition.lastTransitionTime))
-//                                if (!condition.message.isNullOrBlank()) {
-//                                    DetailRow("Message", condition.message)
-//                                }
-//                                if (!condition.reason.isNullOrBlank()) {
-//                                    DetailRow("Reason", condition.reason)
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//
-//        // Labels section
-//        Divider(modifier = Modifier.padding(vertical = 8.dp))
-//
-//        Row(modifier = Modifier.fillMaxWidth().clickable { showLabels.value = !showLabels.value }
-//            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-//            Icon(
-//                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Labels"
-//            )
-//            Text(
-//                text = "Labels",
-//                style = MaterialTheme.typography.titleMedium,
-//            )
-//        }
-//
-//        if (showLabels.value) {
-//            Card(
-//                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-//            ) {
-//                Column(modifier = Modifier.padding(16.dp)) {
-//                    node.metadata?.labels?.entries?.forEach { (key, value) ->
-//                        Row(
-//                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-//                        ) {
-//                            Text(
-//                                text = key,
-//                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-//                                modifier = Modifier.weight(0.4f)
-//                            )
-//                            Text(
-//                                text = value,
-//                                style = MaterialTheme.typography.bodyMedium,
-//                                modifier = Modifier.weight(0.6f)
-//                            )
-//                        }
-//                    }
-//
-//                    if (node.metadata?.labels.isNullOrEmpty()) {
-//                        Text(
-//                            text = "No labels",
-//                            style = MaterialTheme.typography.bodyMedium,
-//                            color = MaterialTheme.colorScheme.onSurfaceVariant
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
 
 @Composable
 fun NodeDetailsView(node: Node) {
@@ -2986,34 +2700,12 @@ private fun parseResourceValue(resource: String): Double {
 }
 
 
-//@Composable
-//private fun formatNodeStatus(conditions: List<NodeCondition>?): String {
-//    if (conditions.isNullOrEmpty()) return "Unknown"
-//
-//    val readyCondition = conditions.find { it.type == "Ready" }
-//    return when (readyCondition?.status) {
-//        "True" -> "Ready"
-//        "False" -> "NotReady"
-//        else -> {
-//            val problemConditions = conditions.filter {
-//                it.status == "True" && it.type != "Ready" && it.type != "NetworkUnavailable"
-//            }
-//            if (problemConditions.isNotEmpty()) {
-//                "NotReady (${problemConditions.first().type})"
-//            } else {
-//                "Unknown"
-//            }
-//        }
-//    }
-//}
-
 fun formatNodeStatus(conditions: List<NodeCondition>?): String {
     val ready = conditions?.find { it.type == "Ready" }; return when (ready?.status) {
         "True" -> "Ready"; "False" -> "NotReady${ready.reason?.let { " ($it)" } ?: ""}"; else -> "Unknown"
     }
 }
 
-//@Composable
 private fun formatNodeRoles(labels: Map<String, String>?): String {
     if (labels.isNullOrEmpty()) return "none"
 
@@ -3032,10 +2724,6 @@ private fun formatTaints(taints: List<Taint>?): String {
         "${it.key}=${it.value}:${it.effect}"
     } + if (taints.size > 2) "..." else ""
 }
-
-//fun formatTaints(taints: List<Taint>?): String {
-//    return taints?.size?.toString() ?: "0"
-//}
 
 @Composable
 private fun formatBytes(bytes: Long): String {
@@ -11588,43 +11276,22 @@ fun ResourceDetailPanel(
                     "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
-                        "Invalid PVC data"
-                    )
-
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
                     "StatefulSets" -> if (resource is StatefulSet) StatefulSetDetailsView(sts = resource) else Text("Invalid StatefulSet data")
                     "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
-                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text(
-                        "Invalid Job data"
-                    )
-
+                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text("Invalid Job data")
                     "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text(
-                        "Invalid ReplicaSet data"
-                    )
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
                     //"NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(netpol = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
-                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text(
-                        "Invalid RoleBinding data"
-                    )
-
-                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text(
-                        "Invalid ClusterRole data"
-                    )
-
-                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(
-                        clusterRoleBinding = resource
-                    ) else Text("Invalid ClusterRoleBinding data")
-
-                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text(
-                        "Invalid ServiceAccount data"
-                    )
+                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
+                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text("Invalid ClusterRole data")
+                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(clusterRoleBinding = resource) else Text("Invalid ClusterRoleBinding data")
+                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text("Invalid ServiceAccount data")
                     //"Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
-                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text(
-                        "Invalid StorageClass data"
-                    )
+                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text("Invalid StorageClass data")
                     //"CustomResourceDefinitions" -> if (resource is CustomResourceDefinition) CRDDetailsView(crd = resource) else Text("Invalid CRD data")
 
                     // TODO: Додати кейси для всіх інших типів ресурсів (NetworkPolicies, Events, CustomResourceDefinitions, etc.)
@@ -11890,6 +11557,7 @@ fun App() {
     // Стан для всіх типів ресурсів (Моделі Fabric8)
     var namespacesList by remember { mutableStateOf<List<Namespace>>(emptyList()) }
     var nodesList by remember { mutableStateOf<List<Node>>(emptyList()) }
+    var eventsList by remember { mutableStateOf<List<Event>>(emptyList()) }
     var podsList by remember { mutableStateOf<List<Pod>>(emptyList()) }
     var deploymentsList by remember { mutableStateOf<List<Deployment>>(emptyList()) }
     var statefulSetsList by remember { mutableStateOf<List<StatefulSet>>(emptyList()) }
@@ -11915,8 +11583,7 @@ fun App() {
     var detailedResourceType by remember { mutableStateOf<String?>(null) }
     // Стани для лог вікна
     val showLogViewer = remember { mutableStateOf(false) } // Прапорець видимості
-    val logViewerParams =
-        remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
+    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
     // Діалог помилки
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
@@ -11927,17 +11594,14 @@ fun App() {
 
     // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
-        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList =
-            emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList =
-            emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList =
-            emptyList(); endpointsList = emptyList(); pvsList = emptyList(); pvcsList =
-            emptyList(); storageClassesList =
-            emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList =
-            emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList =
-            emptyList(); clusterRoleBindingsList = emptyList()
+        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList();
+        deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList();
+        replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList();
+        servicesList = emptyList(); ingressesList = emptyList(); endpointsList = emptyList();
+        pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList();
+        secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList();
+        roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList(); eventsList = emptyList();
     }
-    // ---
-
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
@@ -12104,10 +11768,13 @@ fun App() {
                                     if (isLeaf) {
                                         if (activeClient != null && !isLoading) {
                                             // Скидаємо показ деталей/логів при виборі нового типу ресурсу
-                                            detailedResource = null; detailedResourceType = null; showLogViewer.value =
-                                                false; logViewerParams.value = null
-                                            selectedResourceType = nodeId; resourceLoadError =
-                                                null; clearResourceLists()
+                                            detailedResource = null;
+                                            detailedResourceType = null;
+                                            showLogViewer.value = false;
+                                            logViewerParams.value = null
+                                            selectedResourceType = nodeId;
+                                            resourceLoadError = null;
+                                            clearResourceLists()
                                             connectionStatus = "Loading $nodeId..."; isLoading = true
                                             coroutineScope.launch {
                                                 var loadOk = false
@@ -12128,9 +11795,12 @@ fun App() {
                                                         nodesList = it; loadOk = true
                                                     }.onFailure { errorMsg = it.message }
 
-                                                    "Pods" -> loadPodsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { podsList = it; loadOk = true }
+                                                    "Events" -> loadEventsFabric8(activeClient).onSuccess {
+                                                        eventsList = it; loadOk = true
+                                                    }.onFailure { errorMsg = it.message }
+
+                                                    "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess {
+                                                        podsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Deployments" -> loadDeploymentsFabric8(
@@ -12416,6 +12086,11 @@ fun App() {
                                                             ).onSuccess { nodesList = it; loadOk = true }
                                                                 .onFailure { errorMsg = it.message }
 
+                                                            "Events" -> loadEventsFabric8(
+                                                                activeClient
+                                                            ).onSuccess { eventsList = it; loadOk = true }
+                                                                .onFailure { errorMsg = it.message }
+
                                                             "PersistentVolumes" -> loadPVsFabric8(
                                                                 activeClient
                                                             ).onSuccess { pvsList = it; loadOk = true }
@@ -12542,6 +12217,7 @@ fun App() {
                                                 currentResourceType,
                                                 namespacesList,
                                                 nodesList,
+                                                eventsList,
                                                 podsList,
                                                 deploymentsList,
                                                 statefulSetsList,
@@ -12564,7 +12240,29 @@ fun App() {
                                                 clusterRoleBindingsList
                                             ) {
                                                 when (currentResourceType) {
-                                                    "Namespaces" -> namespacesList; "Nodes" -> nodesList; "Pods" -> podsList; "Deployments" -> deploymentsList; "StatefulSets" -> statefulSetsList; "DaemonSets" -> daemonSetsList; "ReplicaSets" -> replicaSetsList; "Jobs" -> jobsList; "CronJobs" -> cronJobsList; "Services" -> servicesList; "Ingresses" -> ingressesList; "Endpoints" -> endpointsList; "PersistentVolumes" -> pvsList; "PersistentVolumeClaims" -> pvcsList; "StorageClasses" -> storageClassesList; "ConfigMaps" -> configMapsList; "Secrets" -> secretsList; "ServiceAccounts" -> serviceAccountsList; "Roles" -> rolesList; "RoleBindings" -> roleBindingsList; "ClusterRoles" -> clusterRolesList; "ClusterRoleBindings" -> clusterRoleBindingsList
+                                                    "Namespaces" -> namespacesList;
+                                                    "Nodes" -> nodesList;
+                                                    "Events" -> eventsList;
+                                                    "Pods" -> podsList;
+                                                    "Deployments" -> deploymentsList;
+                                                    "StatefulSets" -> statefulSetsList;
+                                                    "DaemonSets" -> daemonSetsList;
+                                                    "ReplicaSets" -> replicaSetsList;
+                                                    "Jobs" -> jobsList;
+                                                    "CronJobs" -> cronJobsList;
+                                                    "Services" -> servicesList;
+                                                    "Ingresses" -> ingressesList;
+                                                    "Endpoints" -> endpointsList;
+                                                    "PersistentVolumes" -> pvsList;
+                                                    "PersistentVolumeClaims" -> pvcsList;
+                                                    "StorageClasses" -> storageClassesList;
+                                                    "ConfigMaps" -> configMapsList;
+                                                    "Secrets" -> secretsList;
+                                                    "ServiceAccounts" -> serviceAccountsList;
+                                                    "Roles" -> rolesList;
+                                                    "RoleBindings" -> roleBindingsList;
+                                                    "ClusterRoles" -> clusterRolesList;
+                                                    "ClusterRoleBindings" -> clusterRoleBindingsList
                                                     else -> emptyList()
                                                 }
                                             }
