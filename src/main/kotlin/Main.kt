@@ -50,10 +50,7 @@ import io.fabric8.kubernetes.api.model.apps.ReplicaSet
 import io.fabric8.kubernetes.api.model.apps.StatefulSet
 import io.fabric8.kubernetes.api.model.batch.v1.CronJob
 import io.fabric8.kubernetes.api.model.batch.v1.JobStatus
-import io.fabric8.kubernetes.api.model.networking.v1.Ingress
-import io.fabric8.kubernetes.api.model.networking.v1.IngressLoadBalancerIngress
-import io.fabric8.kubernetes.api.model.networking.v1.IngressRule
-import io.fabric8.kubernetes.api.model.networking.v1.IngressTLS
+import io.fabric8.kubernetes.api.model.networking.v1.*
 import io.fabric8.kubernetes.api.model.rbac.ClusterRole
 import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
 import io.fabric8.kubernetes.api.model.rbac.Role
@@ -136,7 +133,7 @@ val resourceTreeData: Map<String, List<String>> = mapOf(
     "" to listOf("Cluster", "Workloads", "Network", "Storage", "Configuration", "Access Control"),
     "Cluster" to listOf("Namespaces", "Nodes", "Events"),
     "Workloads" to listOf("Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs"),
-    "Network" to listOf("Services", "Ingresses", "Endpoints"),
+    "Network" to listOf("Services", "Ingresses", "Endpoints", "NetworkPolicies"),
     "Storage" to listOf("PersistentVolumes", "PersistentVolumeClaims", "StorageClasses"),
     "Configuration" to listOf("ConfigMaps", "Secrets"),
     "Access Control" to listOf("ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings")
@@ -155,6 +152,7 @@ val resourceLeafNodes: Set<String> = setOf(
     "Services",
     "Ingresses",
     "Endpoints",
+    "NetworkPolicies",
     "PersistentVolumes",
     "PersistentVolumeClaims",
     "StorageClasses",
@@ -717,6 +715,7 @@ fun getHeadersForType(resourceType: String): List<String> {
         "Services" -> listOf("Namespace", "Name", "Type", "ClusterIP", "ExternalIP", "Ports", "Age")
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
         "Endpoints" -> listOf("Namespace", "Name", "Endpoints", "Age")
+        "NetworkPolicies" -> listOf("Namespace", "Name", "Selector", "Type","Age")
         "PersistentVolumes" -> listOf(
             "Name",
             "Capacity",
@@ -928,6 +927,18 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
                 }
             } else ""
 
+            "NetworkPolicies" -> if (resource is NetworkPolicy) {
+                when (colIndex) {
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.spec?.podSelector?.matchLabels?.entries?.joinToString(", ") { "${it.key}=${it.value}" }
+                        ?: "<all pods>"
+                    3 -> formatPolicyTypes(resource.spec?.policyTypes)
+                    4 -> formatAge(resource.metadata?.creationTimestamp)
+                    else -> ""
+                }
+            } else ""
+
             "PersistentVolumes" -> if (resource is PersistentVolume) {
                 when (colIndex) {
                     0 -> resource.metadata?.name ?: na; 1 -> resource.spec?.capacity?.get("storage")?.toString()
@@ -1110,6 +1121,16 @@ suspend fun loadEndpointsFabric8(client: KubernetesClient?, namespace: String?) 
         if (ns == null) cl.endpoints().inAnyNamespace().list().items
         else cl.endpoints().inNamespace(ns).list().items
     }
+
+suspend fun loadNetworkPoliciesFabric8(client: KubernetesClient?, namespace: String? = null) =
+    fetchK8sResource(client, "networkpolicies", namespace) { c, ns ->
+        if (ns == null) {
+            c.network().v1().networkPolicies().inAnyNamespace().list().items
+        } else {
+            c.network().v1().networkPolicies().inNamespace(ns).list().items
+        }
+    }
+
 
 suspend fun loadPVsFabric8(client: KubernetesClient?) = fetchK8sResource(client, "PersistentVolumes", null) { cl, _ ->
     cl.persistentVolumes().list().items
@@ -2748,7 +2769,6 @@ private fun formatNodeRoles(labels: Map<String, String>?): String {
     return if (roles.isEmpty()) "worker" else roles.sorted().joinToString(", ")
 }
 
-
 private fun formatTaints(taints: List<Taint>?): String {
     if (taints.isNullOrEmpty()) return "None"
 
@@ -2766,6 +2786,11 @@ private fun formatBytes(bytes: Long): String {
         bytes >= 1024L -> String.format("%.2f KiB", bytes / 1024.0)
         else -> "$bytes B"
     }
+}
+
+fun formatPolicyTypes(policyTypes: List<String>?): String {
+    if (policyTypes.isNullOrEmpty()) return "Ingress"
+    return policyTypes.joinToString(", ")
 }
 
 
@@ -3596,6 +3621,513 @@ fun ServiceDetailsView(svc: Service) {
         // You could add a section for events related to this service if you implement that
     }
 }
+
+@Composable
+fun NetworkPolicyDetailsView(networkPolicy: NetworkPolicy) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "Network Policy Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", networkPolicy.metadata?.name)
+        DetailRow("Namespace", networkPolicy.metadata?.namespace)
+        DetailRow("Created", formatAge(networkPolicy.metadata?.creationTimestamp))
+
+        Spacer(Modifier.height(16.dp))
+
+        // Pod Selector
+        Text(
+            text = "Pod Selector",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                val matchLabels = networkPolicy.spec?.podSelector?.matchLabels
+                val matchExpressions = networkPolicy.spec?.podSelector?.matchExpressions
+
+                if (matchLabels.isNullOrEmpty() && matchExpressions.isNullOrEmpty()) {
+                    Text("This policy selects all pods in the namespace")
+                } else {
+                    // Відображаємо matchLabels
+                    if (!matchLabels.isNullOrEmpty()) {
+                        Text("Match Labels:", fontWeight = FontWeight.SemiBold)
+                        Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                            matchLabels.forEach { (key, value) ->
+                                Row {
+                                    SelectionContainer {
+                                        Text(
+                                            text = key,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.width(120.dp)
+                                        )
+                                    }
+                                    Text(text = "= ")
+                                    SelectionContainer {
+                                        Text(value)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Відображаємо matchExpressions
+                    if (!matchExpressions.isNullOrEmpty()) {
+                        Text(
+                            "Match Expressions:",
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = if (matchLabels.isNullOrEmpty()) 0.dp else 8.dp)
+                        )
+                        Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                            matchExpressions.forEach { expr ->
+                                Row {
+                                    SelectionContainer {
+                                        Text(
+                                            text = expr.key ?: "",
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.width(120.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = expr.operator ?: "",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    SelectionContainer {
+                                        Text(
+                                            text = expr.values?.joinToString(", ") ?: "",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Policy Types
+        Text(
+            text = "Policy Types",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                val policyTypes = networkPolicy.spec?.policyTypes
+                if (policyTypes.isNullOrEmpty()) {
+                    Text("Default: Ingress")
+                } else {
+                    Row {
+                        policyTypes.forEach { type ->
+                            Card(
+                                modifier = Modifier.padding(end = 8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = when (type) {
+                                        "Ingress" -> MaterialTheme.colorScheme.primaryContainer
+                                        "Egress" -> MaterialTheme.colorScheme.secondaryContainer
+                                        else -> MaterialTheme.colorScheme.tertiaryContainer
+                                    }
+                                )
+                            ) {
+                                Text(
+                                    text = type,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    color = when (type) {
+                                        "Ingress" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        "Egress" -> MaterialTheme.colorScheme.onSecondaryContainer
+                                        else -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Ingress Rules
+        val ingressRules = networkPolicy.spec?.ingress
+        if (!ingressRules.isNullOrEmpty()) {
+            Text(
+                text = "Ingress Rules (${ingressRules.size})",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 300.dp)
+            ) {
+                itemsIndexed(ingressRules) { index, rule ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Rule #${index + 1}",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // From section
+                            val from = rule.from
+                            if (from.isNullOrEmpty()) {
+                                Text("Allow from: All sources (no restrictions)")
+                            } else {
+                                Text("Allow from:", fontWeight = FontWeight.SemiBold)
+                                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                                    from.forEachIndexed { fromIndex, peer ->
+                                        Text("Source #${fromIndex + 1}:", fontWeight = FontWeight.Medium)
+
+                                        // Pod Selector
+                                        peer.podSelector?.let { podSelector ->
+                                            Text("Pod Selector:", modifier = Modifier.padding(start = 12.dp))
+                                            val matchLabels = podSelector.matchLabels
+                                            if (!matchLabels.isNullOrEmpty()) {
+                                                Column(modifier = Modifier.padding(start = 24.dp)) {
+                                                    matchLabels.forEach { (key, value) ->
+                                                        Row {
+                                                            Text("$key = $value")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Namespace Selector
+                                        peer.namespaceSelector?.let { nsSelector ->
+                                            Text("Namespace Selector:", modifier = Modifier.padding(start = 12.dp))
+                                            val matchLabels = nsSelector.matchLabels
+                                            if (!matchLabels.isNullOrEmpty()) {
+                                                Column(modifier = Modifier.padding(start = 24.dp)) {
+                                                    matchLabels.forEach { (key, value) ->
+                                                        Row {
+                                                            Text("$key = $value")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // IP Block
+                                        peer.ipBlock?.let { ipBlock ->
+                                            Text("IP Block:", modifier = Modifier.padding(start = 12.dp))
+                                            Column(modifier = Modifier.padding(start = 24.dp)) {
+                                                Text("CIDR: ${ipBlock.cidr}")
+                                                if (!ipBlock.except.isNullOrEmpty()) {
+                                                    Text("Except: ${ipBlock.except.joinToString(", ")}")
+                                                }
+                                            }
+                                        }
+
+                                        if (fromIndex < from.size - 1) {
+                                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Ports section
+                            val ports = rule.ports
+                            if (!ports.isNullOrEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text("Ports:", fontWeight = FontWeight.SemiBold)
+                                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                                    ports.forEach { port ->
+                                        Row {
+                                            Text(
+                                                text = "${port.protocol ?: "TCP"}: ${port.port ?: "all ports"}",
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Spacer(Modifier.height(8.dp))
+                                Text("Ports: All ports allowed")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Egress Rules
+        val egressRules = networkPolicy.spec?.egress
+        if (!egressRules.isNullOrEmpty()) {
+            Text(
+                text = "Egress Rules (${egressRules.size})",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 300.dp)
+            ) {
+                itemsIndexed(egressRules) { index, rule ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Rule #${index + 1}",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // To section
+                            val to = rule.to
+                            if (to.isNullOrEmpty()) {
+                                Text("Allow to: All destinations (no restrictions)")
+                            } else {
+                                Text("Allow to:", fontWeight = FontWeight.SemiBold)
+                                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                                    to.forEachIndexed { toIndex, peer ->
+                                        Text("Destination #${toIndex + 1}:", fontWeight = FontWeight.Medium)
+
+                                        // Pod Selector
+                                        peer.podSelector?.let { podSelector ->
+                                            Text("Pod Selector:", modifier = Modifier.padding(start = 12.dp))
+                                            val matchLabels = podSelector.matchLabels
+                                            if (!matchLabels.isNullOrEmpty()) {
+                                                Column(modifier = Modifier.padding(start = 24.dp)) {
+                                                    matchLabels.forEach { (key, value) ->
+                                                        Row {
+                                                            Text("$key = $value")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Namespace Selector
+                                        peer.namespaceSelector?.let { nsSelector ->
+                                            Text("Namespace Selector:", modifier = Modifier.padding(start = 12.dp))
+                                            val matchLabels = nsSelector.matchLabels
+                                            if (!matchLabels.isNullOrEmpty()) {
+                                                Column(modifier = Modifier.padding(start = 24.dp)) {
+                                                    matchLabels.forEach { (key, value) ->
+                                                        Row {
+                                                            Text("$key = $value")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // IP Block
+                                        peer.ipBlock?.let { ipBlock ->
+                                            Text("IP Block:", modifier = Modifier.padding(start = 12.dp))
+                                            Column(modifier = Modifier.padding(start = 24.dp)) {
+                                                Text("CIDR: ${ipBlock.cidr}")
+                                                if (!ipBlock.except.isNullOrEmpty()) {
+                                                    Text("Except: ${ipBlock.except.joinToString(", ")}")
+                                                }
+                                            }
+                                        }
+
+                                        if (toIndex < to.size - 1) {
+                                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Ports section
+                            val ports = rule.ports
+                            if (!ports.isNullOrEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text("Ports:", fontWeight = FontWeight.SemiBold)
+                                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                                    ports.forEach { port ->
+                                        Row {
+                                            Text(
+                                                text = "${port.protocol ?: "TCP"}: ${port.port ?: "all ports"}",
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Spacer(Modifier.height(8.dp))
+                                Text("Ports: All ports allowed")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Мітки та анотації
+        val labelsState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+
+        if (labelsState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${networkPolicy.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (networkPolicy.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                networkPolicy.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Annotations (${networkPolicy.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (annotationsExpanded) {
+                        if (networkPolicy.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                networkPolicy.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
+
+                                        Row(verticalAlignment = Alignment.Top) {
+                                            SelectionContainer {
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
+                                            }
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 fun SecretDetailsView(secret: Secret) {
@@ -11636,7 +12168,7 @@ fun ResourceDetailPanel(
                     "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text(
                         "Invalid ReplicaSet data"
                     )
-                    //"NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(netpol = resource) else Text("Invalid NetworkPolicy data")
+                    "NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(networkPolicy = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
                     "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text(
                         "Invalid RoleBinding data"
@@ -11934,6 +12466,7 @@ fun App() {
     var servicesList by remember { mutableStateOf<List<Service>>(emptyList()) }
     var ingressesList by remember { mutableStateOf<List<Ingress>>(emptyList()) }
     var endpointsList by remember { mutableStateOf<List<Endpoints>>(emptyList()) }
+    var networkPoliciesList by remember { mutableStateOf<List<NetworkPolicy>>(emptyList()) }
     var pvsList by remember { mutableStateOf<List<PersistentVolume>>(emptyList()) }
     var pvcsList by remember { mutableStateOf<List<PersistentVolumeClaim>>(emptyList()) }
     var storageClassesList by remember { mutableStateOf<List<StorageClass>>(emptyList()) }
@@ -11961,14 +12494,30 @@ fun App() {
 
     // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
-        namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList();
-        deploymentsList = emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList();
-        replicaSetsList = emptyList(); jobsList = emptyList(); cronJobsList = emptyList();
-        servicesList = emptyList(); ingressesList = emptyList(); endpointsList = emptyList();
-        pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList();
-        secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList();
-        roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList =
-            emptyList(); eventsList = emptyList();
+        namespacesList = emptyList();
+        nodesList = emptyList();
+        podsList = emptyList();
+        deploymentsList = emptyList();
+        statefulSetsList = emptyList();
+        daemonSetsList = emptyList();
+        replicaSetsList = emptyList();
+        jobsList = emptyList();
+        cronJobsList = emptyList();
+        servicesList = emptyList();
+        ingressesList = emptyList();
+        endpointsList = emptyList();
+        pvsList = emptyList();
+        pvcsList = emptyList();
+        storageClassesList = emptyList();
+        configMapsList = emptyList();
+        secretsList = emptyList();
+        serviceAccountsList = emptyList();
+        rolesList = emptyList();
+        roleBindingsList = emptyList();
+        clusterRolesList = emptyList();
+        clusterRoleBindingsList = emptyList();
+        eventsList = emptyList();
+        networkPoliciesList = emptyList();
     }
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
@@ -12217,6 +12766,11 @@ fun App() {
                                                     ).onSuccess { endpointsList = it; loadOk = true }
                                                         .onFailure { errorMsg = it.message }
 
+                                                    "NetworkPolicies" -> loadNetworkPoliciesFabric8(
+                                                        activeClient, namespaceToUse
+                                                    ).onSuccess { networkPoliciesList = it; loadOk = true }
+                                                        .onFailure { errorMsg = it.message }
+
                                                     "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess {
                                                         pvsList = it; loadOk = true
                                                     }.onFailure { errorMsg = it.message }
@@ -12413,6 +12967,11 @@ fun App() {
                                                             ).onSuccess { endpointsList = it; loadOk = true }
                                                                 .onFailure { errorMsg = it.message }
 
+                                                            "NetworkPolicies" -> loadNetworkPoliciesFabric8(
+                                                                activeClient, namespaceToUse
+                                                            ).onSuccess { networkPoliciesList = it; loadOk = true }
+                                                                .onFailure { errorMsg = it.message }
+
                                                             "PersistentVolumeClaims" -> loadPVCsFabric8(
                                                                 activeClient, namespaceToUse
                                                             ).onSuccess { pvcsList = it; loadOk = true }
@@ -12597,6 +13156,7 @@ fun App() {
                                                 servicesList,
                                                 ingressesList,
                                                 endpointsList,
+                                                networkPoliciesList,
                                                 pvsList,
                                                 pvcsList,
                                                 storageClassesList,
@@ -12622,6 +13182,7 @@ fun App() {
                                                     "Services" -> servicesList;
                                                     "Ingresses" -> ingressesList;
                                                     "Endpoints" -> endpointsList;
+                                                    "NetworkPolicies" -> networkPoliciesList;
                                                     "PersistentVolumes" -> pvsList;
                                                     "PersistentVolumeClaims" -> pvcsList;
                                                     "StorageClasses" -> storageClassesList;
