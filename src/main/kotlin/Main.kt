@@ -568,21 +568,9 @@ fun formatPodRestarts(statuses: List<ContainerStatus>?): String {
     return statuses?.sumOf { it.restartCount ?: 0 }?.toString() ?: "0"
 }
 
-fun formatNodeStatus(conditions: List<NodeCondition>?): String {
-    val ready = conditions?.find { it.type == "Ready" }; return when (ready?.status) {
-        "True" -> "Ready"; "False" -> "NotReady${ready.reason?.let { " ($it)" } ?: ""}"; else -> "Unknown"
-    }
-}
 
-fun formatNodeRoles(labels: Map<String, String>?): String {
-    val r =
-        labels?.filterKeys { it.startsWith("node-role.kubernetes.io/") }?.map { it.key.substringAfter('/') }?.sorted()
-            ?.joinToString(","); return if (r.isNullOrEmpty()) "<none>" else r
-}
 
-fun formatTaints(taints: List<Taint>?): String {
-    return taints?.size?.toString() ?: "0"
-}
+
 
 fun formatPorts(ports: List<ServicePort>?): String {
     if (ports.isNullOrEmpty()) return "<none>"; return ports.joinToString(", ") { p -> "${p.port}${p.nodePort?.let { ":$it" } ?: ""}/${p.protocol ?: "TCP"}${p.name?.let { "($it)" } ?: ""}" }
@@ -645,6 +633,7 @@ fun formatJobDuration(status: JobStatus?): String {
         ).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s"
     }
 }
+
 // Форматування тривалості для відображення
 private fun formatDuration(duration: Duration): String {
     val hours = duration.toHours()
@@ -748,6 +737,7 @@ fun getHeadersForType(resourceType: String): List<String> {
         else -> listOf("Name")
     }
 }
+
 
 fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
     val na = "N/A"
@@ -856,7 +846,7 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
                 }
             } else ""
 
-            "Endpoints" -> if (resource is Endpoints ) {
+            "Endpoints" -> if (resource is Endpoints) {
                 when (colIndex) {
                     0 -> resource.metadata?.namespace ?: na;
                     1 -> resource.metadata?.name ?: na;
@@ -901,6 +891,7 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
                         // Повертаємо список адрес, розділених комами
                         allAddresses.joinToString("; ")
                     }
+
                     3 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
                 }
             } else ""
@@ -1141,7 +1132,6 @@ suspend fun loadClusterRoleBindingsFabric8(client: KubernetesClient?) =
     } // Cluster-scoped
 
 
-
 @Composable
 fun KubeTableHeaderRow(
     headers: List<String>, columnWidths: List<Int> // Add column widths parameter
@@ -1169,8 +1159,10 @@ fun <T : HasMetadata> KubeTableRow(
     item: T, headers: List<String>, resourceType: String, columnWidths: List<Int>, // Add column widths parameter
     onRowClick: (T) -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxWidth().clickable { onRowClick(item) }.padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onRowClick(item) }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         headers.forEachIndexed { colIndex, _ ->
             val width = if (colIndex < columnWidths.size) columnWidths[colIndex] else 100
             Text(
@@ -1672,22 +1664,27 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                                         Text("Type: ConfigMap")
                                         Text("Name: ${volume.configMap.name ?: "Not specified"}")
                                     }
+
                                     volume.secret != null -> {
                                         Text("Type: Secret")
                                         Text("Secret Name: ${volume.secret.secretName ?: "Not specified"}")
                                     }
+
                                     volume.persistentVolumeClaim != null -> {
                                         Text("Type: Persistent Volume Claim")
                                         Text("Claim Name: ${volume.persistentVolumeClaim.claimName ?: "Not specified"}")
                                     }
+
                                     volume.emptyDir != null -> {
                                         Text("Type: EmptyDir")
                                         volume.emptyDir.medium?.let { Text("Medium: $it") }
                                     }
+
                                     volume.hostPath != null -> {
                                         Text("Type: HostPath")
                                         Text("Path: ${volume.hostPath.path ?: "Not specified"}")
                                     }
+
                                     else -> {
                                         Text("Type: Other volume type")
                                     }
@@ -1895,59 +1892,505 @@ fun NamespaceDetailsView(ns: Namespace) {
     }
 }
 
+//@Composable
+//fun NodeDetailsView(node: Node) {
+//    //val scrollState = rememberScrollState()
+//    val showCapacity = remember { mutableStateOf(false) }
+//    val showConditions = remember { mutableStateOf(false) }
+//    val showLabels = remember { mutableStateOf(false) }
+//
+//    Column(
+//        modifier = Modifier
+//            //.verticalScroll(scrollState)
+//            .padding(16.dp)
+//    ) {
+//        // Basic node information section
+//        Text(
+//            text = "Node Information",
+//            style = MaterialTheme.typography.titleMedium,
+//            modifier = Modifier.padding(bottom = 8.dp)
+//        )
+//        DetailRow("Name", node.metadata?.name)
+//        DetailRow("Status", formatNodeStatus(node.status?.conditions))
+//        DetailRow("Roles", formatNodeRoles(node.metadata?.labels))
+//        DetailRow("Age", formatAge(node.metadata?.creationTimestamp))
+//        DetailRow("Version", node.status?.nodeInfo?.kubeletVersion)
+//        DetailRow("OS Image", node.status?.nodeInfo?.osImage)
+//        DetailRow("Kernel Version", node.status?.nodeInfo?.kernelVersion)
+//        DetailRow("Container Runtime", node.status?.nodeInfo?.containerRuntimeVersion)
+//        DetailRow("Architecture", node.status?.nodeInfo?.architecture)
+//        DetailRow("Internal IP", node.status?.addresses?.find { it.type == "InternalIP" }?.address)
+//        DetailRow("External IP", node.status?.addresses?.find { it.type == "ExternalIP" }?.address)
+//        DetailRow("Hostname", node.status?.addresses?.find { it.type == "Hostname" }?.address)
+//        DetailRow("Taints", formatTaints(node.spec?.taints))
+//
+//        Divider(modifier = Modifier.padding(vertical = 8.dp))
+//
+//        // Capacity & Allocatable Resources section
+//        Row(modifier = Modifier.fillMaxWidth().clickable { showCapacity.value = !showCapacity.value }
+//            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+//            Icon(
+//                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Capacity"
+//            )
+//            Text(
+//                text = "Capacity & Allocatable Resources",
+//                style = MaterialTheme.typography.titleMedium,
+//            )
+//        }
+//
+//        if (showCapacity.value) {
+//            Card(
+//                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+//            ) {
+//                Column(modifier = Modifier.padding(16.dp)) {
+//                    // Create a table-like view for capacity and allocatable
+//                    Row(modifier = Modifier.fillMaxWidth()) {
+//                        Text(
+//                            text = "Resource",
+//                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+//                            modifier = Modifier.weight(1f)
+//                        )
+//                        Text(
+//                            text = "Capacity",
+//                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+//                            modifier = Modifier.weight(1f)
+//                        )
+//                        Text(
+//                            text = "Allocatable",
+//                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+//                            modifier = Modifier.weight(1f)
+//                        )
+//                    }
+//
+//                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+//
+//                    // CPUs
+//                    ResourceRow(
+//                        name = "CPU",
+//                        capacity = node.status?.capacity?.get("cpu"),
+//                        allocatable = node.status?.allocatable?.get("cpu")
+//                    )
+//
+//                    // Memory
+//                    ResourceRow(
+//                        name = "Memory",
+//                        capacity = node.status?.capacity?.get("memory"),
+//                        allocatable = node.status?.allocatable?.get("memory")
+//                    )
+//
+//                    // Ephemeral Storage
+//                    ResourceRow(
+//                        name = "Ephemeral Storage",
+//                        capacity = node.status?.capacity?.get("ephemeral-storage"),
+//                        allocatable = node.status?.allocatable?.get("ephemeral-storage")
+//                    )
+//
+//                    // Pods
+//                    ResourceRow(
+//                        name = "Pods",
+//                        capacity = node.status?.capacity?.get("pods"),
+//                        allocatable = node.status?.allocatable?.get("pods")
+//                    )
+//
+//                    // Display other resources dynamically
+//                    node.status?.capacity?.entries?.filter {
+//                        !setOf("cpu", "memory", "ephemeral-storage", "pods").contains(it.key)
+//                    }?.forEach { entry ->
+//                        ResourceRow(
+//                            name = entry.key,
+//                            capacity = entry.value,
+//                            allocatable = node.status?.allocatable?.get(entry.key)
+//                        )
+//                    }
+//                }
+//            }
+//        }
+//
+//        Divider(modifier = Modifier.padding(vertical = 8.dp))
+//
+//        // Conditions section
+//        Row(modifier = Modifier.fillMaxWidth().clickable { showConditions.value = !showConditions.value }
+//            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+//            Icon(
+//                imageVector = if (showConditions.value) ICON_DOWN else ICON_RIGHT,
+//                contentDescription = "Expand Conditions"
+//            )
+//            Text(
+//                text = "Conditions",
+//                style = MaterialTheme.typography.titleMedium,
+//            )
+//        }
+//
+//        if (showConditions.value) {
+//            Card(
+//                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+//            ) {
+//                Column(modifier = Modifier.padding(16.dp)) {
+//                    node.status?.conditions?.forEach { condition ->
+//                        val statusColor = when (condition.status) {
+//                            "True" -> MaterialTheme.colorScheme.primary
+//                            "False" -> if (condition.type == "Ready") MaterialTheme.colorScheme.error
+//                            else MaterialTheme.colorScheme.primary
+//
+//                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+//                        }
+//
+//                        Card(
+//                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+//                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+//                        ) {
+//                            Column(modifier = Modifier.padding(8.dp)) {
+//                                Row(verticalAlignment = Alignment.CenterVertically) {
+//                                    Icon(
+//                                        imageVector = when (condition.status) {
+//                                            "True" -> ICON_SUCCESS
+//                                            "False" -> ICON_ERROR
+//                                            else -> ICON_HELP
+//                                        },
+//                                        contentDescription = "Condition Status",
+//                                        tint = statusColor,
+//                                        modifier = Modifier.size(16.dp)
+//                                    )
+//                                    Spacer(modifier = Modifier.width(4.dp))
+//                                    Text(
+//                                        text = condition.type ?: "Unknown",
+//                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+//                                        color = statusColor
+//                                    )
+//                                    Spacer(modifier = Modifier.weight(1f))
+//                                    Text(
+//                                        text = condition.status ?: "Unknown",
+//                                        style = MaterialTheme.typography.bodyMedium,
+//                                        color = statusColor
+//                                    )
+//                                }
+//
+//                                Spacer(modifier = Modifier.height(4.dp))
+//                                DetailRow("Last Transition", formatAge(condition.lastTransitionTime))
+//                                if (!condition.message.isNullOrBlank()) {
+//                                    DetailRow("Message", condition.message)
+//                                }
+//                                if (!condition.reason.isNullOrBlank()) {
+//                                    DetailRow("Reason", condition.reason)
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        // Labels section
+//        Divider(modifier = Modifier.padding(vertical = 8.dp))
+//
+//        Row(modifier = Modifier.fillMaxWidth().clickable { showLabels.value = !showLabels.value }
+//            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+//            Icon(
+//                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Labels"
+//            )
+//            Text(
+//                text = "Labels",
+//                style = MaterialTheme.typography.titleMedium,
+//            )
+//        }
+//
+//        if (showLabels.value) {
+//            Card(
+//                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+//            ) {
+//                Column(modifier = Modifier.padding(16.dp)) {
+//                    node.metadata?.labels?.entries?.forEach { (key, value) ->
+//                        Row(
+//                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+//                        ) {
+//                            Text(
+//                                text = key,
+//                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+//                                modifier = Modifier.weight(0.4f)
+//                            )
+//                            Text(
+//                                text = value,
+//                                style = MaterialTheme.typography.bodyMedium,
+//                                modifier = Modifier.weight(0.6f)
+//                            )
+//                        }
+//                    }
+//
+//                    if (node.metadata?.labels.isNullOrEmpty()) {
+//                        Text(
+//                            text = "No labels",
+//                            style = MaterialTheme.typography.bodyMedium,
+//                            color = MaterialTheme.colorScheme.onSurfaceVariant
+//                        )
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+
 @Composable
 fun NodeDetailsView(node: Node) {
-    //val scrollState = rememberScrollState()
     val showCapacity = remember { mutableStateOf(false) }
     val showConditions = remember { mutableStateOf(false) }
     val showLabels = remember { mutableStateOf(false) }
+    val showAnnotations = remember { mutableStateOf(false) }
+    val showTaints = remember { mutableStateOf(false) }
+    val showImages = remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
-            //.verticalScroll(scrollState)
             .padding(16.dp)
+            .fillMaxSize()
     ) {
-        // Basic node information section
+        // Основний блок інформації про ноду
         Text(
             text = "Node Information",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
+
+        // Спеціальна картка для статусу вузла
+        val nodeStatus = formatNodeStatus(node.status?.conditions)
+        Spacer(Modifier.height(8.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = when {
+                    nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.tertiaryContainer
+                    nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.errorContainer
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = when {
+                            nodeStatus?.contains("Ready") == true -> FeatherIcons.Check
+                            nodeStatus?.contains("NotReady") == true -> FeatherIcons.AlertTriangle
+                            else -> FeatherIcons.HelpCircle
+                        },
+                        contentDescription = "Node Status",
+                        tint = when {
+                            nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.tertiary
+                            nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Status: $nodeStatus",
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.onTertiaryContainer
+                            nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.onErrorContainer
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Основна інформація
         DetailRow("Name", node.metadata?.name)
-        DetailRow("Status", formatNodeStatus(node.status?.conditions))
         DetailRow("Roles", formatNodeRoles(node.metadata?.labels))
-        DetailRow("Age", formatAge(node.metadata?.creationTimestamp))
-        DetailRow("Version", node.status?.nodeInfo?.kubeletVersion)
-        DetailRow("OS Image", node.status?.nodeInfo?.osImage)
+        DetailRow("Created", formatAge(node.metadata?.creationTimestamp))
+        DetailRow("Kubernetes Version", node.status?.nodeInfo?.kubeletVersion)
+        DetailRow("OS", node.status?.nodeInfo?.osImage)
         DetailRow("Kernel Version", node.status?.nodeInfo?.kernelVersion)
         DetailRow("Container Runtime", node.status?.nodeInfo?.containerRuntimeVersion)
         DetailRow("Architecture", node.status?.nodeInfo?.architecture)
-        DetailRow("Internal IP", node.status?.addresses?.find { it.type == "InternalIP" }?.address)
-        DetailRow("External IP", node.status?.addresses?.find { it.type == "ExternalIP" }?.address)
-        DetailRow("Hostname", node.status?.addresses?.find { it.type == "Hostname" }?.address)
-        DetailRow("Taints", formatTaints(node.spec?.taints))
+        DetailRow("Machine ID", node.status?.nodeInfo?.machineID)
+        DetailRow("System UUID", node.status?.nodeInfo?.systemUUID)
+        DetailRow("Boot ID", node.status?.nodeInfo?.bootID)
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        // IP адреси та hostname
+        Spacer(Modifier.height(8.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Addressing Information",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(Modifier.height(4.dp))
+
+                node.status?.addresses?.forEach { address ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val icon = when(address.type) {
+                            "InternalIP" -> FeatherIcons.Server
+                            "ExternalIP" -> FeatherIcons.Globe
+                            "Hostname" -> FeatherIcons.Home
+                            else -> FeatherIcons.Terminal
+                        }
+
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = address.type,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "${address.type}: ${address.address}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Taints section
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable { showTaints.value = !showTaints.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showTaints.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Expand Taints"
+            )
+            Text(
+                text = "Taints (${node.spec?.taints?.size ?: 0})",
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
+
+        if (showTaints.value) {
+            if (node.spec?.taints.isNullOrEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Info,
+                            contentDescription = "Info",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "No taints set on this node",
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Pods can be scheduled normally without tolerations",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 200.dp)
+                ) {
+                    items(node.spec?.taints ?: emptyList()) { taint ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = when (taint.effect) {
+                                    "NoSchedule" -> MaterialTheme.colorScheme.errorContainer
+                                    "PreferNoSchedule" -> MaterialTheme.colorScheme.secondaryContainer
+                                    "NoExecute" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                }
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = when (taint.effect) {
+                                            "NoSchedule" -> FeatherIcons.Lock
+                                            "PreferNoSchedule" -> FeatherIcons.AlertTriangle
+                                            "NoExecute" -> FeatherIcons.XCircle
+                                            else -> FeatherIcons.HelpCircle
+                                        },
+                                        contentDescription = "Taint Effect",
+                                        tint = when (taint.effect) {
+                                            "NoSchedule" -> MaterialTheme.colorScheme.error
+                                            "PreferNoSchedule" -> MaterialTheme.colorScheme.secondary
+                                            "NoExecute" -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "${taint.key}=${taint.value}:${taint.effect}",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(Modifier.height(4.dp))
+
+                                // Пояснювальний текст
+                                val explanationText = when (taint.effect) {
+                                    "NoSchedule" -> "Pods without matching toleration won't be scheduled on this node"
+                                    "PreferNoSchedule" -> "Scheduler will try to avoid placing pods without matching toleration on this node"
+                                    "NoExecute" -> "Pods without matching toleration will be evicted from the node if already running"
+                                    else -> "Custom taint effect"
+                                }
+
+                                Text(
+                                    text = explanationText,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         // Capacity & Allocatable Resources section
-        Row(modifier = Modifier.fillMaxWidth().clickable { showCapacity.value = !showCapacity.value }
-            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable { showCapacity.value = !showCapacity.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
-                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Capacity"
+                imageVector = if (showCapacity.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Expand Capacity"
             )
             Text(
                 text = "Capacity & Allocatable Resources",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall
             )
         }
 
         if (showCapacity.value) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // Create a table-like view for capacity and allocatable
+                    // Заголовок таблиці
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = "Resource",
@@ -1968,35 +2411,45 @@ fun NodeDetailsView(node: Node) {
 
                     Divider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    // CPUs
-                    ResourceRow(
+                    // Основні ресурси з гарним відображенням
+                    ResourceRowWithVisualization(
                         name = "CPU",
-                        capacity = node.status?.capacity?.get("cpu"),
-                        allocatable = node.status?.allocatable?.get("cpu")
+                        capacity = node.status?.capacity?.get("cpu").toString(),
+                        allocatable = node.status?.allocatable?.get("cpu").toString(),
+                        icon = FeatherIcons.Cpu
                     )
 
-                    // Memory
-                    ResourceRow(
+                    ResourceRowWithVisualization(
                         name = "Memory",
-                        capacity = node.status?.capacity?.get("memory"),
-                        allocatable = node.status?.allocatable?.get("memory")
+                        capacity = node.status?.capacity?.get("memory").toString(),
+                        allocatable = node.status?.allocatable?.get("memory").toString(),
+                        icon = FeatherIcons.Database
                     )
 
-                    // Ephemeral Storage
-                    ResourceRow(
+                    ResourceRowWithVisualization(
                         name = "Ephemeral Storage",
-                        capacity = node.status?.capacity?.get("ephemeral-storage"),
-                        allocatable = node.status?.allocatable?.get("ephemeral-storage")
+                        capacity = node.status?.capacity?.get("ephemeral-storage").toString(),
+                        allocatable = node.status?.allocatable?.get("ephemeral-storage").toString(),
+                        icon = FeatherIcons.HardDrive
                     )
 
-                    // Pods
-                    ResourceRow(
+                    ResourceRowWithVisualization(
                         name = "Pods",
-                        capacity = node.status?.capacity?.get("pods"),
-                        allocatable = node.status?.allocatable?.get("pods")
+                        capacity = node.status?.capacity?.get("pods").toString(),
+                        allocatable = node.status?.allocatable?.get("pods").toString(),
+                        icon = FeatherIcons.Box
                     )
 
-                    // Display other resources dynamically
+                    // Інші ресурси
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Extended Resources",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    Divider(modifier = Modifier.padding(bottom = 4.dp))
+
+                    // Відобразити інші ресурси динамічно
                     node.status?.capacity?.entries?.filter {
                         !setOf("cpu", "memory", "ephemeral-storage", "pods").contains(it.key)
                     }?.forEach { entry ->
@@ -2006,77 +2459,104 @@ fun NodeDetailsView(node: Node) {
                             allocatable = node.status?.allocatable?.get(entry.key)
                         )
                     }
+
+                    if (node.status?.capacity?.entries?.none { !setOf("cpu", "memory", "ephemeral-storage", "pods").contains(it.key) } == true) {
+                        Text(
+                            text = "No extended resources available",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
                 }
             }
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        Spacer(Modifier.height(16.dp))
 
         // Conditions section
-        Row(modifier = Modifier.fillMaxWidth().clickable { showConditions.value = !showConditions.value }
-            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable { showConditions.value = !showConditions.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
                 imageVector = if (showConditions.value) ICON_DOWN else ICON_RIGHT,
                 contentDescription = "Expand Conditions"
             )
             Text(
-                text = "Conditions",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Conditions (${node.status?.conditions?.size ?: 0})",
+                style = MaterialTheme.typography.titleSmall
             )
         }
 
         if (showConditions.value) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 300.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    node.status?.conditions?.forEach { condition ->
-                        val statusColor = when (condition.status) {
-                            "True" -> MaterialTheme.colorScheme.primary
-                            "False" -> if (condition.type == "Ready") MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.primary
+                items(node.status?.conditions ?: emptyList()) { condition ->
+                    val statusColor = when (condition.status) {
+                        "True" -> MaterialTheme.colorScheme.primary
+                        "False" -> if (condition.type == "Ready") MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
 
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when {
+                                condition.type == "Ready" && condition.status == "True" ->
+                                    MaterialTheme.colorScheme.primaryContainer
+                                condition.type == "Ready" && condition.status != "True" ->
+                                    MaterialTheme.colorScheme.errorContainer
+                                else -> MaterialTheme.colorScheme.surface
+                            }
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = when (condition.status) {
+                                        "True" -> ICON_SUCCESS
+                                        "False" -> ICON_ERROR
+                                        else -> ICON_HELP
+                                    },
+                                    contentDescription = "Condition Status",
+                                    tint = statusColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = condition.type ?: "Unknown",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = statusColor
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Text(
+                                    text = condition.status ?: "Unknown",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = statusColor
+                                )
+                            }
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(modifier = Modifier.padding(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = when (condition.status) {
-                                            "True" -> ICON_SUCCESS
-                                            "False" -> ICON_ERROR
-                                            else -> ICON_HELP
-                                        },
-                                        contentDescription = "Condition Status",
-                                        tint = statusColor,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            DetailRow("Last Transition", formatAge(condition.lastTransitionTime))
+                            if (!condition.reason.isNullOrBlank()) {
+                                DetailRow("Reason", condition.reason)
+                            }
+                            if (!condition.message.isNullOrBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
                                     Text(
-                                        text = condition.type ?: "Unknown",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = statusColor
+                                        text = condition.message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(4.dp)
                                     )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Text(
-                                        text = condition.status ?: "Unknown",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = statusColor
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-                                DetailRow("Last Transition", formatAge(condition.lastTransitionTime))
-                                if (!condition.message.isNullOrBlank()) {
-                                    DetailRow("Message", condition.message)
-                                }
-                                if (!condition.reason.isNullOrBlank()) {
-                                    DetailRow("Reason", condition.reason)
                                 }
                             }
                         }
@@ -2085,55 +2565,488 @@ fun NodeDetailsView(node: Node) {
             }
         }
 
-        // Labels section
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        Spacer(Modifier.height(16.dp))
 
-        Row(modifier = Modifier.fillMaxWidth().clickable { showLabels.value = !showLabels.value }
-            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Container Images section
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable { showImages.value = !showImages.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
-                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT, contentDescription = "Expand Labels"
+                imageVector = if (showImages.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Expand Images"
             )
             Text(
-                text = "Labels",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Container Images (${node.status?.images?.size ?: 0})",
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
+
+        if (showImages.value) {
+            if (node.status?.images.isNullOrEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.Image,
+                            contentDescription = "No Images",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "No container images on this node",
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.heightIn(max = 200.dp).padding(12.dp)) {
+                        Text(
+                            text = "Images cached on this node:",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        LazyColumn {
+                            items(node.status?.images?.sortedByDescending { it.sizeBytes } ?: emptyList()) { image ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Package,
+                                        contentDescription = "Container Image",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        // Відображення тегів зображення
+                                        image.names?.firstOrNull()?.let { mainName ->
+                                            Text(
+                                                text = mainName,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+
+                                        // Розмір зображення
+                                        image.sizeBytes?.let { size ->
+                                            Text(
+                                                text = "Size: ${formatBytes(size)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        // Інші теги, якщо є більше одного
+                                        if ((image.names?.size ?: 0) > 1) {
+                                            var expanded by remember { mutableStateOf(false) }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.clickable { expanded = !expanded }
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (expanded) ICON_DOWN else ICON_RIGHT,
+                                                    contentDescription = "Show more tags",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "${image.names?.size?.minus(1)} more tags",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+
+                                            if (expanded) {
+                                                Column(modifier = Modifier.padding(start = 16.dp)) {
+                                                    image.names?.drop(1)?.forEach { tag ->
+                                                        Text(
+                                                            text = tag,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontSize = 10.sp
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Divider(modifier = Modifier.padding(vertical = 2.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Labels section
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable { showLabels.value = !showLabels.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showLabels.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Expand Labels"
+            )
+            Text(
+                text = "Labels (${node.metadata?.labels?.size ?: 0})",
+                style = MaterialTheme.typography.titleSmall
             )
         }
 
         if (showLabels.value) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    node.metadata?.labels?.entries?.forEach { (key, value) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                        ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    if (node.metadata?.labels.isNullOrEmpty()) {
+                        Text("No labels found", modifier = Modifier.padding(vertical = 4.dp))
+                    } else {
+                        // Розділяємо мітки на категорії
+                        val kubernetesLabels = node.metadata?.labels?.filterKeys { it.startsWith("kubernetes.io/") || it.startsWith("node-role.kubernetes.io/") }
+                        val otherLabels = node.metadata?.labels?.filterKeys { !it.startsWith("kubernetes.io/") && !it.startsWith("node-role.kubernetes.io/") }
+
+                        // Kubernetes мітки
+                        if (!kubernetesLabels.isNullOrEmpty()) {
                             Text(
-                                text = key,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                modifier = Modifier.weight(0.4f)
+                                text = "Kubernetes Labels:",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
+
+                            kubernetesLabels.entries.forEach { (key, value) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp, horizontal = 8.dp)
+                                ) {
+                                    Text(
+                                        text = key,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        modifier = Modifier.weight(0.5f)
+                                    )
+                                    Text(
+                                        text = value,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(0.5f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Інші мітки
+                        if (!otherLabels.isNullOrEmpty()) {
+                            if (!kubernetesLabels.isNullOrEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Divider()
+                                Spacer(Modifier.height(8.dp))
+                            }
+
                             Text(
-                                text = value,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(0.6f)
+                                text = "Custom Labels:",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
+
+                            otherLabels.entries.forEach { (key, value) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp, horizontal = 8.dp)
+                                ) {
+                                    Text(
+                                        text = key,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        modifier = Modifier.weight(0.5f)
+                                    )
+                                    Text(
+                                        text = value,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(0.5f)
+                                    )
+                                }
+                            }
                         }
                     }
+                }
+            }
+        }
 
-                    if (node.metadata?.labels.isNullOrEmpty()) {
-                        Text(
-                            text = "No labels",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+        // Annotations section
+        Spacer(Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable { showAnnotations.value = !showAnnotations.value }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (showAnnotations.value) ICON_DOWN else ICON_RIGHT,
+                contentDescription = "Expand Annotations"
+            )
+            Text(
+                text = "Annotations (${node.metadata?.annotations?.size ?: 0})",
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
+
+        if (showAnnotations.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    if (node.metadata?.annotations.isNullOrEmpty()) {
+                        Text("No annotations found", modifier = Modifier.padding(vertical = 4.dp))
+                    } else {
+                        node.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = key,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                                Text(
+                                    text = value,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 8.dp, top = 2.dp),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
+/**
+ * Відображає рядок із ресурсом та його візуалізацією
+ */
+@Composable
+private fun ResourceRowWithVisualization(
+    name: String,
+    capacity: String?,
+    allocatable: String?,
+    icon: ImageVector
+) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+            Icon(
+                imageVector = icon,
+                contentDescription = name,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Capacity",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = capacity ?: "N/A",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Allocatable",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = allocatable ?: "N/A",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
+        // Прогрес-бар для візуалізації (якщо можливо)
+        if (capacity != null && allocatable != null) {
+            // Винести логіку парсингу за межі композиції
+            val resourceInfo = remember(capacity, allocatable) {
+                calculateResourceUsage(capacity, allocatable)
+            }
+
+            if (resourceInfo.isValid) {
+                Spacer(Modifier.height(4.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LinearProgressIndicator(
+                        progress = { resourceInfo.usedRatio },
+                        modifier = Modifier
+                            .height(8.dp)
+                            .fillMaxWidth(0.8f),
+                        color = when {
+                            resourceInfo.freeRatio < 0.2f -> MaterialTheme.colorScheme.error
+                            resourceInfo.freeRatio < 0.5f -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.primary
+                        },
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Text(
+                        text = "${resourceInfo.freePercentFormatted}% free",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+private fun calculateResourceUsage(capacity: String, allocatable: String): ResourceUsageInfo {
+    return try {
+        val capValue = parseResourceValue(capacity)
+        val allocValue = parseResourceValue(allocatable)
+
+        if (capValue > 0) {
+            val freeRatio = allocValue / capValue
+            val freePercent = (freeRatio * 100).toInt()
+
+            ResourceUsageInfo(
+                isValid = true,
+                usedRatio = freeRatio.toFloat(),
+                freeRatio = freeRatio.toFloat(),
+                freePercentFormatted = freePercent
+            )
+        } else {
+            ResourceUsageInfo()
+        }
+    } catch (e: Exception) {
+        ResourceUsageInfo()
+    }
+}
+
+/**
+ * Клас для зберігання інформації про використання ресурсу
+ */
+private data class ResourceUsageInfo(
+    val isValid: Boolean = false,
+    val usedRatio: Float = 0f,
+    val freeRatio: Float = 0f,
+    val freePercentFormatted: Int = 0
+)
+
+
+/**
+ * Функція для парсингу значень ресурсів Kubernetes
+ */
+private fun parseResourceValue(resource: String): Double {
+    return try {
+        when {
+            resource.endsWith("Ki") -> resource.substring(0, resource.length - 2).toDouble() * 1024
+            resource.endsWith("Mi") -> resource.substring(0, resource.length - 2).toDouble() * 1024 * 1024
+            resource.endsWith("Gi") -> resource.substring(0, resource.length - 2).toDouble() * 1024 * 1024 * 1024
+            resource.endsWith("Ti") -> resource.substring(0, resource.length - 2).toDouble() * 1024 * 1024 * 1024 * 1024
+            resource.endsWith("m") -> resource.substring(0, resource.length - 1).toDouble() / 1000
+            else -> resource.toDouble()
+        }
+    } catch (e: Exception) {
+        0.0
+    }
+}
+
+
+//@Composable
+//private fun formatNodeStatus(conditions: List<NodeCondition>?): String {
+//    if (conditions.isNullOrEmpty()) return "Unknown"
+//
+//    val readyCondition = conditions.find { it.type == "Ready" }
+//    return when (readyCondition?.status) {
+//        "True" -> "Ready"
+//        "False" -> "NotReady"
+//        else -> {
+//            val problemConditions = conditions.filter {
+//                it.status == "True" && it.type != "Ready" && it.type != "NetworkUnavailable"
+//            }
+//            if (problemConditions.isNotEmpty()) {
+//                "NotReady (${problemConditions.first().type})"
+//            } else {
+//                "Unknown"
+//            }
+//        }
+//    }
+//}
+
+fun formatNodeStatus(conditions: List<NodeCondition>?): String {
+    val ready = conditions?.find { it.type == "Ready" }; return when (ready?.status) {
+        "True" -> "Ready"; "False" -> "NotReady${ready.reason?.let { " ($it)" } ?: ""}"; else -> "Unknown"
+    }
+}
+
+//@Composable
+private fun formatNodeRoles(labels: Map<String, String>?): String {
+    if (labels.isNullOrEmpty()) return "none"
+
+    val roles = labels.keys
+        .filter { it.startsWith("node-role.kubernetes.io/") }
+        .map { it.removePrefix("node-role.kubernetes.io/") }
+
+    return if (roles.isEmpty()) "worker" else roles.sorted().joinToString(", ")
+}
+
+
+private fun formatTaints(taints: List<Taint>?): String {
+    if (taints.isNullOrEmpty()) return "None"
+
+    return taints.take(2).joinToString(", ") {
+        "${it.key}=${it.value}:${it.effect}"
+    } + if (taints.size > 2) "..." else ""
+}
+
+//fun formatTaints(taints: List<Taint>?): String {
+//    return taints?.size?.toString() ?: "0"
+//}
+
+@Composable
+private fun formatBytes(bytes: Long): String {
+    return when {
+        bytes >= 1024L * 1024L * 1024L * 1024L -> String.format("%.2f TiB", bytes / (1024.0 * 1024.0 * 1024.0 * 1024.0))
+        bytes >= 1024L * 1024L * 1024L -> String.format("%.2f GiB", bytes / (1024.0 * 1024.0 * 1024.0))
+        bytes >= 1024L * 1024L -> String.format("%.2f MiB", bytes / (1024.0 * 1024.0))
+        bytes >= 1024L -> String.format("%.2f KiB", bytes / 1024.0)
+        else -> "$bytes B"
+    }
+}
+
 
 @Composable
 fun ResourceRow(name: String, capacity: Quantity?, allocatable: Quantity?) {
@@ -3990,7 +4903,10 @@ fun StatefulSetDetailsView(sts: StatefulSet) {
 
         // Секція контейнерів
         val containerState = remember { mutableStateOf(false) }
-        DetailSectionHeader(title = "Containers (${sts.spec?.template?.spec?.containers?.size ?: 0})", expanded = containerState)
+        DetailSectionHeader(
+            title = "Containers (${sts.spec?.template?.spec?.containers?.size ?: 0})",
+            expanded = containerState
+        )
 
         if (containerState.value) {
             sts.spec?.template?.spec?.containers?.forEachIndexed { index, container ->
@@ -4018,7 +4934,10 @@ fun StatefulSetDetailsView(sts: StatefulSet) {
 
         // Секція томів
         val volumesState = remember { mutableStateOf(false) }
-        DetailSectionHeader(title = "Volume Claims (${sts.spec?.volumeClaimTemplates?.size ?: 0})", expanded = volumesState)
+        DetailSectionHeader(
+            title = "Volume Claims (${sts.spec?.volumeClaimTemplates?.size ?: 0})",
+            expanded = volumesState
+        )
 
         if (volumesState.value) {
             sts.spec?.volumeClaimTemplates?.forEach { pvc ->
@@ -4139,7 +5058,10 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
 
         // Секція контейнерів - покращена
         val containerState = remember { mutableStateOf(false) }
-        DetailSectionHeader(title = "Containers (${ds.spec?.template?.spec?.containers?.size ?: 0})", expanded = containerState)
+        DetailSectionHeader(
+            title = "Containers (${ds.spec?.template?.spec?.containers?.size ?: 0})",
+            expanded = containerState
+        )
 
         if (containerState.value) {
             LazyColumn(
@@ -4385,6 +5307,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                         Text("Optional: true")
                                     }
                                 }
+
                                 volume.secret != null -> {
                                     Text("Type: Secret")
                                     Text("Name: ${volume.secret?.secretName ?: ""}")
@@ -4392,6 +5315,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                         Text("Optional: true")
                                     }
                                 }
+
                                 volume.persistentVolumeClaim != null -> {
                                     Text("Type: PersistentVolumeClaim")
                                     Text("Claim Name: ${volume.persistentVolumeClaim?.claimName ?: ""}")
@@ -4399,16 +5323,19 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                         Text("Read Only: true")
                                     }
                                 }
+
                                 volume.hostPath != null -> {
                                     Text("Type: HostPath")
                                     Text("Path: ${volume.hostPath?.path ?: ""}")
                                     Text("Type: ${volume.hostPath?.type ?: "Directory"}")
                                 }
+
                                 volume.emptyDir != null -> {
                                     Text("Type: EmptyDir")
                                     volume.emptyDir?.medium?.let { Text("Medium: $it") }
                                     volume.emptyDir?.sizeLimit?.let { Text("Size Limit: $it") }
                                 }
+
                                 else -> Text("Type: Other volume type")
                             }
                         }
@@ -4845,7 +5772,8 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                                                     )
                                                     SelectionContainer {
                                                         Text(
-                                                            text = env.value ?: env.valueFrom?.let { "(from source)" } ?: "",
+                                                            text = env.value ?: env.valueFrom?.let { "(from source)" }
+                                                            ?: "",
                                                             overflow = TextOverflow.Ellipsis
                                                         )
                                                     }
@@ -5067,7 +5995,8 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                                 DetailRow("Completion Time", formatAge(job.status?.completionTime))
 
                                 // Розрахунок тривалості - без try-catch навколо composable функцій
-                                val durationText = calculateJobDuration(job.status?.startTime, job.status?.completionTime)
+                                val durationText =
+                                    calculateJobDuration(job.status?.startTime, job.status?.completionTime)
                                 DetailRow("Duration", durationText)
                             } else {
                                 DetailRow("Completion Time", "Не завершено")
@@ -5689,7 +6618,8 @@ fun CronJobDetailsView(cronJob: io.fabric8.kubernetes.api.model.batch.v1.CronJob
                                                     )
                                                     SelectionContainer {
                                                         Text(
-                                                            text = env.value ?: env.valueFrom?.let { "(from source)" } ?: "",
+                                                            text = env.value ?: env.valueFrom?.let { "(from source)" }
+                                                            ?: "",
                                                             overflow = TextOverflow.Ellipsis
                                                         )
                                                     }
@@ -6348,7 +7278,8 @@ fun ReplicaSetDetailsView(replicaSet: io.fabric8.kubernetes.api.model.apps.Repli
                                                         modifier = Modifier.width(120.dp)
                                                     )
                                                     SelectionContainer {
-                                                        val envValue = env.value ?: env.valueFrom?.let { "(from source)" } ?: ""
+                                                        val envValue =
+                                                            env.value ?: env.valueFrom?.let { "(from source)" } ?: ""
                                                         Text(
                                                             text = envValue,
                                                             overflow = TextOverflow.Ellipsis
@@ -6422,7 +7353,8 @@ fun ReplicaSetDetailsView(replicaSet: io.fabric8.kubernetes.api.model.apps.Repli
 
                             // Проби готовності/життєздатності
                             var probesExpanded by remember { mutableStateOf(false) }
-                            val hasProbes = container.livenessProbe != null || container.readinessProbe != null || container.startupProbe != null
+                            val hasProbes =
+                                container.livenessProbe != null || container.readinessProbe != null || container.startupProbe != null
 
                             if (hasProbes) {
                                 Row(
@@ -6631,7 +7563,10 @@ fun ReplicaSetDetailsView(replicaSet: io.fabric8.kubernetes.api.model.apps.Repli
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Annotations (${replicaSet.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Annotations (${replicaSet.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (annotationsExpanded) {
@@ -6639,47 +7574,50 @@ fun ReplicaSetDetailsView(replicaSet: io.fabric8.kubernetes.api.model.apps.Repli
                             Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
                         } else {
                             Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                replicaSet.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                                    val isLongValue = value.length > 50
-                                    var valueExpanded by remember { mutableStateOf(false) }
+                                replicaSet.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
 
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.width(180.dp)
-                                            )
-                                        }
-
-                                        Text(": ")
-
-                                        if (isLongValue) {
-                                            Column {
-                                                SelectionContainer {
-                                                    Text(
-                                                        text = if (valueExpanded) value else value.take(50) + "...",
-                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
-                                                    )
-                                                }
-                                                if (!valueExpanded) {
-                                                    Text(
-                                                        text = "Click to expand",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable { valueExpanded = true }
-                                                    )
-                                                }
-                                            }
-                                        } else {
+                                        Row(verticalAlignment = Alignment.Top) {
                                             SelectionContainer {
-                                                Text(value)
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(4.dp))
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                }
                             }
                         }
                     }
@@ -7358,7 +8296,7 @@ fun RoleBindingDetailsView(roleBinding: io.fabric8.kubernetes.api.model.rbac.Rol
             LazyColumn(
                 modifier = Modifier.heightIn(max = 400.dp)
             ) {
-                itemsIndexed(roleBinding.subjects ?: emptyList()) { _ , subject ->
+                itemsIndexed(roleBinding.subjects ?: emptyList()) { _, subject ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -7559,7 +8497,10 @@ fun RoleBindingDetailsView(roleBinding: io.fabric8.kubernetes.api.model.rbac.Rol
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Annotations (${roleBinding.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Annotations (${roleBinding.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (annotationsExpanded) {
@@ -7567,47 +8508,50 @@ fun RoleBindingDetailsView(roleBinding: io.fabric8.kubernetes.api.model.rbac.Rol
                             Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
                         } else {
                             Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                roleBinding.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                                    val isLongValue = value.length > 50
-                                    var valueExpanded by remember { mutableStateOf(false) }
+                                roleBinding.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
 
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.width(180.dp)
-                                            )
-                                        }
-
-                                        Text(": ")
-
-                                        if (isLongValue) {
-                                            Column {
-                                                SelectionContainer {
-                                                    Text(
-                                                        text = if (valueExpanded) value else value.take(50) + "...",
-                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
-                                                    )
-                                                }
-                                                if (!valueExpanded) {
-                                                    Text(
-                                                        text = "Click to expand",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable { valueExpanded = true }
-                                                    )
-                                                }
-                                            }
-                                        } else {
+                                        Row(verticalAlignment = Alignment.Top) {
                                             SelectionContainer {
-                                                Text(value)
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(4.dp))
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                }
                             }
                         }
                     }
@@ -8152,7 +9096,10 @@ fun ClusterRoleDetailsView(clusterRole: io.fabric8.kubernetes.api.model.rbac.Clu
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Annotations (${clusterRole.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Annotations (${clusterRole.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (annotationsExpanded) {
@@ -8160,47 +9107,50 @@ fun ClusterRoleDetailsView(clusterRole: io.fabric8.kubernetes.api.model.rbac.Clu
                             Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
                         } else {
                             Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                clusterRole.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                                    val isLongValue = value.length > 50
-                                    var valueExpanded by remember { mutableStateOf(false) }
+                                clusterRole.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
 
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.width(180.dp)
-                                            )
-                                        }
-
-                                        Text(": ")
-
-                                        if (isLongValue) {
-                                            Column {
-                                                SelectionContainer {
-                                                    Text(
-                                                        text = if (valueExpanded) value else value.take(50) + "...",
-                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
-                                                    )
-                                                }
-                                                if (!valueExpanded) {
-                                                    Text(
-                                                        text = "Click to expand",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable { valueExpanded = true }
-                                                    )
-                                                }
-                                            }
-                                        } else {
+                                        Row(verticalAlignment = Alignment.Top) {
                                             SelectionContainer {
-                                                Text(value)
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(4.dp))
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                }
                             }
                         }
                     }
@@ -8209,7 +9159,6 @@ fun ClusterRoleDetailsView(clusterRole: io.fabric8.kubernetes.api.model.rbac.Clu
         }
     }
 }
-
 
 
 // Допоміжна функція для відображення секції правил в ClusterRole
@@ -8632,7 +9581,8 @@ fun ClusterRoleBindingDetailsView(clusterRoleBinding: io.fabric8.kubernetes.api.
 
                             // Спеціальне повідомлення для суб'єктів, які стосуються всіх
                             if ((subject.kind == "Group" && subject.name == "system:authenticated") ||
-                                (subject.kind == "Group" && subject.name == "system:unauthenticated")) {
+                                (subject.kind == "Group" && subject.name == "system:unauthenticated")
+                            ) {
                                 Spacer(Modifier.height(8.dp))
                                 Surface(
                                     color = MaterialTheme.colorScheme.errorContainer,
@@ -8723,7 +9673,10 @@ fun ClusterRoleBindingDetailsView(clusterRoleBinding: io.fabric8.kubernetes.api.
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Labels (${clusterRoleBinding.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Labels (${clusterRoleBinding.metadata?.labels?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (labelsExpanded) {
@@ -8764,7 +9717,10 @@ fun ClusterRoleBindingDetailsView(clusterRoleBinding: io.fabric8.kubernetes.api.
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Annotations (${clusterRoleBinding.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Annotations (${clusterRoleBinding.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (annotationsExpanded) {
@@ -8772,47 +9728,50 @@ fun ClusterRoleBindingDetailsView(clusterRoleBinding: io.fabric8.kubernetes.api.
                             Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
                         } else {
                             Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                clusterRoleBinding.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                                    val isLongValue = value.length > 50
-                                    var valueExpanded by remember { mutableStateOf(false) }
+                                clusterRoleBinding.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
 
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.width(180.dp)
-                                            )
-                                        }
-
-                                        Text(": ")
-
-                                        if (isLongValue) {
-                                            Column {
-                                                SelectionContainer {
-                                                    Text(
-                                                        text = if (valueExpanded) value else value.take(50) + "...",
-                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
-                                                    )
-                                                }
-                                                if (!valueExpanded) {
-                                                    Text(
-                                                        text = "Click to expand",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable { valueExpanded = true }
-                                                    )
-                                                }
-                                            }
-                                        } else {
+                                        Row(verticalAlignment = Alignment.Top) {
                                             SelectionContainer {
-                                                Text(value)
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(4.dp))
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                }
                             }
                         }
                     }
@@ -9558,7 +10517,10 @@ fun ServiceAccountDetailsView(serviceAccount: io.fabric8.kubernetes.api.model.Se
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Annotations (${serviceAccount.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Annotations (${serviceAccount.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (annotationsExpanded) {
@@ -9566,47 +10528,50 @@ fun ServiceAccountDetailsView(serviceAccount: io.fabric8.kubernetes.api.model.Se
                             Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
                         } else {
                             Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                serviceAccount.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                                    val isLongValue = value.length > 50
-                                    var valueExpanded by remember { mutableStateOf(false) }
+                                serviceAccount.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
 
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.width(180.dp)
-                                            )
-                                        }
-
-                                        Text(": ")
-
-                                        if (isLongValue) {
-                                            Column {
-                                                SelectionContainer {
-                                                    Text(
-                                                        text = if (valueExpanded) value else value.take(50) + "...",
-                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
-                                                    )
-                                                }
-                                                if (!valueExpanded) {
-                                                    Text(
-                                                        text = "Click to expand",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable { valueExpanded = true }
-                                                    )
-                                                }
-                                            }
-                                        } else {
+                                        Row(verticalAlignment = Alignment.Top) {
                                             SelectionContainer {
-                                                Text(value)
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(4.dp))
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                }
                             }
                         }
                     }
@@ -9643,6 +10608,7 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                 containerColor = when {
                     storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                         MaterialTheme.colorScheme.primaryContainer
+
                     else -> MaterialTheme.colorScheme.surfaceVariant
                 }
             )
@@ -9653,12 +10619,14 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                         imageVector = when {
                             storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                                 FeatherIcons.Star
+
                             else -> FeatherIcons.Database
                         },
                         contentDescription = "Storage Class Status",
                         tint = when {
                             storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                                 MaterialTheme.colorScheme.onPrimaryContainer
+
                             else -> MaterialTheme.colorScheme.primary
                         },
                         modifier = Modifier.size(24.dp)
@@ -9669,12 +10637,14 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                             text = when {
                                 storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                                     "Default Storage Class"
+
                                 else -> "Storage Class"
                             },
                             fontWeight = FontWeight.Bold,
                             color = when {
                                 storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                                     MaterialTheme.colorScheme.onPrimaryContainer
+
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
@@ -9682,12 +10652,14 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                             text = when {
                                 storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                                     "Used when no storage class is specified in PVCs"
+
                                 else -> "Must be explicitly selected in PVCs"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = when {
                                 storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
                                     MaterialTheme.colorScheme.onPrimaryContainer
+
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
@@ -9766,16 +10738,19 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                         MaterialTheme.colorScheme.primary,
                         "Manually reclaim the volume after the claim is deleted"
                     )
+
                     "Delete" -> Triple(
                         FeatherIcons.Trash2,
                         MaterialTheme.colorScheme.error,
                         "Automatically delete the volume when the claim is deleted"
                     )
+
                     "Recycle" -> Triple(
                         FeatherIcons.RefreshCw,
                         MaterialTheme.colorScheme.tertiary,
                         "Basic scrub and make available again (Deprecated)"
                     )
+
                     else -> Triple(
                         FeatherIcons.HelpCircle,
                         MaterialTheme.colorScheme.secondary,
@@ -10310,7 +11285,10 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Annotations (${storageClass.metadata?.annotations?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Annotations (${storageClass.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     if (annotationsExpanded) {
@@ -10318,47 +11296,50 @@ fun StorageClassDetailsView(storageClass: io.fabric8.kubernetes.api.model.storag
                             Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
                         } else {
                             Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                storageClass.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                                    val isLongValue = value.length > 50
-                                    var valueExpanded by remember { mutableStateOf(false) }
+                                storageClass.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
 
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.width(180.dp)
-                                            )
-                                        }
-
-                                        Text(": ")
-
-                                        if (isLongValue) {
-                                            Column {
-                                                SelectionContainer {
-                                                    Text(
-                                                        text = if (valueExpanded) value else value.take(50) + "...",
-                                                        modifier = Modifier.clickable { valueExpanded = !valueExpanded }
-                                                    )
-                                                }
-                                                if (!valueExpanded) {
-                                                    Text(
-                                                        text = "Click to expand",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.clickable { valueExpanded = true }
-                                                    )
-                                                }
-                                            }
-                                        } else {
+                                        Row(verticalAlignment = Alignment.Top) {
                                             SelectionContainer {
-                                                Text(value)
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(4.dp))
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                }
                             }
                         }
                     }
@@ -10587,7 +11568,18 @@ fun ResourceDetailPanel(
                 // --- Виклик відповідного DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName -> (resource as? HasMetadata)?.metadata?.let { meta -> onShowLogsRequest(meta.namespace, meta.name, containerName)} ?: logger.error("Metadata is null for Pod.")}) else Text("Invalid Pod data")
+                    "Pods" -> if (resource is Pod) PodDetailsView(
+                        pod = resource,
+                        onShowLogsRequest = { containerName ->
+                            (resource as? HasMetadata)?.metadata?.let { meta ->
+                                onShowLogsRequest(
+                                    meta.namespace,
+                                    meta.name,
+                                    containerName
+                                )
+                            } ?: logger.error("Metadata is null for Pod.")
+                        }) else Text("Invalid Pod data")
+
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -10595,22 +11587,43 @@ fun ResourceDetailPanel(
                     "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
+                        "Invalid PVC data"
+                    )
+
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
                     "StatefulSets" -> if (resource is StatefulSet) StatefulSetDetailsView(sts = resource) else Text("Invalid StatefulSet data")
                     "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
-                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text("Invalid Job data")
+                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text(
+                        "Invalid Job data"
+                    )
+
                     "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text(
+                        "Invalid ReplicaSet data"
+                    )
                     //"NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(netpol = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
-                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
-                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text("Invalid ClusterRole data")
-                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(clusterRoleBinding = resource) else Text("Invalid ClusterRoleBinding data")
-                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text("Invalid ServiceAccount data")
+                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text(
+                        "Invalid RoleBinding data"
+                    )
+
+                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text(
+                        "Invalid ClusterRole data"
+                    )
+
+                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(
+                        clusterRoleBinding = resource
+                    ) else Text("Invalid ClusterRoleBinding data")
+
+                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text(
+                        "Invalid ServiceAccount data"
+                    )
                     //"Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
-                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text("Invalid StorageClass data")
+                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text(
+                        "Invalid StorageClass data"
+                    )
                     //"CustomResourceDefinitions" -> if (resource is CustomResourceDefinition) CRDDetailsView(crd = resource) else Text("Invalid CRD data")
 
                     // TODO: Додати кейси для всіх інших типів ресурсів (NetworkPolicies, Events, CustomResourceDefinitions, etc.)
@@ -10916,7 +11929,8 @@ fun App() {
         namespacesList = emptyList(); nodesList = emptyList(); podsList = emptyList(); deploymentsList =
             emptyList(); statefulSetsList = emptyList(); daemonSetsList = emptyList(); replicaSetsList =
             emptyList(); jobsList = emptyList(); cronJobsList = emptyList(); servicesList = emptyList(); ingressesList =
-            emptyList(); endpointsList = emptyList(); pvsList = emptyList(); pvcsList = emptyList(); storageClassesList =
+            emptyList(); endpointsList = emptyList(); pvsList = emptyList(); pvcsList =
+            emptyList(); storageClassesList =
             emptyList(); configMapsList = emptyList(); secretsList = emptyList(); serviceAccountsList =
             emptyList(); rolesList = emptyList(); roleBindingsList = emptyList(); clusterRolesList =
             emptyList(); clusterRoleBindingsList = emptyList()
@@ -11011,48 +12025,49 @@ fun App() {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
-                                                    if (selectedContext != contextName) {
-                                                        logger.info("Click on context: $contextName. Launching connectWithRetries...")
-                                                        coroutineScope.launch {
-                                                            isLoading = true
-                                                            connectionStatus = "Connection to '$contextName'..."
-                                                            activeClient?.close()
-                                                            activeClient = null
-                                                            selectedResourceType = null
-                                                            clearResourceLists()
-                                                            resourceLoadError = null
+                                                if (selectedContext != contextName) {
+                                                    logger.info("Click on context: $contextName. Launching connectWithRetries...")
+                                                    coroutineScope.launch {
+                                                        isLoading = true
+                                                        connectionStatus = "Connection to '$contextName'..."
+                                                        activeClient?.close()
+                                                        activeClient = null
+                                                        selectedResourceType = null
+                                                        clearResourceLists()
+                                                        resourceLoadError = null
+                                                        errorMessage = null
+                                                        detailedResource = null
+                                                        detailedResourceType = null
+                                                        showLogViewer.value = false
+                                                        logViewerParams.value = null // Скидаємо все
+
+                                                        val connectionResult = connectWithRetries(contextName)
+                                                        isLoading = false
+
+                                                        connectionResult.onSuccess { (newClient, serverVersion) ->
+                                                            activeClient = newClient
+                                                            selectedContext = contextName
+                                                            connectionStatus =
+                                                                "Connected to: $contextName (v$serverVersion)"
                                                             errorMessage = null
-                                                            detailedResource = null
-                                                            detailedResourceType = null
-                                                            showLogViewer.value = false
-                                                            logViewerParams.value = null // Скидаємо все
-
-                                                            val connectionResult = connectWithRetries(contextName)
-                                                            isLoading = false
-
-                                                            connectionResult.onSuccess { (newClient, serverVersion) ->
-                                                                activeClient = newClient
-                                                                selectedContext = contextName
-                                                                connectionStatus =
-                                                                    "Connected to: $contextName (v$serverVersion)"
-                                                                errorMessage = null
-                                                                logger.info("UI State updated on Success for $contextName")
-                                                            }.onFailure { error ->
-                                                                    connectionStatus =
-                                                                        "Connection Error to '$contextName'"
-                                                                    errorMessage =
-                                                                        error.localizedMessage ?: "Unknown error"
-                                                                    logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
-                                                                    dialogErrorMessage.value =
-                                                                        "Failed to connect to '$contextName' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
-                                                                    showErrorDialog.value = true
-                                                                    activeClient = null
-                                                                    selectedContext = null
-                                                                }
-                                                            logger.info("Attempting to connect to '$contextName' Completed (the result is processed).")
+                                                            logger.info("UI State updated on Success for $contextName")
+                                                        }.onFailure { error ->
+                                                            connectionStatus =
+                                                                "Connection Error to '$contextName'"
+                                                            errorMessage =
+                                                                error.localizedMessage ?: "Unknown error"
+                                                            logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
+                                                            dialogErrorMessage.value =
+                                                                "Failed to connect to '$contextName' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
+                                                            showErrorDialog.value = true
+                                                            activeClient = null
+                                                            selectedContext = null
                                                         }
+                                                        logger.info("Attempting to connect to '$contextName' Completed (the result is processed).")
                                                     }
-                                                }.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                                                }
+                                            }.padding(horizontal = 8.dp, vertical = 6.dp)
+                                        ) {
                                             // Додаємо іконку
                                             Icon(
                                                 imageVector = ICON_CONTEXT, // Ви можете змінити цю іконку на іншу
