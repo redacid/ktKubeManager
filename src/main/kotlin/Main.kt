@@ -570,9 +570,6 @@ fun formatPodRestarts(statuses: List<ContainerStatus>?): String {
 }
 
 
-
-
-
 fun formatPorts(ports: List<ServicePort>?): String {
     if (ports.isNullOrEmpty()) return "<none>"; return ports.joinToString(", ") { p -> "${p.port}${p.nodePort?.let { ":$it" } ?: ""}/${p.protocol ?: "TCP"}${p.name?.let { "($it)" } ?: ""}" }
 }
@@ -709,7 +706,7 @@ fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
         "Namespaces" -> listOf("Name", "Status", "Age")
         "Nodes" -> listOf("Name", "Status", "Roles", "Version", "Taints", "Age")
-        "Events" -> listOf("Namespace", "Name", "Type", "Reason", "Object Type", "Object Name","Message", "Age")
+        "Events" -> listOf("Namespace", "Name", "Type", "Reason", "Object Type", "Object Name", "Message", "Age")
         "Pods" -> listOf("Namespace", "Name", "Ready", "Status", "Restarts", "Node", "Age")
         "Deployments" -> listOf("Namespace", "Name", "Ready", "Up-to-date", "Available", "Age")
         "StatefulSets" -> listOf("Namespace", "Name", "Ready", "Age")
@@ -720,8 +717,28 @@ fun getHeadersForType(resourceType: String): List<String> {
         "Services" -> listOf("Namespace", "Name", "Type", "ClusterIP", "ExternalIP", "Ports", "Age")
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
         "Endpoints" -> listOf("Namespace", "Name", "Endpoints", "Age")
-        "PersistentVolumes" -> listOf("Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age")
-        "PersistentVolumeClaims" -> listOf("Namespace", "Name", "Status", "Volume", "Capacity", "Access Modes", "StorageClass", "Age")
+        "PersistentVolumes" -> listOf(
+            "Name",
+            "Capacity",
+            "Access Modes",
+            "Reclaim Policy",
+            "Status",
+            "Claim",
+            "StorageClass",
+            "Age"
+        )
+
+        "PersistentVolumeClaims" -> listOf(
+            "Namespace",
+            "Name",
+            "Status",
+            "Volume",
+            "Capacity",
+            "Access Modes",
+            "StorageClass",
+            "Age"
+        )
+
         "StorageClasses" -> listOf("Name", "Provisioner", "Reclaim Policy", "Binding Mode", "Allow Expand", "Age")
         "ConfigMaps" -> listOf("Namespace", "Name", "Data", "Age")
         "Secrets" -> listOf("Namespace", "Name", "Type", "Data", "Age")
@@ -748,10 +765,10 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 
             "Nodes" -> if (resource is Node) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name?: na;
+                    0 -> resource.metadata?.name ?: na;
                     1 -> formatNodeStatus(resource.status?.conditions);
                     2 -> formatNodeRoles(resource.metadata?.labels);
-                    3 -> resource.status?.nodeInfo?.kubeletVersion?: na;
+                    3 -> resource.status?.nodeInfo?.kubeletVersion ?: na;
                     4 -> formatTaints(resource.spec?.taints);
                     5 -> formatAge(resource.metadata?.creationTimestamp); else -> ""
                 }
@@ -760,13 +777,15 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
             "Events" -> if (resource is Event) {
                 when (colIndex) {
                     0 -> resource.metadata?.namespace ?: na
-                    1 -> resource.metadata?.name ?: na
+                    1 -> resource.message ?: na
+                    //1 -> resource.metadata?.name ?: na
                     2 -> resource.type ?: na
                     3 -> resource.reason ?: na
                     4 -> resource.involvedObject?.kind ?: na
-                    5 -> resource.involvedObject?.name ?: na
-                    6 -> resource.message ?: na
-                    7 -> formatAge(resource.lastTimestamp ?: resource.metadata?.creationTimestamp)
+                    5 -> resource.source?.component ?: na
+                    //5 -> resource.involvedObject?.name ?: na
+                    //6 -> resource.message ?: na
+                    6 -> formatAge(resource.lastTimestamp ?: resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
@@ -1944,7 +1963,7 @@ fun NodeDetailsView(node: Node) {
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val icon = when(address.type) {
+                        val icon = when (address.type) {
                             "InternalIP" -> FeatherIcons.Server
                             "ExternalIP" -> FeatherIcons.Globe
                             "Hostname" -> FeatherIcons.Home
@@ -2175,7 +2194,14 @@ fun NodeDetailsView(node: Node) {
                         )
                     }
 
-                    if (node.status?.capacity?.entries?.none { !setOf("cpu", "memory", "ephemeral-storage", "pods").contains(it.key) } == true) {
+                    if (node.status?.capacity?.entries?.none {
+                            !setOf(
+                                "cpu",
+                                "memory",
+                                "ephemeral-storage",
+                                "pods"
+                            ).contains(it.key)
+                        } == true) {
                         Text(
                             text = "No extended resources available",
                             style = MaterialTheme.typography.bodySmall,
@@ -2215,6 +2241,7 @@ fun NodeDetailsView(node: Node) {
                         "True" -> MaterialTheme.colorScheme.primary
                         "False" -> if (condition.type == "Ready") MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.primary
+
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
@@ -2224,8 +2251,10 @@ fun NodeDetailsView(node: Node) {
                             containerColor = when {
                                 condition.type == "Ready" && condition.status == "True" ->
                                     MaterialTheme.colorScheme.primaryContainer
+
                                 condition.type == "Ready" && condition.status != "True" ->
                                     MaterialTheme.colorScheme.errorContainer
+
                                 else -> MaterialTheme.colorScheme.surface
                             }
                         )
@@ -2439,8 +2468,10 @@ fun NodeDetailsView(node: Node) {
                         Text("No labels found", modifier = Modifier.padding(vertical = 4.dp))
                     } else {
                         // Розділяємо мітки на категорії
-                        val kubernetesLabels = node.metadata?.labels?.filterKeys { it.startsWith("kubernetes.io/") || it.startsWith("node-role.kubernetes.io/") }
-                        val otherLabels = node.metadata?.labels?.filterKeys { !it.startsWith("kubernetes.io/") && !it.startsWith("node-role.kubernetes.io/") }
+                        val kubernetesLabels =
+                            node.metadata?.labels?.filterKeys { it.startsWith("kubernetes.io/") || it.startsWith("node-role.kubernetes.io/") }
+                        val otherLabels =
+                            node.metadata?.labels?.filterKeys { !it.startsWith("kubernetes.io/") && !it.startsWith("node-role.kubernetes.io/") }
 
                         // Kubernetes мітки
                         if (!kubernetesLabels.isNullOrEmpty()) {
@@ -2555,6 +2586,7 @@ fun NodeDetailsView(node: Node) {
         }
     }
 }
+
 /**
  * Відображає рядок із ресурсом та його візуалізацією
  */
@@ -2753,6 +2785,318 @@ fun ResourceRow(name: String, capacity: Quantity?, allocatable: Quantity?) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
+    }
+}
+
+@Composable
+fun EventDetailsView(event: Event) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        // Основна інформація
+        Text(
+            text = "Event Information",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        DetailRow("Name", event.metadata?.name)
+        DetailRow("Namespace", event.metadata?.namespace)
+        DetailRow("Type", event.type)
+        DetailRow("Reason", event.reason)
+        DetailRow("Last Timestamp", formatAge(event.lastTimestamp ?: event.metadata?.creationTimestamp))
+        DetailRow("Count", event.count?.toString() ?: "1")
+
+        // Спеціальний блок для типу Warning
+        if (event.type == "Warning") {
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.AlertTriangle,
+                        contentDescription = "Warning Event",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "Warning Event",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            "This event indicates a potential issue that might require attention",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Пов'язаний об'єкт
+        Text(
+            text = "Involved Object",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                DetailRow("Kind", event.involvedObject?.kind)
+                DetailRow("Name", event.involvedObject?.name)
+                DetailRow("Namespace", event.involvedObject?.namespace)
+                DetailRow("UID", event.involvedObject?.uid)
+
+                // ResourceVersion та FieldPath показуємо, якщо вони доступні
+                if (!event.involvedObject?.resourceVersion.isNullOrEmpty()) {
+                    DetailRow("Resource Version", event.involvedObject?.resourceVersion)
+                }
+
+                if (!event.involvedObject?.fieldPath.isNullOrEmpty()) {
+                    DetailRow("Field Path", event.involvedObject?.fieldPath)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Повідомлення події
+        Text(
+            text = "Message",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                SelectionContainer {
+                    Text(
+                        text = event.message ?: "No message",
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Джерело події
+        Text(
+            text = "Source",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                DetailRow("Component", event.source?.component ?: "N/A")
+                if (!event.source?.host.isNullOrEmpty()) {
+                    DetailRow("Host", event.source?.host)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Часові рамки
+        val timeframesState = remember { mutableStateOf(false) }
+        DetailSectionHeader(
+            title = "Event Timeframes",
+            expanded = timeframesState
+        )
+
+        if (timeframesState.value) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    DetailRow("First Occurrence", formatAge(event.firstTimestamp))
+                    DetailRow("Last Occurrence", formatAge(event.lastTimestamp))
+                    DetailRow("Created", formatAge(event.metadata?.creationTimestamp))
+
+                    // Додаємо Event Time, якщо воно доступне
+                    if (event.eventTime != null) {
+                        DetailRow("Event Time", formatAge(event.eventTime.toString()))
+                    }
+
+                    // Додаємо тривалість, якщо можемо обчислити
+                    if (event.firstTimestamp != null && event.lastTimestamp != null) {
+                        //try {
+                            val firstTime = OffsetDateTime.parse(event.firstTimestamp)
+                            val lastTime = OffsetDateTime.parse(event.lastTimestamp)
+                            val duration = Duration.between(firstTime, lastTime)
+                            val durationText = when {
+                                duration.seconds < 1 -> "Less than a second"
+                                duration.seconds < 60 -> "${duration.seconds}s"
+                                duration.toMinutes() < 60 -> "${duration.toMinutes()}m ${duration.seconds % 60}s"
+                                duration.toHours() < 24 -> "${duration.toHours()}h ${duration.toMinutes() % 60}m"
+                                else -> "${duration.toDays()}d ${duration.toHours() % 24}h"
+                            }
+                            DetailRow("Duration", durationText)
+                        //} catch (e: Exception) {
+                            // Ігноруємо помилки парсингу дати
+                        //}
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Метадані
+        val metadataState = remember { mutableStateOf(false) }
+        DetailSectionHeader(title = "Metadata", expanded = metadataState)
+
+        if (metadataState.value) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    // Мітки з можливістю згортання/розгортання
+                    var labelsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Labels",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Labels (${event.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (labelsExpanded) {
+                        if (event.metadata?.labels.isNullOrEmpty()) {
+                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                event.metadata?.labels?.forEach { (key, value) ->
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(": ")
+                                        SelectionContainer {
+                                            Text(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Анотації з можливістю згортання/розгортання
+                    var annotationsExpanded by remember { mutableStateOf(true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
+                    ) {
+                        Icon(
+                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
+                            contentDescription = "Toggle Annotations",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Annotations (${event.metadata?.annotations?.size ?: 0}):",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (annotationsExpanded) {
+                        if (event.metadata?.annotations.isNullOrEmpty()) {
+                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
+                        } else {
+                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
+                                event.metadata?.annotations?.entries?.sortedBy { it.key }
+                                    ?.forEach { (key, value) ->
+                                        val isLongValue = value.length > 50
+                                        var valueExpanded by remember { mutableStateOf(false) }
+
+                                        Row(verticalAlignment = Alignment.Top) {
+                                            SelectionContainer {
+                                                Text(
+                                                    text = key,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.width(180.dp)
+                                                )
+                                            }
+
+                                            Text(": ")
+
+                                            if (isLongValue) {
+                                                Column {
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = if (valueExpanded) value else value.take(50) + "...",
+                                                            modifier = Modifier.clickable {
+                                                                valueExpanded = !valueExpanded
+                                                            }
+                                                        )
+                                                    }
+                                                    if (!valueExpanded) {
+                                                        Text(
+                                                            text = "Click to expand",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                SelectionContainer {
+                                                    Text(value)
+                                                }
+                                            }
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -11276,22 +11620,44 @@ fun ResourceDetailPanel(
                     "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
+                        "Invalid PVC data"
+                    )
+
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
                     "StatefulSets" -> if (resource is StatefulSet) StatefulSetDetailsView(sts = resource) else Text("Invalid StatefulSet data")
                     "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
-                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text("Invalid Job data")
+                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text(
+                        "Invalid Job data"
+                    )
+
                     "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text(
+                        "Invalid ReplicaSet data"
+                    )
                     //"NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(netpol = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
-                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
-                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text("Invalid ClusterRole data")
-                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(clusterRoleBinding = resource) else Text("Invalid ClusterRoleBinding data")
-                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text("Invalid ServiceAccount data")
-                    //"Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
-                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text("Invalid StorageClass data")
+                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text(
+                        "Invalid RoleBinding data"
+                    )
+
+                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text(
+                        "Invalid ClusterRole data"
+                    )
+
+                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(
+                        clusterRoleBinding = resource
+                    ) else Text("Invalid ClusterRoleBinding data")
+
+                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text(
+                        "Invalid ServiceAccount data"
+                    )
+
+                    "Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
+                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text(
+                        "Invalid StorageClass data"
+                    )
                     //"CustomResourceDefinitions" -> if (resource is CustomResourceDefinition) CRDDetailsView(crd = resource) else Text("Invalid CRD data")
 
                     // TODO: Додати кейси для всіх інших типів ресурсів (NetworkPolicies, Events, CustomResourceDefinitions, etc.)
@@ -11583,7 +11949,8 @@ fun App() {
     var detailedResourceType by remember { mutableStateOf<String?>(null) }
     // Стани для лог вікна
     val showLogViewer = remember { mutableStateOf(false) } // Прапорець видимості
-    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
+    val logViewerParams =
+        remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
     // Діалог помилки
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
@@ -11600,7 +11967,8 @@ fun App() {
         servicesList = emptyList(); ingressesList = emptyList(); endpointsList = emptyList();
         pvsList = emptyList(); pvcsList = emptyList(); storageClassesList = emptyList(); configMapsList = emptyList();
         secretsList = emptyList(); serviceAccountsList = emptyList(); rolesList = emptyList();
-        roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList = emptyList(); eventsList = emptyList();
+        roleBindingsList = emptyList(); clusterRolesList = emptyList(); clusterRoleBindingsList =
+            emptyList(); eventsList = emptyList();
     }
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
@@ -11800,7 +12168,8 @@ fun App() {
                                                     }.onFailure { errorMsg = it.message }
 
                                                     "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess {
-                                                        podsList = it; loadOk = true }
+                                                        podsList = it; loadOk = true
+                                                    }
                                                         .onFailure { errorMsg = it.message }
 
                                                     "Deployments" -> loadDeploymentsFabric8(
@@ -12349,7 +12718,7 @@ fun App() {
                     } // Кінець Column правої панелі
                 } // Кінець Row
                 // --- Статус-бар ---
-                Divider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
