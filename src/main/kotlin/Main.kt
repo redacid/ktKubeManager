@@ -2160,7 +2160,7 @@ fun NodeDetailsView(node: Node) {
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = when {
-                    nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.tertiaryContainer
+                    nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.primaryContainer
                     nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.errorContainer
                     else -> MaterialTheme.colorScheme.surfaceVariant
                 }
@@ -2234,6 +2234,7 @@ fun NodeDetailsView(node: Node) {
                             "InternalIP" -> FeatherIcons.Server
                             "ExternalIP" -> FeatherIcons.Globe
                             "Hostname" -> FeatherIcons.Home
+                            "InternalDNS" -> FeatherIcons.Eye
                             else -> FeatherIcons.Terminal
                         }
 
