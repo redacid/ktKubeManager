@@ -12089,258 +12089,215 @@ private fun getProvisionerDescription(provisioner: String?): String? {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CrdDetailsView(crd: CustomResourceDefinition) {
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .padding(16.dp)
             .fillMaxSize()
+            //.verticalScroll(scrollState)
     ) {
-        // Основна інформація
-        Text(
-            text = "Custom Resource Definition Information",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        DetailRow("Name", crd.metadata?.name)
-        DetailRow("Created", formatAge(crd.metadata?.creationTimestamp))
-        DetailRow("Group", crd.spec?.group)
-        DetailRow("Scope", crd.spec?.scope ?: "Namespaced")
-
-        // Інформація про кастомний ресурс
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = "Resource Information",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
+        // Базова інформація у вигляді картки
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                .padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                val names = crd.spec?.names
-                DetailRow("Kind", names?.kind)
-                DetailRow("Plural", names?.plural)
-                DetailRow("Singular", names?.singular)
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = crd.metadata?.name ?: "Невідомий CRD",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
 
-                if (!names?.shortNames.isNullOrEmpty()) {
-                    DetailRow("Short Names", names?.shortNames?.joinToString(", "))
-                }
+                Spacer(Modifier.height(4.dp))
 
-                DetailRow("List Kind", names?.listKind ?: "${names?.kind}List")
+                Text(
+                    text = "${crd.spec?.group ?: "Невідома група"} / ${crd.spec?.names?.kind ?: "Невідомий тип"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
 
-                if (names?.categories?.isNotEmpty() == true) {
-                    DetailRow("Categories", names.categories.joinToString(", "))
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text(
+                            text = "Scope: ${crd.spec?.scope ?: "Namespaced"}",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = "Created: ${formatAge(crd.metadata?.creationTimestamp)}",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
         }
 
-        // Версії CRD
-        Spacer(Modifier.height(16.dp))
-        val versions = crd.spec?.versions
-        Text(
-            text = "Versions (${versions?.size ?: 0})",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        // Інформація про кастомний ресурс
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Інформація про ресурс",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
-        if (versions.isNullOrEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.AlertTriangle,
-                        contentDescription = "Warning",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "No versions defined for this CRD",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontWeight = FontWeight.Bold
-                    )
+                Divider(modifier = Modifier.padding(bottom = 12.dp))
+
+                val names = crd.spec?.names
+
+                // Базова інформація
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row {
+                            Text(
+                                text = "Kind:",
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(100.dp)
+                            )
+                            Text(
+                                text = names?.kind ?: "Невідомий",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Row {
+                            Text(
+                                text = "List Kind:",
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(100.dp)
+                            )
+                            Text(
+                                text = names?.listKind ?: "${names?.kind ?: ""}List",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row {
+                            Text(
+                                text = "Plural:",
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(100.dp)
+                            )
+                            Text(
+                                text = names?.plural ?: "Невідомий",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Row {
+                            Text(
+                                text = "Singular:",
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(100.dp)
+                            )
+                            Text(
+                                text = names?.singular ?: "-",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 400.dp)
-            ) {
-                itemsIndexed(versions) { index, version ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (version.served == true) {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                            }
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+
+                // Короткі назви
+                if (!names?.shortNames.isNullOrEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Короткі назви:",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(modifier = Modifier.padding(top = 4.dp)) {
+                        names?.shortNames?.forEach { shortName ->
+                            Card(
+                                modifier = Modifier.padding(end = 8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                                )
                             ) {
                                 Text(
-                                    text = version.name ?: "unknown",
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (version.storage == true) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    style = MaterialTheme.typography.titleSmall
+                                    text = shortName,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
-
-                                Spacer(Modifier.weight(1f))
-
-                                if (version.storage == true) {
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
-                                    ) {
-                                        Text(
-                                            "Storage Version",
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (version.served == true) {
-                                            MaterialTheme.colorScheme.tertiaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.errorContainer
-                                        }
-                                    )
-                                ) {
-                                    Text(
-                                        if (version.served == true) "Served" else "Not Served",
-                                        color = if (version.served == true) {
-                                            MaterialTheme.colorScheme.onTertiaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.onErrorContainer
-                                        },
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        fontSize = 12.sp
-                                    )
-                                }
                             }
+                        }
+                    }
+                }
 
-                            Divider(modifier = Modifier.padding(vertical = 8.dp))
+                // Категорії
+                if (!names?.categories.isNullOrEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Категорії:",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-                            // Schema інформація
-                            version.schema?.let { schema ->
-                                schema.openAPIV3Schema?.let { openAPISchema ->
-                                    Text(
-                                        "Schema Type: ${openAPISchema.type ?: "unknown"}",
-                                        fontWeight = FontWeight.Medium
-                                    )
-
-                                    // Додаткові поля схеми, якщо потрібно
-                                    if (openAPISchema.required?.isNotEmpty() == true) {
-                                        Spacer(Modifier.height(4.dp))
-                                        Text("Required Fields:", fontWeight = FontWeight.Medium)
-                                        Text(openAPISchema.required.joinToString(", "))
-                                    }
-                                }
-                            }
-
-                            // Інформація про субресурси
-                            version.subresources?.let { subresources ->
-                                Spacer(Modifier.height(8.dp))
-                                Text("Subresources:", fontWeight = FontWeight.Medium)
-
-                                // Status subresource
-                                if (subresources.status != null) {
-                                    Spacer(Modifier.height(4.dp))
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            "status",
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-
-                                // Scale subresource
-                                subresources.scale?.let {
-                                    Spacer(Modifier.height(4.dp))
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            "scale",
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-
-                                    Column(modifier = Modifier.padding(start = 16.dp, top = 2.dp)) {
-                                        Text("Status replicas: ${it.statusReplicasPath ?: "N/A"}")
-                                        Text("Spec replicas: ${it.specReplicasPath ?: "N/A"}")
-                                        if (it.labelSelectorPath != null) {
-                                            Text("Label selector: ${it.labelSelectorPath}")
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Validation інформація
-                            Spacer(Modifier.height(8.dp))
-                            Text("Additional Printer Columns:", fontWeight = FontWeight.Medium)
-
-                            if (version.additionalPrinterColumns.isNullOrEmpty()) {
-                                Text("None", fontStyle = FontStyle.Italic)
-                            } else {
-                                version.additionalPrinterColumns.forEach { column ->
-                                    Row(
-                                        modifier = Modifier.padding(top = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Card(
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                            modifier = Modifier.width(100.dp)
-                                        ) {
-                                            Text(
-                                                column.name ?: "unnamed",
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                fontWeight = FontWeight.Medium,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-
-                                        Spacer(Modifier.width(8.dp))
-
-                                        Text(
-                                            "${column.type ?: "unknown"} - ${column.jsonPath ?: "no path"}",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                }
+                    FlowRow(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        names?.categories?.forEach { category ->
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Text(
+                                    text = category,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
                             }
                         }
                     }
@@ -12348,89 +12305,419 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
             }
         }
 
-        // Умови статусу
-        Spacer(Modifier.height(16.dp))
+        // Статус CRD
         val conditions = crd.status?.conditions
-        val conditionsState = remember { mutableStateOf(false) }
-        DetailSectionHeader(
-            title = "Status Conditions (${conditions?.size ?: 0})",
-            expanded = conditionsState
-        )
+        if (!conditions.isNullOrEmpty()) {
+            Spacer(Modifier.height(8.dp))
 
-        if (conditionsState.value && !conditions.isNullOrEmpty()) {
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 300.dp)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                itemsIndexed(conditions) { _, condition ->
-                    Card(
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Статус CRD",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Divider(modifier = Modifier.padding(bottom = 12.dp))
+
+                    // Умови статусу
+                    conditions.forEach { condition ->
+                        val isPositive = condition.status == "True"
+                        val backgroundColor = when {
+                            condition.type == "Established" && isPositive -> MaterialTheme.colorScheme.primaryContainer
+                            condition.type == "NamesAccepted" && isPositive -> MaterialTheme.colorScheme.secondaryContainer
+                            isPositive -> MaterialTheme.colorScheme.tertiaryContainer
+                            else -> MaterialTheme.colorScheme.errorContainer
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = backgroundColor)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPositive) ICON_SUCCESS else ICON_ERROR,
+                                        contentDescription = condition.type,
+                                        tint = if (isPositive)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+
+                                    Spacer(Modifier.width(8.dp))
+
+                                    Text(
+                                        text = condition.type ?: "Невідомий стан",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+
+                                    Spacer(Modifier.weight(1f))
+
+                                    Text(
+                                        text = condition.status ?: "Невідомо",
+                                        color = if (isPositive)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+
+                                Text(
+                                    text = "Причина: ${condition.reason ?: "Невідома"}",
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                if (!condition.message.isNullOrEmpty()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    SelectionContainer {
+                                        Text(
+                                            text = condition.message,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "Останнє оновлення: ${formatAge(condition.lastTransitionTime)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontStyle = FontStyle.Italic
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Версії CRD
+        val versions = crd.spec?.versions
+        Spacer(Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Версії (${versions?.size ?: 0})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Divider(modifier = Modifier.padding(bottom = 12.dp))
+
+                if (versions.isNullOrEmpty()) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = when (condition.type) {
-                                "Established" -> if (condition.status == "True")
-                                    MaterialTheme.colorScheme.primaryContainer
-                                else
-                                    MaterialTheme.colorScheme.errorContainer
-                                "NamesAccepted" -> if (condition.status == "True")
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                else
-                                    MaterialTheme.colorScheme.errorContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        )
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (condition.status == "True") ICON_SUCCESS else ICON_ERROR,
-                                    contentDescription = condition.type,
-                                    tint = if (condition.status == "True")
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                        Icon(
+                            imageVector = FeatherIcons.AlertTriangle,
+                            contentDescription = "Попередження",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Жодної версії не визначено для цього CRD",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    versions.forEachIndexed { index, version ->
+                        val isServed = version.served == true
 
-                                Spacer(Modifier.width(8.dp))
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isServed) MaterialTheme.colorScheme.surfaceVariant
+                                else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                // Заголовок версії
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isServed) {
+                                                if (version.storage == true)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.secondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.errorContainer
+                                            }
+                                        )
+                                    ) {
+                                        Text(
+                                            text = version.name ?: "невідома",
+                                            color = if (isServed) {
+                                                if (version.storage == true)
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                else
+                                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onErrorContainer
+                                            },
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        )
+                                    }
 
-                                Text(
-                                    text = condition.type ?: "Unknown",
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleSmall
-                                )
+                                    Spacer(Modifier.weight(1f))
 
-                                Spacer(Modifier.weight(1f))
+                                    // Ознаки статусу
+                                    Row {
+                                        if (version.storage == true) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                                )
+                                            ) {
+                                                Text(
+                                                    text = "Версія зберігання",
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    fontSize = 12.sp,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                        }
 
-                                Text(
-                                    text = condition.status ?: "Unknown",
-                                    color = if (condition.status == "True")
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                                        Card(
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isServed)
+                                                    MaterialTheme.colorScheme.tertiaryContainer
+                                                else
+                                                    MaterialTheme.colorScheme.errorContainer
+                                            )
+                                        ) {
+                                            Text(
+                                                text = if (isServed) "Активна" else "Неактивна",
+                                                color = if (isServed)
+                                                    MaterialTheme.colorScheme.onTertiaryContainer
+                                                else
+                                                    MaterialTheme.colorScheme.onErrorContainer,
+                                                fontSize = 12.sp,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
 
-                            Spacer(Modifier.height(4.dp))
+                                Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-                            Text("Reason: ${condition.reason ?: "N/A"}")
+                                // Деталі схеми
+                                version.schema?.let { schema ->
+                                    schema.openAPIV3Schema?.let { openAPISchema ->
+                                        Row {
+                                            Text(
+                                                text = "Тип схеми:",
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.width(120.dp)
+                                            )
+                                            Text(
+                                                text = openAPISchema.type ?: "не вказано",
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
 
-                            if (!condition.message.isNullOrEmpty()) {
-                                Spacer(Modifier.height(4.dp))
-                                SelectionContainer {
-                                    Text("Message: ${condition.message}")
+                                        if (openAPISchema.required?.isNotEmpty() == true) {
+                                            Spacer(Modifier.height(8.dp))
+                                            Text("Обов'язкові поля:", fontWeight = FontWeight.Medium)
+
+                                            FlowRow(
+                                                modifier = Modifier.padding(top = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                openAPISchema.required.forEach { field ->
+                                                    Card(
+                                                        colors = CardDefaults.cardColors(
+                                                            containerColor = MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.1f)
+                                                        )
+                                                    ) {
+                                                        Text(
+                                                            text = field,
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                            fontSize = 13.sp
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Субресурси
+                                version.subresources?.let { subresources ->
+                                    if (subresources.status != null || subresources.scale != null) {
+                                        Spacer(Modifier.height(12.dp))
+                                        Text("Субресурси:", fontWeight = FontWeight.Medium)
+
+                                        Row(
+                                            modifier = Modifier.padding(top = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            if (subresources.status != null) {
+                                                Card(
+                                                    colors = CardDefaults.cardColors(
+                                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                                    )
+                                                ) {
+                                                    Text(
+                                                        text = "status",
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            if (subresources.scale != null) {
+                                                Card(
+                                                    colors = CardDefaults.cardColors(
+                                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                                    )
+                                                ) {
+                                                    Text(
+                                                        text = "scale",
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Деталі scale
+                                        subresources.scale?.let { scale ->
+                                            Column(
+                                                modifier = Modifier
+                                                    .padding(start = 16.dp, top = 4.dp)
+                                                    .fillMaxWidth()
+                                            ) {
+                                                scale.specReplicasPath?.let {
+                                                    Text(
+                                                        text = "Шлях до spec.replicas: $it",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+
+                                                scale.statusReplicasPath?.let {
+                                                    Text(
+                                                        text = "Шлях до status.replicas: $it",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+
+                                                scale.labelSelectorPath?.let {
+                                                    Text(
+                                                        text = "Шлях до селектора міток: $it",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Додаткові колонки для виводу
+                                if (!version.additionalPrinterColumns.isNullOrEmpty()) {
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        text = "Додаткові колонки виводу:",
+                                        fontWeight = FontWeight.Medium
+                                    )
+
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(top = 8.dp)
+                                            .fillMaxWidth()
+                                    ) {
+                                        version.additionalPrinterColumns.forEach { column ->
+                                            Row(
+                                                modifier = Modifier.padding(bottom = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Card(
+                                                    colors = CardDefaults.cardColors(
+                                                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                                                    ),
+                                                    modifier = Modifier.width(110.dp)
+                                                ) {
+                                                    Text(
+                                                        text = column.name ?: "без назви",
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        fontWeight = FontWeight.Medium,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier
+                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                            .fillMaxWidth()
+                                                    )
+                                                }
+
+                                                Spacer(Modifier.width(12.dp))
+
+                                                Row {
+                                                    Card(
+                                                        colors = CardDefaults.cardColors(
+                                                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                                        )
+                                                    ) {
+                                                        Text(
+                                                            text = column.type ?: "невідомий",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            fontSize = 13.sp,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+
+                                                    Spacer(Modifier.width(8.dp))
+
+                                                    Text(
+                                                        text = column.jsonPath ?: "невідомий шлях",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        modifier = Modifier.align(Alignment.CenterVertically)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                        }
 
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "Last Transition: ${formatAge(condition.lastTransitionTime)}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                        if (index < versions.size - 1) {
+                            Spacer(Modifier.height(8.dp))
                         }
                     }
                 }
@@ -12438,130 +12725,147 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
         }
 
         // Мітки та анотації
-        Spacer(Modifier.height(16.dp))
-        val labelsState = remember { mutableStateOf(false) }
-        DetailSectionHeader(title = "Labels & Annotations", expanded = labelsState)
+        if (!crd.metadata?.labels.isNullOrEmpty() || !crd.metadata?.annotations.isNullOrEmpty()) {
+            Spacer(Modifier.height(8.dp))
 
-        if (labelsState.value) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    // Мітки з можливістю згортання/розгортання
-                    var labelsExpanded by remember { mutableStateOf(true) }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { labelsExpanded = !labelsExpanded }
-                    ) {
-                        Icon(
-                            imageVector = if (labelsExpanded) ICON_DOWN else ICON_RIGHT,
-                            contentDescription = "Toggle Labels",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Labels (${crd.metadata?.labels?.size ?: 0}):", fontWeight = FontWeight.Bold)
-                    }
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Мітки та анотації",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
-                    if (labelsExpanded) {
-                        if (crd.metadata?.labels.isNullOrEmpty()) {
-                            Text("No labels", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
-                        } else {
-                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                crd.metadata?.labels?.forEach { (key, value) ->
-                                    Row {
-                                        SelectionContainer {
-                                            Text(
-                                                text = key,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                        Text(": ")
-                                        SelectionContainer {
-                                            Text(value)
-                                        }
+                    Divider(modifier = Modifier.padding(bottom = 12.dp))
+
+                    // Мітки
+                    if (!crd.metadata?.labels.isNullOrEmpty()) {
+                        Text(
+                            text = "Мітки:",
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Column(
+                            modifier = Modifier
+                                .padding(vertical = 6.dp, horizontal = 8.dp)
+                                .fillMaxWidth()
+                        ) {
+                            crd.metadata?.labels?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                    SelectionContainer {
+                                        Text(
+                                            text = key,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.width(180.dp)
+                                        )
+                                    }
+
+                                    Text(text = "= ")
+
+                                    SelectionContainer {
+                                        Text(
+                                            text = value,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
                                     }
                                 }
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(8.dp))
+                    // Анотації
+                    if (!crd.metadata?.annotations.isNullOrEmpty()) {
+                        if (!crd.metadata?.labels.isNullOrEmpty()) {
+                            Spacer(Modifier.height(16.dp))
+                        }
 
-                    // Анотації з можливістю згортання/розгортання
-                    var annotationsExpanded by remember { mutableStateOf(true) }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { annotationsExpanded = !annotationsExpanded }
-                    ) {
-                        Icon(
-                            imageVector = if (annotationsExpanded) ICON_DOWN else ICON_RIGHT,
-                            contentDescription = "Toggle Annotations",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
                         Text(
-                            "Annotations (${crd.metadata?.annotations?.size ?: 0}):",
-                            fontWeight = FontWeight.Bold
+                            text = "Анотації:",
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
 
-                    if (annotationsExpanded) {
-                        if (crd.metadata?.annotations.isNullOrEmpty()) {
-                            Text("No annotations", modifier = Modifier.padding(start = 24.dp, top = 4.dp))
-                        } else {
-                            Column(modifier = Modifier.padding(start = 24.dp, top = 4.dp)) {
-                                crd.metadata?.annotations?.entries?.sortedBy { it.key }
-                                    ?.forEach { (key, value) ->
-                                        val isLongValue = value.length > 50
-                                        var valueExpanded by remember { mutableStateOf(false) }
+                        Column(
+                            modifier = Modifier
+                                .padding(vertical = 6.dp, horizontal = 8.dp)
+                                .fillMaxWidth()
+                        ) {
+                            crd.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
+                                val isLongValue = value.length > 60
+                                var valueExpanded by remember { mutableStateOf(false) }
 
-                                        Row(verticalAlignment = Alignment.Top) {
-                                            SelectionContainer {
-                                                Text(
-                                                    text = key,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = MaterialTheme.colorScheme.tertiary,
-                                                    modifier = Modifier.width(180.dp)
-                                                )
-                                            }
+                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    Row {
+                                        SelectionContainer {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.width(180.dp)
+                                            )
+                                        }
 
-                                            Text(": ")
+                                        Text(text = "= ")
+                                    }
 
-                                            if (isLongValue) {
-                                                Column {
+                                    if (isLongValue) {
+                                        Row(
+                                            modifier = Modifier
+                                                .padding(start = 12.dp, top = 4.dp)
+                                                .clickable { valueExpanded = !valueExpanded }
+                                        ) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                                ),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(modifier = Modifier.padding(8.dp)) {
                                                     SelectionContainer {
                                                         Text(
-                                                            text = if (valueExpanded) value else value.take(50) + "...",
-                                                            modifier = Modifier.clickable {
-                                                                valueExpanded = !valueExpanded
-                                                            }
+                                                            text = if (valueExpanded) value else value.take(60) + "...",
+                                                            style = MaterialTheme.typography.bodySmall
                                                         )
                                                     }
+
                                                     if (!valueExpanded) {
                                                         Text(
-                                                            text = "Click to expand",
+                                                            text = "Натисніть, щоб розгорнути",
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.clickable { valueExpanded = true }
+                                                            modifier = Modifier.padding(top = 4.dp)
                                                         )
                                                     }
-                                                }
-                                            } else {
-                                                SelectionContainer {
-                                                    Text(value)
                                                 }
                                             }
                                         }
-                                        Spacer(Modifier.height(4.dp))
+                                    } else {
+                                        Row(
+                                            modifier = Modifier.padding(start = 12.dp, top = 2.dp)
+                                        ) {
+                                            SelectionContainer {
+                                                Text(value)
+                                            }
+                                        }
                                     }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
+        // Нижній відступ
+        Spacer(Modifier.height(16.dp))
     }
 }
 
