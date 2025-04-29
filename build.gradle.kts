@@ -13,7 +13,7 @@ plugins {
     //id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
-group = "com.example.kubemanager"
+group = "ua.in.ios.kubemanager"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -65,7 +65,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "KotlinKubeManager"
-            packageVersion = "1.0.1"
+            packageVersion = "1.0.2"
             macOS {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
             }
