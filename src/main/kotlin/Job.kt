@@ -442,7 +442,7 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                             Spacer(Modifier.height(8.dp))
 
                             val status = job.status
-                            val startTime = status?.startTime
+                            //val startTime = status?.startTime
                             val completionTime = status?.completionTime
 
                             // Status timeline
