@@ -66,7 +66,6 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
-import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -267,7 +266,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
         try {
             val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) {
                 logger.info("[IO] Створення базового конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
-                // 1. Отримуємо оброблену конфігурацію
+                // Отримуємо оброблену конфігурацію
                 val resolvedConfig: Config =
                     Config.autoConfigure(targetContext) ?: throw KubernetesClientException(
                         "Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'"
@@ -291,29 +290,29 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                     val mapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
                     val kubeConfigModel: KubeConfigModel = mapper.readValue(kubeConfigFile, KubeConfigModel::class.java)
 
-                    // 3. Визначаємо ім'я контексту, яке було фактично використано
+                    // Визначаємо ім'я контексту, яке було фактично використано
                     val actualContextName = resolvedConfig.currentContext?.name
                         ?: kubeConfigModel.currentContext // Беремо з resolvedConfig, або з моделі якщо там null
                         ?: throw KubernetesClientException("Не вдалося визначити поточний контекст")
 
-                    // 4. Знаходимо NamedContext у сирій моделі
+                    // Знаходимо NamedContext у сирій моделі
                     val namedContext: NamedContext? = kubeConfigModel.contexts?.find { it.name == actualContextName }
                     val contextInfo = namedContext?.context
                         ?: throw KubernetesClientException("Не знайдено деталей для контексту '$actualContextName' у KubeConfig моделі")
 
-                    // 5. Отримуємо ім'я користувача з контексту
+                    // Отримуємо ім'я користувача з контексту
                     val userName: String? = contextInfo.user
 
                     if (userName != null) {
-                        // 6. Отримуємо список користувачів (NamedAuthInfo) з сирої моделі
+                        // Отримуємо список користувачів (NamedAuthInfo) з сирої моделі
                         val usersList: List<NamedAuthInfo> =
                             kubeConfigModel.users ?: emptyList() // У моделі поле називається 'users'
 
-                        // 7. Знаходимо NamedAuthInfo для нашого користувача
+                        // Знаходимо NamedAuthInfo для нашого користувача
                         val namedAuthInfo: NamedAuthInfo? = usersList.find { it.name == userName }
                         val userAuth: AuthInfo? = namedAuthInfo?.user // AuthInfo з сирої моделі
 
-                        // 8. Отримуємо ExecConfig
+                        // Отримуємо ExecConfig
                         val execConfig: ExecConfig? = userAuth?.exec
 
                         // 9. Перевіряємо, чи це EKS exec
@@ -344,10 +343,10 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 
                             logger.info("Параметри для EKS TokenProvider: cluster='$clusterName', region='$region', profile='${awsProfile ?: "(default)"}'")
 
-                            // 10. Створюємо та встановлюємо наш кастомний провайдер токенів в ОБРОБЛЕНУ конфігурацію
+                            //Створюємо та встановлюємо наш кастомний провайдер токенів в ОБРОБЛЕНУ конфігурацію
                             resolvedConfig.oauthTokenProvider = EksTokenProvider(clusterName, region, awsProfile)
 
-                            // 11. Обнуляємо конфліктуючі методи аутентифікації в ОБРОБЛЕНІЙ конфігурації
+                            // Обнуляємо конфліктуючі методи аутентифікації в ОБРОБЛЕНІЙ конфігурації
                             // Достатньо обнулити поля верхнього рівня в resolvedConfig
                             resolvedConfig.username = null
                             resolvedConfig.password = null
@@ -408,9 +407,9 @@ fun findArgumentValue(args: List<String>, argName: String): String? {
         null
     }
 }
-private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
-    return envList?.find { it.name == key }?.value
-}
+//private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
+//    return envList?.find { it.name == key }?.value
+//}
 
 // Calculate optimal column widths based on content
 @Composable
@@ -482,34 +481,6 @@ fun measureTextWidth(
         text = text, style = style
     )
     return textLayoutResult.size.width
-}
-
-
-// Допоміжна функція для обчислення тривалості поза композебл функцією
-fun calculateJobDuration(startTimeStr: String?, completionTimeStr: String?): String {
-    if (startTimeStr == null || completionTimeStr == null) {
-        return "Не вдалося розрахувати"
-    }
-
-    return try {
-        val start = OffsetDateTime.parse(startTimeStr)
-        val end = OffsetDateTime.parse(completionTimeStr)
-        val duration = Duration.between(start, end)
-
-        val days = duration.toDays()
-        val hours = duration.toHours() % 24
-        val minutes = duration.toMinutes() % 60
-        val seconds = duration.seconds % 60
-
-        when {
-            days > 0 -> "${days}d ${hours}h ${minutes}m ${seconds}s"
-            hours > 0 -> "${hours}h ${minutes}m ${seconds}s"
-            minutes > 0 -> "${minutes}m ${seconds}s"
-            else -> "${seconds}s"
-        }
-    } catch (e: Exception) {
-        "Не вдалося розрахувати"
-    }
 }
 
 
@@ -2157,7 +2128,7 @@ fun App() {
                                                     modifier = Modifier.fillMaxSize(),
                                                     contentAlignment = Alignment.Center
                                                 ) { Text("No type resources '$currentResourceType'") }
-                                            } // M3 Text
+                                            }
                                             else if (headers.isNotEmpty()) {
                                                 // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
                                                 Column(modifier = Modifier.fillMaxSize()) {
@@ -2188,8 +2159,7 @@ fun App() {
                                                                             columnWidths = columnWidths,
                                                                             onRowClick = { clickedItem ->
                                                                                 detailedResource = clickedItem
-                                                                                detailedResourceType =
-                                                                                    currentResourceType
+                                                                                detailedResourceType = currentResourceType
                                                                                 showLogViewer.value = false
                                                                                 logViewerParams.value = null
                                                                             })

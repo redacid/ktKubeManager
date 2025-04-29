@@ -4,7 +4,7 @@ SHELL := /bin/bash
 APP_NAME := kotlinkubemanager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
-RELEASE_VERSION ?= 1.0.0
+RELEASE_VERSION ?= 1.0.2
 
 # colors
 GREEN = $(shell tput -Txterm setaf 2)
