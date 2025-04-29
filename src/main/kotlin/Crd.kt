@@ -40,7 +40,7 @@ suspend fun loadCrdsFabric8(client: KubernetesClient?) =
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CrdDetailsView(crd: CustomResourceDefinition) {
-    val scrollState = rememberScrollState()
+    //val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier.Companion
