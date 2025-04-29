@@ -4,7 +4,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,16 +65,18 @@ fun ReplicaSetDetailsView(replicaSet: ReplicaSet) {
                     .height(48.dp)
             ) {
                 CircularProgressIndicator(
-                progress = { 1f },
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                strokeWidth = 4.dp,
+                    progress = 1f,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 4.dp
                 )
                 CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxSize(),
-                color = if (progress >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                strokeWidth = 4.dp,
+                    progress = progress,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    color = if (progress >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    strokeWidth = 4.dp
                 )
                 Text(
                     text = "$readyReplicas/$desiredReplicas",

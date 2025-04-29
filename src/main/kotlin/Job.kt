@@ -21,8 +21,6 @@ import compose.icons.feathericons.Clock
 import compose.icons.feathericons.HardDrive
 import compose.icons.feathericons.Terminal
 import io.fabric8.kubernetes.client.KubernetesClient
-import java.time.Duration
-import java.time.OffsetDateTime
 
 suspend fun loadJobsFabric8(client: KubernetesClient?, namespace: String?) =
     fetchK8sResource(client, "Jobs", namespace) { cl, ns ->
@@ -444,7 +442,7 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                             Spacer(Modifier.height(8.dp))
 
                             val status = job.status
-                            //val startTime = status?.startTime
+                            val startTime = status?.startTime
                             val completionTime = status?.completionTime
 
                             // Status timeline
@@ -690,32 +688,5 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                 }
             }
         }
-    }
-}
-
-// Допоміжна функція для обчислення тривалості поза композебл функцією
-fun calculateJobDuration(startTimeStr: String?, completionTimeStr: String?): String {
-    if (startTimeStr == null || completionTimeStr == null) {
-        return "Не вдалося розрахувати"
-    }
-
-    return try {
-        val start = OffsetDateTime.parse(startTimeStr)
-        val end = OffsetDateTime.parse(completionTimeStr)
-        val duration = Duration.between(start, end)
-
-        val days = duration.toDays()
-        val hours = duration.toHours() % 24
-        val minutes = duration.toMinutes() % 60
-        val seconds = duration.seconds % 60
-
-        when {
-            days > 0 -> "${days}d ${hours}h ${minutes}m ${seconds}s"
-            hours > 0 -> "${hours}h ${minutes}m ${seconds}s"
-            minutes > 0 -> "${minutes}m ${seconds}s"
-            else -> "${seconds}s"
-        }
-    } catch (e: Exception) {
-        "Не вдалося розрахувати"
     }
 }

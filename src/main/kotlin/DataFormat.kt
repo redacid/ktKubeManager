@@ -129,7 +129,3 @@ fun formatAge(creationTimestamp: String?): String {
         logger.warn("Failed to format timestamp '$creationTimestamp': ${e.message}"); return "Invalid"
     }
 }
-
-//fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
-//    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
-//}

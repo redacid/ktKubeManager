@@ -369,15 +369,15 @@ fun ServiceAccountDetailsView(serviceAccount: ServiceAccount) {
                     )
 
                     Spacer(Modifier.Companion.height(8.dp))
-                    val serviceAccountNamespace = serviceAccount.metadata?.namespace
-                    val serviceAccountName = serviceAccount.metadata?.name
+                    val namespace = serviceAccount.metadata?.namespace
+                    val name = serviceAccount.metadata?.name
 
-                    val subjectReference = if (serviceAccountNamespace != null && serviceAccountName != null) {
+                    val subjectReference = if (namespace != null && name != null) {
                         """
                         subject:
                           kind: ServiceAccount
-                          name: $serviceAccountName
-                          namespace: $serviceAccountNamespace
+                          name: $name
+                          namespace: $namespace
                         """.trimIndent()
                     } else {
                         "Subject reference not available"

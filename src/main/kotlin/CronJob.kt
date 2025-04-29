@@ -154,7 +154,7 @@ fun CronJobDetailsView(cronJob: CronJob) {
                 Column(modifier = Modifier.Companion.padding(8.dp)) {
                     // Останні запуски
                     val lastScheduled = cronJob.status?.lastScheduleTime
-                    //val creationTime = cronJob.metadata?.creationTimestamp
+                    val creationTime = cronJob.metadata?.creationTimestamp
 
                     Text("Timeline", fontWeight = FontWeight.Companion.Bold)
                     Spacer(Modifier.Companion.height(8.dp))

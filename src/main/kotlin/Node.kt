@@ -53,8 +53,8 @@ fun NodeDetailsView(node: Node) {
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = when {
-                    nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.primaryContainer
-                    nodeStatus.contains("NotReady") -> MaterialTheme.colorScheme.errorContainer
+                    nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.primaryContainer
+                    nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.errorContainer
                     else -> MaterialTheme.colorScheme.surfaceVariant
                 }
             )
@@ -63,14 +63,14 @@ fun NodeDetailsView(node: Node) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = when {
-                            nodeStatus.contains("Ready") -> FeatherIcons.Check
-                            nodeStatus.contains("NotReady") -> FeatherIcons.AlertTriangle
+                            nodeStatus?.contains("Ready") == true -> FeatherIcons.Check
+                            nodeStatus?.contains("NotReady") == true -> FeatherIcons.AlertTriangle
                             else -> FeatherIcons.HelpCircle
                         },
                         contentDescription = "Node Status",
                         tint = when {
-                            nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.primary
-                            nodeStatus.contains("NotReady") -> MaterialTheme.colorScheme.error
+                            nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.tertiary
+                            nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.error
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                         modifier = Modifier.size(24.dp)
@@ -80,8 +80,8 @@ fun NodeDetailsView(node: Node) {
                         text = "Status: $nodeStatus",
                         fontWeight = FontWeight.Bold,
                         color = when {
-                            nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.onPrimaryContainer
-                            nodeStatus.contains("NotReady") -> MaterialTheme.colorScheme.onErrorContainer
+                            nodeStatus?.contains("Ready") == true -> MaterialTheme.colorScheme.onTertiaryContainer
+                            nodeStatus?.contains("NotReady") == true -> MaterialTheme.colorScheme.onErrorContainer
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
@@ -516,7 +516,7 @@ fun NodeDetailsView(node: Node) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(modifier = Modifier.heightIn(max = 400.dp).padding(12.dp)) {
+                    Column(modifier = Modifier.heightIn(max = 200.dp).padding(12.dp)) {
                         Text(
                             text = "Images cached on this node:",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),

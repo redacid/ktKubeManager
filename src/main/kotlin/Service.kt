@@ -167,7 +167,7 @@ fun ServiceDetailsView(svc: Service) {
 //            verticalAlignment = Alignment.CenterVertically
 //        ) {
 //            Icon(
-//                imageVector = if (showEndpoints.value) .ICON_DOWN else .ICON_RIGHT,
+//                imageVector = if (showEndpoints.value) ICON_DOWN else ICON_RIGHT,
 //                contentDescription = "Expand Endpoints"
 //            )
 //            Text(

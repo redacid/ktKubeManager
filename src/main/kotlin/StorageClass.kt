@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-//import compose.icons.FeatherIcons
+import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
 import compose.icons.feathericons.*
 import compose.icons.simpleicons.*
@@ -63,8 +63,9 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                     Icon(
                         imageVector = when {
                             storageClass.metadata?.annotations?.get("storageclass.kubernetes.io/is-default-class") == "true" ->
-                                ICON_STAR
-                            else -> ICON_DB
+                                FeatherIcons.Star
+
+                            else -> FeatherIcons.Database
                         },
                         contentDescription = "Storage Class Status",
                         tint = when {
@@ -178,25 +179,25 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                 val reclaimPolicy = storageClass.reclaimPolicy ?: "Delete"
                 val (reclaimIcon, reclaimColor, reclaimDescription) = when (reclaimPolicy) {
                     "Retain" -> Triple(
-                        ICON_LOCK,
+                        FeatherIcons.Lock,
                         MaterialTheme.colorScheme.primary,
                         "Manually reclaim the volume after the claim is deleted"
                     )
 
                     "Delete" -> Triple(
-                        ICON_TRASH,
+                        FeatherIcons.Trash2,
                         MaterialTheme.colorScheme.error,
                         "Automatically delete the volume when the claim is deleted"
                     )
 
                     "Recycle" -> Triple(
-                        ICON_REFRESH,
+                        FeatherIcons.RefreshCw,
                         MaterialTheme.colorScheme.tertiary,
                         "Basic scrub and make available again (Deprecated)"
                     )
 
                     else -> Triple(
-                        ICON_HELP,
+                        FeatherIcons.HelpCircle,
                         MaterialTheme.colorScheme.secondary,
                         "Unknown reclaim policy"
                     )
@@ -260,7 +261,7 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(
-                                imageVector = ICON_WARNING,
+                                imageVector = FeatherIcons.AlertTriangle,
                                 contentDescription = "Warning",
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(16.dp)
@@ -296,7 +297,7 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                 Spacer(Modifier.height(8.dp))
 
                 val bindingMode = storageClass.volumeBindingMode ?: "Immediate"
-                val bindingModeIcon = if (bindingMode == "Immediate") ICON_CONNECT else ICON_CLOCK
+                val bindingModeIcon = if (bindingMode == "Immediate") FeatherIcons.Zap else FeatherIcons.Clock
                 val bindingModeDescription = if (bindingMode == "Immediate") {
                     "Volume is provisioned immediately when PVC is created"
                 } else {
@@ -490,7 +491,7 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                                             modifier = Modifier.size(16.dp)
                                         ) {
                                             Icon(
-                                                imageVector = if (showValue) ICON_EYEOFF else ICON_EYE,
+                                                imageVector = if (showValue) FeatherIcons.EyeOff else FeatherIcons.Eye,
                                                 contentDescription = "Toggle Visibility",
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(16.dp)
@@ -546,9 +547,9 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (storageClass.allowVolumeExpansion == true)
-                            ICON_MAXIMIZE
+                            FeatherIcons.Maximize2
                         else
-                            ICON_MINIIMIZE,
+                            FeatherIcons.Minimize2,
                         contentDescription = "Volume Expansion",
                         tint = if (storageClass.allowVolumeExpansion == true)
                             MaterialTheme.colorScheme.primary
@@ -571,9 +572,9 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                     "Not Allowed - Volume size is fixed after creation"
 
                 val expansionIcon = if (storageClass.allowVolumeExpansion == true)
-                    ICON_CHECK
+                    FeatherIcons.Check
                 else
-                    ICON_CLOSE
+                    FeatherIcons.X
 
                 val expansionColor = if (storageClass.allowVolumeExpansion == true)
                     MaterialTheme.colorScheme.primary
@@ -637,7 +638,7 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
                                 modifier = Modifier.padding(vertical = 2.dp)
                             ) {
                                 Icon(
-                                    imageVector = ICON_TERMINAL,
+                                    imageVector = FeatherIcons.Terminal,
                                     contentDescription = "Mount Option",
                                     tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(14.dp)
@@ -793,25 +794,24 @@ fun StorageClassDetailsView(storageClass: StorageClass) {
     }
 }
 
-// TODO: create global vars for SimpleIcons
 @Composable
 fun getProvisionerIcon(provisioner: String?): ImageVector {
     return when {
-        provisioner == null -> ICON_HELP
+        provisioner == null -> FeatherIcons.HelpCircle
         provisioner.contains("aws") || provisioner.contains("ebs") -> SimpleIcons.Amazonaws
         provisioner.contains("azure") || provisioner.contains("microsoft") -> SimpleIcons.Microsoftazure
         provisioner.contains("gce") || provisioner.contains("gke") || provisioner.contains("google") -> SimpleIcons.Googlecloud
-        provisioner.contains("csi") -> ICON_HD
+        provisioner.contains("csi") -> FeatherIcons.HardDrive
         provisioner.contains("ceph") -> SimpleIcons.Ceph
-        provisioner.contains("rbd") -> ICON_DB
-        provisioner.contains("nfs") -> ICON_SHARE
-        provisioner.contains("iscsi") -> ICON_SERVER
-        provisioner.contains("hostpath") || provisioner.contains("local") -> ICON_HOME
+        provisioner.contains("rbd") -> FeatherIcons.Database
+        provisioner.contains("nfs") -> FeatherIcons.Share2
+        provisioner.contains("iscsi") -> FeatherIcons.Server
+        provisioner.contains("hostpath") || provisioner.contains("local") -> FeatherIcons.Home
         provisioner.contains("gluster") -> SimpleIcons.Glitch
         provisioner.contains("vsphere") || provisioner.contains("vmware") -> SimpleIcons.Vmware
         provisioner.contains("openstack") || provisioner.contains("cinder") -> SimpleIcons.Openstack
-        provisioner.contains("portworx") -> ICON_BOX
-        provisioner.contains("flex") ->  ICON_SHUFFLE
+        provisioner.contains("portworx") -> FeatherIcons.Box
+        provisioner.contains("flex") -> FeatherIcons.Shuffle
         provisioner.contains("kubernetes.io") -> SimpleIcons.Kubernetes
         provisioner.contains("longhorn") -> SimpleIcons.Rancher
         provisioner.contains("digitalocean") -> SimpleIcons.Digitalocean
@@ -821,7 +821,7 @@ fun getProvisionerIcon(provisioner: String?): ImageVector {
         provisioner.contains("openshift") || provisioner.contains("redhat") -> SimpleIcons.Redhat
         provisioner.contains("oracle") -> SimpleIcons.Oracle
         provisioner.contains("ibm") -> SimpleIcons.Ibm
-        else -> ICON_DB
+        else -> FeatherIcons.Database
     }
 }
 
