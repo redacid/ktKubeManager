@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
@@ -1352,7 +1353,7 @@ fun ResourceTreeNode(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
+
 @Composable
 @Preview
 fun App() {
@@ -1490,10 +1491,10 @@ fun App() {
     }
     // --- Діалогове вікно помилки (M3) ---
     if (showErrorDialog.value) {
-        AlertDialog( // M3 AlertDialog
-            onDismissRequest = { showErrorDialog.value = false }, title = { Text("Помилка Підключення") }, // M3 Text
-            text = { Text(dialogErrorMessage.value) }, // M3 Text
-            confirmButton = { Button(onClick = { showErrorDialog.value = false }) { Text("OK") } } // M3 Button, M3 Text
+        ErrorDialog(
+            showDialog = showErrorDialog.value,
+            errorMessage = dialogErrorMessage.value,
+            onDismiss = { showErrorDialog.value = false }
         )
     }
     // ---
@@ -1764,12 +1765,10 @@ fun App() {
                                 })
                         }
                     } // Кінець лівої панелі
-
                     Divider(
                         modifier = Modifier.fillMaxHeight().width(1.dp),
                         color = MaterialTheme.colorScheme.outlineVariant
                     ) // M3 Divider
-
                     // --- Права панель (АБО Таблиця АБО Деталі АБО Логи) ---
                     Column(
                         modifier = Modifier.fillMaxHeight().weight(1f).padding(start = 16.dp, end = 16.dp, top = 16.dp)
@@ -1800,39 +1799,21 @@ fun App() {
                         if (currentView == "table" && activeClient != null) {
                             val isFilterEnabled =
                                 namespacedResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
-                            ExposedDropdownMenuBox(
-                                expanded = isNamespaceDropdownExpanded,
-                                onExpandedChange = { if (isFilterEnabled) isNamespaceDropdownExpanded = it },
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                            ) {
-                                TextField( // M3 TextField
-                                    value = selectedNamespaceFilter,
-                                    onValueChange = {}, // ReadOnly
-                                    readOnly = true,
-                                    //label = { Text("Namespace Filter") },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
-                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                                        .fillMaxWidth(), // menuAnchor для M3
-                                    enabled = isFilterEnabled, // Вимикаємо для кластерних ресурсів
-                                    colors = ExposedDropdownMenuDefaults.textFieldColors() // M3 кольори
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = isNamespaceDropdownExpanded,
-                                    onDismissRequest = { isNamespaceDropdownExpanded = false }) {
-                                    allNamespaces.forEach { nsName ->
-                                        DropdownMenuItem(text = { Text(nsName) }, onClick = {
-                                            if (selectedNamespaceFilter != nsName) {
-                                                selectedNamespaceFilter = nsName
-                                                isNamespaceDropdownExpanded = false
-                                                // Перезавантаження даних спрацює через LaunchedEffect в onNodeClick,
-                                                // але нам треба його "тригернути", якщо тип ресурсу вже вибрано.
-                                                // Найпростіше - знову викликати логіку завантаження поточного ресурсу
-                                                if (selectedResourceType != null) {
-                                                    // Повторно викликаємо ту саму логіку, що й в onNodeClick
-                                                    resourceLoadError = null; clearResourceLists()
-                                                    connectionStatus =
-                                                        "Loading $selectedResourceType (filter)..."; isLoading =
-                                                        true
+                            NamespaceFilter(
+                                selectedNamespaceFilter = selectedNamespaceFilter,
+                                isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
+                                onExpandedChange = { isNamespaceDropdownExpanded = it },
+                                isFilterEnabled = isFilterEnabled,
+                                allNamespaces = allNamespaces,
+                                onNamespaceSelected = { nsName ->
+                                    if (selectedNamespaceFilter != nsName) {
+                                        selectedNamespaceFilter = nsName
+                                        if (selectedResourceType != null) {
+                                            resourceLoadError = null
+                                            clearResourceLists()
+                                            connectionStatus = "Loading $selectedResourceType (filter)..."
+                                            isLoading = true
+
                                                     coroutineScope.launch {
                                                         var loadOk = false
                                                         var errorMsg: String? = null
@@ -1976,12 +1957,10 @@ fun App() {
                                                         }
                                                         isLoading = false
                                                     }
-                                                }
-                                            }
-                                        })
+                                        }
                                     }
                                 }
-                            }
+                            )
                             Divider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(Modifier.height(4.dp))
                         }
@@ -2203,23 +2182,107 @@ fun App() {
                 } // Кінець Row
                 // --- Статус-бар ---
                 Divider(color = MaterialTheme.colorScheme.outlineVariant)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = connectionStatus,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelSmall
-                    ); if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                } // Явний M3 Text, M3 Indicator
-                }
-                // ---------------
+                StatusBar(
+                    connectionStatus = connectionStatus,
+                    isLoading = isLoading
+                )
+
+
             } // Кінець Column
         } // Кінець Surface M3
     } // Кінець MaterialTheme M3
 }
+
+
+@OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
+@Composable
+private fun NamespaceFilter(
+    selectedNamespaceFilter: String,
+    isNamespaceDropdownExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    isFilterEnabled: Boolean,
+    allNamespaces: List<String>,
+    onNamespaceSelected: (String) -> Unit
+) {
+    ExposedDropdownMenuBox(
+        expanded = isNamespaceDropdownExpanded,
+        onExpandedChange = { if (isFilterEnabled) onExpandedChange(it) },
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+    ) {
+        TextField(
+            value = selectedNamespaceFilter,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                .fillMaxWidth(),
+            enabled = isFilterEnabled,
+            colors = ExposedDropdownMenuDefaults.textFieldColors()
+        )
+        ExposedDropdownMenu(
+            expanded = isNamespaceDropdownExpanded,
+            onDismissRequest = { onExpandedChange(false) }
+        ) {
+            allNamespaces.forEach { nsName ->
+                DropdownMenuItem(
+                    text = { Text(nsName) },
+                    onClick = {
+                        if (selectedNamespaceFilter != nsName) {
+                            onNamespaceSelected(nsName)
+                            onExpandedChange(false)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorDialog(
+    showDialog: Boolean,
+    errorMessage: String,
+    onDismiss: () -> Unit
+) {
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Помилка Підключення") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                Button(onClick = onDismiss) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+}
+
+
+@Composable
+private fun StatusBar(
+    connectionStatus: String,
+    isLoading: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = connectionStatus,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelSmall
+        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    }
+}
+
 
 fun main() = application {
     // Створюємо іконку з Base64-даних для вікна
