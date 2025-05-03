@@ -25,6 +25,10 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.fabric8.kubernetes.api.model.HasMetadata
+import io.fabric8.kubernetes.client.KubernetesClient
+import io.fabric8.kubernetes.client.KubernetesClientException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ErrorDialog(
@@ -157,4 +161,32 @@ fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
         color = MaterialTheme.colorScheme.outlineVariant,
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+suspend fun <T> fetchK8sResource(
+    client: KubernetesClient?, resourceType: String, namespace: String?, // Додано параметр неймспейсу
+    apiCall: (KubernetesClient, String?) -> List<T>? // Лямбда тепер приймає клієнт і неймспейс
+): Result<List<T>> {
+    if (client == null) return Result.failure(IllegalStateException("Kubernetes client is not initialized"))
+    val targetNamespace = if (namespace == ALL_NAMESPACES_OPTION) null else namespace
+    val nsLog = targetNamespace ?: "all"
+    logger.info("Loading the list $resourceType (Namespace: $nsLog)...")
+    return try {
+        val items = withContext(Dispatchers.IO) {
+            logger.info("[IO] Call API for $resourceType (Namespace: $nsLog)...")
+            apiCall(client, targetNamespace) ?: emptyList() // Передаємо неймспейс у лямбду
+        }
+        logger.info("Loaded ${items.size} $resourceType (Namespace: $nsLog).")
+        try {
+            @Suppress("UNCHECKED_CAST") val sortedItems = items.sortedBy { (it as? HasMetadata)?.metadata?.name ?: "" }
+            Result.success(sortedItems)
+        } catch (e: Exception) {
+            logger.warn("Failed sort $resourceType: ${e.message}")
+            Result.success(items)
+        }
+    } catch (e: KubernetesClientException) {
+        logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
+    } catch (e: Exception) {
+        logger.error("Error $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
+    }
 }
