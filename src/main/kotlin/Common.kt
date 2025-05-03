@@ -29,6 +29,7 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.KubernetesClientException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 
 @Composable
 fun ErrorDialog(
@@ -190,3 +191,45 @@ suspend fun <T> fetchK8sResource(
         logger.error("Error $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
     }
 }
+
+val resourceTreeData: Map<String, List<String>> = mapOf(
+    "" to listOf("Cluster", "Workloads", "Network", "Storage", "Configuration", "Access Control", "CustomResources"),
+    "Cluster" to listOf("Namespaces", "Nodes", "Events"),
+    "Workloads" to listOf("Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs"),
+    "Network" to listOf("Services", "Ingresses", "Endpoints", "NetworkPolicies"),
+    "Storage" to listOf("PersistentVolumes", "PersistentVolumeClaims", "StorageClasses"),
+    "Configuration" to listOf("ConfigMaps", "Secrets"),
+    "Access Control" to listOf("ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"),
+    "CustomResources" to listOf("CRDs")
+)
+val resourceLeafNodes: Set<String> = setOf(
+    "Namespaces",
+    "Nodes",
+    "Events",
+    "Pods",
+    "Deployments",
+    "StatefulSets",
+    "DaemonSets",
+    "ReplicaSets",
+    "Jobs",
+    "CronJobs",
+    "Services",
+    "Ingresses",
+    "Endpoints",
+    "NetworkPolicies",
+    "PersistentVolumes",
+    "PersistentVolumeClaims",
+    "StorageClasses",
+    "ConfigMaps",
+    "Secrets",
+    "ServiceAccounts",
+    "Roles",
+    "RoleBindings",
+    "ClusterRoles",
+    "ClusterRoleBindings",
+    "CRDs"
+)
+
+val NSResources: Set<String> =
+    resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
+val logger = LoggerFactory.getLogger("KKM")
