@@ -252,7 +252,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
         } catch (e: Exception) {
             lastError = e
             logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
-            //if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
+            //if (attempt < .MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
         }
     }
     logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
@@ -276,3 +276,9 @@ fun findArgumentValue(args: List<String>, argName: String): String? {
 private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
     return envList?.find { it.name == key }?.value
 }
+
+const val MAX_CONNECT_RETRIES = 1
+
+//const val RETRY_DELAY_MS = 1000L
+const val CONNECTION_TIMEOUT_MS = 5000
+const val REQUEST_TIMEOUT_MS = 15000
