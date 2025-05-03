@@ -243,7 +243,6 @@ fun App() {
         onSuccess(loadOk, errorMsg)
     }
 
-    // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
         namespacesList = emptyList();
         nodesList = emptyList();
@@ -334,11 +333,18 @@ fun App() {
     // ---
 
     MaterialTheme { // M3 Theme
+
         Surface(
             modifier = Modifier.Companion.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) { // M3 Surface
+
+            }
             Column(modifier = Modifier.Companion.fillMaxSize()) {
+                Column {
+                    Row(modifier = Modifier.Companion.fillMaxWidth()) {
+                        MainMenu()  // Додаємо меню на початку основного вікна
+                    }
                 Row(modifier = Modifier.Companion.weight(1f)) {
                     // --- Ліва панель ---
                     Column(modifier = Modifier.Companion.fillMaxHeight().width(300.dp).padding(16.dp)) {
