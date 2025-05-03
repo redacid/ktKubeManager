@@ -4,18 +4,14 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,7 +22,6 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
@@ -72,7 +67,6 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.collections.List
 import kotlin.collections.Map
-import kotlin.collections.MutableList
 import kotlin.collections.MutableMap
 import kotlin.collections.Set
 import kotlin.collections.contains
@@ -94,7 +88,6 @@ import kotlin.collections.setOf
 import kotlin.collections.sorted
 import kotlin.collections.sortedBy
 import kotlin.collections.sortedWith
-import kotlin.collections.take
 import androidx.compose.material3.HorizontalDivider as Divider
 import io.fabric8.kubernetes.api.model.Config as KubeConfigModel
 
@@ -141,20 +134,18 @@ val resourceLeafNodes: Set<String> = setOf(
 )
 
 // Мапа для визначення, чи є ресурс неймспейсним (спрощено)
-val namespacedResources: Set<String> =
+val nonNSResources: Set<String> =
     resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
 
 // Логер
-val logger = LoggerFactory.getLogger("MainKtNamespaceFilter")
+val logger = LoggerFactory.getLogger("KKM")
 
 const val MAX_CONNECT_RETRIES = 1
 //const val RETRY_DELAY_MS = 1000L
 const val CONNECTION_TIMEOUT_MS = 5000
 const val REQUEST_TIMEOUT_MS = 15000
-//const val FABRIC8_VERSION = "6.13.5"
 const val LOG_LINES_TO_TAIL = 50
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
-
 
 var ICON_UP = FeatherIcons.ArrowUp
 var ICON_DOWN = FeatherIcons.ArrowDown
@@ -408,86 +399,11 @@ fun findArgumentValue(args: List<String>, argName: String): String? {
         null
     }
 }
+
 //private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
 //    return envList?.find { it.name == key }?.value
 //}
 
-// Calculate optimal column widths based on content
-@Composable
-fun calculateColumnWidths(
-    headers: List<String>,
-    items: List<HasMetadata>,
-    resourceType: String,
-    minColumnWidth: Int = 60,
-    maxColumnWidth: Int = 500,
-    padding: Int = 16
-): List<Int> {
-    // Text measurer to calculate text dimensions
-    val textMeasurer = rememberTextMeasurer()
-    val headerStyle = MaterialTheme.typography.titleSmall
-    val cellStyle = MaterialTheme.typography.bodyMedium
-
-    return remember(headers, items, resourceType) {
-        // Initialize with minimum widths
-        val widths = MutableList(headers.size) { minColumnWidth }
-
-        // Measure header widths
-        headers.forEachIndexed { index, header ->
-            val textWidth = measureTextWidth(textMeasurer, header, headerStyle)
-            widths[index] = maxOf(
-                widths[index], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
-            )
-        }
-
-        // Measure data widths (sample up to 100 items for performance)
-        val sampleItems = if (items.size > 100) items.take(100) else items
-        sampleItems.forEach { item ->
-            headers.forEachIndexed { colIndex, _ ->
-                val cellData = getCellData(item, colIndex, resourceType)
-                val textWidth = measureTextWidth(textMeasurer, cellData, cellStyle)
-                widths[colIndex] = maxOf(
-                    widths[colIndex], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
-                )
-            }
-        }
-
-        widths
-    }
-}
-
-fun convertJsonToYaml(jsonString: String): String {
-    try {
-        // Parse JSON to object
-        val jsonMapper = ObjectMapper().registerKotlinModule()
-        val jsonObject = jsonMapper.readValue(jsonString, Any::class.java)
-
-        // Convert object to YAML
-        val yamlMapper = ObjectMapper(
-            YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-        ).registerKotlinModule()
-
-        return yamlMapper.writeValueAsString(jsonObject)
-    } catch (e: Exception) {
-        return "Error converting JSON to YAML: ${e.message}"
-    }
-}
-
-
-// Helper function to measure text width
-fun measureTextWidth(
-    textMeasurer: TextMeasurer, text: String, style: TextStyle
-): Int {
-    val textLayoutResult = textMeasurer.measure(
-        text = text, style = style
-    )
-    return textLayoutResult.size.width
-}
-
-
-//fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
-//    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
-//}
 fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
         "Namespaces" -> listOf("Name", "Status", "Age")
@@ -504,28 +420,8 @@ fun getHeadersForType(resourceType: String): List<String> {
         "Ingresses" -> listOf("Namespace", "Name", "Class", "Hosts", "Address", "Ports", "Age")
         "Endpoints" -> listOf("Namespace", "Name", "Endpoints", "Age")
         "NetworkPolicies" -> listOf("Namespace", "Name", "Selector", "Type","Age")
-        "PersistentVolumes" -> listOf(
-            "Name",
-            "Capacity",
-            "Access Modes",
-            "Reclaim Policy",
-            "Status",
-            "Claim",
-            "StorageClass",
-            "Age"
-        )
-
-        "PersistentVolumeClaims" -> listOf(
-            "Namespace",
-            "Name",
-            "Status",
-            "Volume",
-            "Capacity",
-            "Access Modes",
-            "StorageClass",
-            "Age"
-        )
-
+        "PersistentVolumes" -> listOf("Name", "Capacity", "Access Modes", "Reclaim Policy", "Status", "Claim", "StorageClass", "Age")
+        "PersistentVolumeClaims" -> listOf("Namespace", "Name", "Status", "Volume", "Capacity", "Access Modes", "StorageClass", "Age")
         "StorageClasses" -> listOf("Name", "Provisioner", "Reclaim Policy", "Binding Mode", "Allow Expand", "Age")
         "ConfigMaps" -> listOf("Namespace", "Name", "Data", "Age")
         "Secrets" -> listOf("Namespace", "Name", "Type", "Data", "Age")
@@ -1619,7 +1515,7 @@ fun App() {
 
                                                 // Визначаємо, чи ресурс неймспейсний, щоб знати, чи передавати фільтр
                                                 val namespaceToUse =
-                                                    if (namespacedResources.contains(nodeId)) currentFilter else null
+                                                    if (nonNSResources.contains(nodeId)) currentFilter else null
                                                 // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
                                                 when (nodeId) {
                                                     "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess {
@@ -1798,7 +1694,7 @@ fun App() {
                         // --- ДОДАНО ФІЛЬТР НЕЙМСПЕЙСІВ (якщо є клієнт і це не деталі/логи) ---
                         if (currentView == "table" && activeClient != null) {
                             val isFilterEnabled =
-                                namespacedResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                                nonNSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
                             NamespaceFilter(
                                 selectedNamespaceFilter = selectedNamespaceFilter,
                                 isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
@@ -1818,7 +1714,7 @@ fun App() {
                                                         var loadOk = false
                                                         var errorMsg: String? = null
                                                         val namespaceToUse =
-                                                            if (namespacedResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                            if (nonNSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
                                                         when (selectedResourceType) { // Повторний виклик з новим фільтром
                                                             "Pods" -> loadPodsFabric8(
                                                                 activeClient, namespaceToUse
@@ -2236,26 +2132,6 @@ private fun NamespaceFilter(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ErrorDialog(
-    showDialog: Boolean,
-    errorMessage: String,
-    onDismiss: () -> Unit
-) {
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text("Помилка Підключення") },
-            text = { Text(errorMessage) },
-            confirmButton = {
-                Button(onClick = onDismiss) {
-                    Text("OK")
-                }
-            }
-        )
     }
 }
 
