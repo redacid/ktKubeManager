@@ -40,15 +40,14 @@ kotlin {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-//    implementation("org.apache.avalon.framework:avalon-framework-api:4.3.1")
     val fabric8Version = "6.13.5"
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
     implementation("io.fabric8:kubernetes-client:${fabric8Version}")
     implementation(compose.material3)
     implementation("ch.qos.logback:logback-classic:1.5.18") //1.4.14
-    implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.23")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.23") // 1.9.23
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") //1.9.0
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0") //1.9.0
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.3")
