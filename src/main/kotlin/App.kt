@@ -66,6 +66,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
+
+
+
 @Composable
 @Preview
 fun App() {
@@ -120,6 +123,125 @@ fun App() {
     var selectedNamespaceFilter by remember { mutableStateOf(ALL_NAMESPACES_OPTION) }
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    suspend fun handleResourceLoad(
+        nodeId: String,
+        //activeClient: KubernetesClient,
+        namespaceToUse: String?,
+        onSuccess: suspend (Boolean, String?) -> Unit
+    ) {
+        var loadOk = false
+        var errorMsg: String? = null
+
+        when (nodeId) {
+            "Namespaces" -> loadNamespacesFabric8(activeClient)
+                .onSuccess { namespacesList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Nodes" -> loadNodesFabric8(activeClient)
+                .onSuccess {nodesList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+            "Events" -> loadEventsFabric8(activeClient)
+                .onSuccess {eventsList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            "Pods" -> loadPodsFabric8(activeClient, namespaceToUse)
+                .onSuccess {podsList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            "Deployments" -> loadDeploymentsFabric8(activeClient, namespaceToUse)
+                .onSuccess { deploymentsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "StatefulSets" -> loadStatefulSetsFabric8(activeClient, namespaceToUse)
+                .onSuccess { statefulSetsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "DaemonSets" -> loadDaemonSetsFabric8(activeClient, namespaceToUse)
+                .onSuccess { daemonSetsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "ReplicaSets" -> loadReplicaSetsFabric8(activeClient, namespaceToUse)
+                .onSuccess { replicaSetsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Jobs" -> loadJobsFabric8(activeClient, namespaceToUse)
+                .onSuccess { jobsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "CronJobs" -> loadCronJobsFabric8(activeClient, namespaceToUse)
+                .onSuccess { cronJobsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Services" -> loadServicesFabric8(activeClient, namespaceToUse)
+                .onSuccess { servicesList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Ingresses" -> loadIngressesFabric8(activeClient, namespaceToUse)
+                .onSuccess { ingressesList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Endpoints" -> loadEndpointsFabric8(activeClient, namespaceToUse)
+                .onSuccess { endpointsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "NetworkPolicies" -> loadNetworkPoliciesFabric8(activeClient, namespaceToUse)
+                .onSuccess { networkPoliciesList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "PersistentVolumes" -> loadPVsFabric8(activeClient)
+                .onSuccess {pvsList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient, namespaceToUse)
+                .onSuccess { pvcsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "StorageClasses" -> loadStorageClassesFabric8(activeClient)
+                .onSuccess {storageClassesList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            "ConfigMaps" -> loadConfigMapsFabric8(activeClient, namespaceToUse)
+                .onSuccess { configMapsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Secrets" -> loadSecretsFabric8(activeClient, namespaceToUse)
+                .onSuccess { secretsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "ServiceAccounts" -> loadServiceAccountsFabric8(activeClient, namespaceToUse)
+                .onSuccess { serviceAccountsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "Roles" -> loadRolesFabric8(activeClient, namespaceToUse)
+                .onSuccess { rolesList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "RoleBindings" -> loadRoleBindingsFabric8(activeClient, namespaceToUse)
+                .onSuccess { roleBindingsList = it; loadOk = true }
+                .onFailure { errorMsg = it.message }
+
+            "ClusterRoles" -> loadClusterRolesFabric8(activeClient)
+                .onSuccess {clusterRolesList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient)
+                .onSuccess {clusterRoleBindingsList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            "CRDs" -> loadCrdsFabric8(activeClient)
+                .onSuccess {crdsList = it; loadOk = true}
+                .onFailure { errorMsg = it.message }
+
+            else -> {
+                logger.warn("The handler '$nodeId' not realized.")
+                loadOk = false
+                errorMsg = "Not realized"
+            }
+        }
+
+        onSuccess(loadOk, errorMsg)
+    }
 
     // --- Функція для очищення всіх списків ресурсів ---
     fun clearResourceLists() {
@@ -331,148 +453,19 @@ fun App() {
                                             clearResourceLists()
                                             connectionStatus = "Loading $nodeId..."; isLoading = true
                                             coroutineScope.launch {
-                                                var loadOk = false
-                                                var errorMsg: String? = null
                                                 val currentFilter =
                                                     selectedNamespaceFilter // We take the current filter value
-
-                                                // Визначаємо, чи ресурс неймспейсний, щоб знати, чи передавати фільтр
                                                 val namespaceToUse =
                                                     if (NSResources.contains(nodeId)) currentFilter else null
-                                                // --- ВИКЛИК ВІДПОВІДНОЇ ФУНКЦІЇ ЗАВАНТАЖЕННЯ ---
-                                                when (nodeId) {
-                                                    "Namespaces" -> loadNamespacesFabric8(activeClient).onSuccess {
-                                                        namespacesList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "Nodes" -> loadNodesFabric8(activeClient).onSuccess {
-                                                        nodesList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "Events" -> loadEventsFabric8(activeClient).onSuccess {
-                                                        eventsList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "Pods" -> loadPodsFabric8(activeClient, namespaceToUse).onSuccess {
-                                                        podsList = it; loadOk = true
+                                                handleResourceLoad(nodeId, /*activeClient,*/ namespaceToUse) { loadOk, errorMsg ->
+                                                    if (loadOk) {
+                                                        connectionStatus = "Loaded $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                    } else {
+                                                        resourceLoadError = "Error $nodeId: $errorMsg"
+                                                        connectionStatus = "Error $nodeId"
                                                     }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Deployments" -> loadDeploymentsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { deploymentsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "StatefulSets" -> loadStatefulSetsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { statefulSetsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "DaemonSets" -> loadDaemonSetsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { daemonSetsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ReplicaSets" -> loadReplicaSetsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { replicaSetsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Jobs" -> loadJobsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { jobsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "CronJobs" -> loadCronJobsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { cronJobsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Services" -> loadServicesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { servicesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Ingresses" -> loadIngressesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { ingressesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Endpoints" -> loadEndpointsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { endpointsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "NetworkPolicies" -> loadNetworkPoliciesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { networkPoliciesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "PersistentVolumes" -> loadPVsFabric8(activeClient).onSuccess {
-                                                        pvsList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "PersistentVolumeClaims" -> loadPVCsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { pvcsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "StorageClasses" -> loadStorageClassesFabric8(activeClient).onSuccess {
-                                                        storageClassesList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "ConfigMaps" -> loadConfigMapsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { configMapsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Secrets" -> loadSecretsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { secretsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ServiceAccounts" -> loadServiceAccountsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { serviceAccountsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Roles" -> loadRolesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { rolesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "RoleBindings" -> loadRoleBindingsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { roleBindingsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ClusterRoles" -> loadClusterRolesFabric8(activeClient).onSuccess {
-                                                        clusterRolesList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient).onSuccess {
-                                                        clusterRoleBindingsList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-                                                    "CRDs" -> loadCrdsFabric8(activeClient).onSuccess {
-                                                        crdsList = it; loadOk = true
-                                                    }.onFailure { errorMsg = it.message }
-
-
-                                                    else -> {
-                                                        logger.warn("The handler '$nodeId' not realized."); loadOk =
-                                                            false; errorMsg = "Not realized"
-                                                    }
+                                                    isLoading = false
                                                 }
-                                                // Оновлюємо статус після завершення
-                                                if (loadOk) {
-                                                    connectionStatus =
-                                                        "Loaded $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
-                                                } else {
-                                                    resourceLoadError = "Error $nodeId: $errorMsg"; connectionStatus =
-                                                        "Error $nodeId"
-                                                }
-                                                isLoading = false
                                             }
                                         } else if (activeClient == null) {
                                             logger.warn("No connection."); connectionStatus =
@@ -533,149 +526,17 @@ fun App() {
                                             clearResourceLists()
                                             connectionStatus = "Loading $selectedResourceType (filter)..."
                                             isLoading = true
-
                                             coroutineScope.launch {
-                                                var loadOk = false
-                                                var errorMsg: String? = null
                                                 val namespaceToUse =
-                                                    if (NSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
-                                                when (selectedResourceType) { // Повторний виклик з новим фільтром
-                                                    "Pods" -> loadPodsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { podsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Deployments" -> loadDeploymentsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { deploymentsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "StatefulSets" -> loadStatefulSetsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { statefulSetsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "DaemonSets" -> loadDaemonSetsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { daemonSetsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ReplicaSets" -> loadReplicaSetsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { replicaSetsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Jobs" -> loadJobsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { jobsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "CronJobs" -> loadCronJobsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { cronJobsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Services" -> loadServicesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { servicesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Ingresses" -> loadIngressesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { ingressesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Endpoints" -> loadEndpointsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { endpointsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "NetworkPolicies" -> loadNetworkPoliciesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { networkPoliciesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "PersistentVolumeClaims" -> loadPVCsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { pvcsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ConfigMaps" -> loadConfigMapsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { configMapsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Secrets" -> loadSecretsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { secretsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ServiceAccounts" -> loadServiceAccountsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { serviceAccountsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Roles" -> loadRolesFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { rolesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "RoleBindings" -> loadRoleBindingsFabric8(
-                                                        activeClient, namespaceToUse
-                                                    ).onSuccess { roleBindingsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    // Ресурси без неймспейсу
-                                                    "Namespaces" -> {
-                                                        loadNamespacesFabric8(activeClient).onSuccess {
-                                                            namespacesList = it; loadOk = true
-                                                        }.onFailure { errorMsg = it.message }
-                                                    } // Namespaces не фільтруємо
-
-                                                    "Nodes" -> loadNodesFabric8(
-                                                        activeClient
-                                                    ).onSuccess { nodesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "Events" -> loadEventsFabric8(
-                                                        activeClient
-                                                    ).onSuccess { eventsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "PersistentVolumes" -> loadPVsFabric8(
-                                                        activeClient
-                                                    ).onSuccess { pvsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "StorageClasses" -> loadStorageClassesFabric8(
-                                                        activeClient
-                                                    ).onSuccess { storageClassesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ClusterRoles" -> loadClusterRolesFabric8(
-                                                        activeClient
-                                                    ).onSuccess { clusterRolesList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(
-                                                        activeClient
-                                                    ).onSuccess { clusterRoleBindingsList = it; loadOk = true }
-                                                        .onFailure { errorMsg = it.message }
-
-                                                    else -> {
-                                                        loadOk = false; errorMsg = "The filter is not used"
+                                                if (NSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                handleResourceLoad(selectedResourceType!!, /*activeClient,*/ namespaceToUse) { loadOk, errorMsg ->
+                                                    if (loadOk) {
+                                                        connectionStatus = "Loaded $selectedResourceType (filter applied)"
+                                                    } else {
+                                                        resourceLoadError = "Error loading $selectedResourceType: $errorMsg"
                                                     }
+                                                    isLoading = false
                                                 }
-
-                                                if (loadOk) {
-                                                    connectionStatus =
-                                                        "Loaded $selectedResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
-                                                } else {
-                                                    resourceLoadError =
-                                                        "Error $selectedResourceType: $errorMsg"; connectionStatus =
-                                                        "Error $selectedResourceType"
-                                                }
-                                                isLoading = false
                                             }
                                         }
                                     }
