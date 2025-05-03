@@ -5,6 +5,20 @@ tasks.wrapper {
     distributionType = Wrapper.DistributionType.BIN
 }
 
+tasks.register("printDependencies") {
+    doLast {
+        configurations
+            .filter { it.isCanBeResolved }
+            .forEach { config ->
+                println("\nConfiguration ${config.name}")
+                config.resolvedConfiguration.resolvedArtifacts.forEach {
+                    println("${it.moduleVersion.id}:${it.classifier ?: ""}")
+                }
+            }
+    }
+}
+
+
 plugins {
     kotlin("jvm") version "1.9.23"
     id("org.jetbrains.compose") version "1.7.3"
@@ -26,17 +40,18 @@ kotlin {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    val fabric8Version = "6.13.5" // Ваша версія
+//    implementation("org.apache.avalon.framework:avalon-framework-api:4.3.1")
+    val fabric8Version = "6.13.5"
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
     implementation("io.fabric8:kubernetes-client:${fabric8Version}")
     implementation(compose.material3)
-    implementation("ch.qos.logback:logback-classic:1.4.14")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.0")
+    implementation("ch.qos.logback:logback-classic:1.5.18") //1.4.14
+    implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.23")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
     implementation("br.com.devsrsouza.compose.icons:feather:1.1.1") // https://feathericons.com/
     implementation("br.com.devsrsouza.compose.icons:simple-icons:1.1.1") // https://simpleicons.org/
     val awssdkVersion = "2.31.25"
@@ -48,16 +63,21 @@ dependencies {
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}")
     implementation("software.amazon.awssdk:eks:${awssdkVersion}")
-    //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}") // DONT ENABLE IT, CONNECT TO CONTEXT NOT WORKED
+    //implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}") // DON'T ENABLE IT, CONNECT TO CONTEXT NOT WORKED
     testImplementation(kotlin("test"))
 }
 
 compose.desktop {
     application {
         mainClass = "MainKt"
+
+        buildTypes.release.proguard {
+            isEnabled.set(false)
+            //configurationFiles.from("proguard-rules.pro")
+        }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
-            packageName = "KotlinKubeManager"
+            packageName = "KubeManager"
             packageVersion = "1.0.2"
             macOS {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
@@ -67,6 +87,12 @@ compose.desktop {
             }
             linux {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
+                menuGroup = "Development;System;Network"
+                shortcut = true
+                debMaintainer = "Serhii Rudenko <sr@ios.in.ua>"
+                appCategory = "System"
+                appRelease = "1"
+                debPackageVersion = packageVersion
             }
 
         }
