@@ -20,9 +20,6 @@ import androidx.compose.ui.window.application
 //import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
 import compose.icons.feathericons.*
@@ -42,36 +39,16 @@ import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.fabric8.kubernetes.client.KubernetesClientBuilder
 import io.fabric8.kubernetes.client.KubernetesClientException
-import io.fabric8.kubernetes.client.OAuthTokenProvider
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
-import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
-import software.amazon.awssdk.http.SdkHttpFullRequest
-import software.amazon.awssdk.http.SdkHttpMethod
-import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner
-import software.amazon.awssdk.http.auth.aws.signer.RegionSet
-import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
-import java.io.File
 import java.io.IOException
-import java.net.URI
-import java.nio.charset.StandardCharsets
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.*
 import kotlin.collections.List
 import kotlin.collections.Map
 import kotlin.collections.MutableMap
 import kotlin.collections.Set
 import kotlin.collections.contains
 import kotlin.collections.emptyList
-import kotlin.collections.find
 import kotlin.collections.firstOrNull
 import kotlin.collections.forEach
 import kotlin.collections.forEachIndexed
@@ -89,7 +66,6 @@ import kotlin.collections.sorted
 import kotlin.collections.sortedBy
 import kotlin.collections.sortedWith
 import androidx.compose.material3.HorizontalDivider as Divider
-import io.fabric8.kubernetes.api.model.Config as KubeConfigModel
 
 // TODO: check NS filter for all resources (e.g. Pods)
 
@@ -162,247 +138,6 @@ var ICON_CONTEXT = SimpleIcons.Kubernetes
 var ICON_RESOURCE = FeatherIcons.Aperture
 var ICON_NF = Icons.Filled.Place
 
-class EksTokenProvider(
-    private val clusterName: String, private val region: String, private val awsProfile: String? = null
-) : OAuthTokenProvider {
-
-    private val logger = LoggerFactory.getLogger(EksTokenProvider::class.java)
-
-    // Провайдер AWS облікових даних
-    private val credentialsProvider: AwsCredentialsProvider = if (awsProfile != null) {
-        logger.info("Using AWS profile '$awsProfile' for eks authentication")
-        ProfileCredentialsProvider.builder().profileName(awsProfile).build()
-    } else {
-        logger.info("Using the standard AWS providers' chain for EKS authentication")
-        DefaultCredentialsProvider.create()
-    }
-
-    // Підписувач HTTP запитів за алгоритмом AWS SigV4
-    private val signer = AwsV4aHttpSigner.create()
-
-    // Форматер для дати в заголовку X-Amz-Date
-    private val amzDateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneId.of("UTC"))
-
-    /**
-     * Отримує токен для аутентифікації з кластером EKS.
-     */
-    override fun getToken(): String {
-        try {
-            logger.debug("Generation of a new EKS token for cluster '$clusterName' in the region '$region'")
-
-            // Отримуємо облікові дані AWS
-            val credentials = credentialsProvider.resolveCredentials()
-
-            // Поточний час для генерації підпису
-            val now = Instant.now()
-            val formattedDate = amzDateFormatter.format(now)
-            //val datestamp = formattedDate.substring(0, 8)
-
-            // Створюємо базовий запит STS GetCallerIdentity
-            val host = "sts.$region.amazonaws.com"
-            val requestBuilder =
-                SdkHttpFullRequest.builder().method(SdkHttpMethod.GET).uri(URI.create("https://$host/"))
-                    .putRawQueryParameter("Action", "GetCallerIdentity").putRawQueryParameter("Version", "2011-06-15")
-                    .appendHeader("host", host).appendHeader("x-k8s-aws-id", clusterName)
-                    .appendHeader("x-amz-date", formattedDate)
-
-            // Додаємо токен сесії, якщо присутній
-            if (credentials is AwsSessionCredentials) {
-                requestBuilder.appendHeader("x-amz-security-token", credentials.sessionToken())
-            }
-
-            val request = requestBuilder.build()
-
-            // Створюємо об'єкт SignRequest за допомогою функціонального інтерфейсу Consumer
-            val signedRequest = signer.sign { b ->
-                // Встановлюємо HTTP запит
-                b.request(request)
-                // Створюємо ідентичність AWS з облікових даних
-                val identity = AwsCredentialsIdentity.create(
-                    credentials.accessKeyId(), credentials.secretAccessKey()
-                )
-                b.identity(identity)
-                // Додаємо інші необхідні властивості з використанням констант
-                b.putProperty(AwsV4aHttpSigner.SERVICE_SIGNING_NAME, "sts")
-                b.putProperty(AwsV4aHttpSigner.REGION_SET, RegionSet.create(region))
-                b.putProperty(AwsV4aHttpSigner.PAYLOAD_SIGNING_ENABLED, true)
-                b.putProperty(AwsV4aHttpSigner.EXPIRATION_DURATION, Duration.ofMinutes(1))
-            }
-
-            // Отримуємо URL з підписаним запитом
-            val signedUrl = signedRequest.request().getUri().toString()
-
-            // Кодуємо URL в Base64 та форматуємо токен
-            val base64SignedUrl =
-                Base64.getUrlEncoder().withoutPadding().encodeToString(signedUrl.toByteArray(StandardCharsets.UTF_8))
-
-            return "k8s-aws-v1.$base64SignedUrl"
-
-        } catch (e: Exception) {
-            val errorMsg = "Failed to generate eks token: ${e.message}"
-            logger.error(errorMsg, e)
-            throw RuntimeException(errorMsg, e)
-        }
-    }
-}
-
-
-suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
-    val targetContext = if (contextName.isNullOrBlank()) null else contextName
-    var lastError: Exception? = null
-    // targetContext тут може бути null, autoConfigure сам визначить поточний
-    val contextNameToLog = targetContext ?: "(default)"
-
-    for (attempt in 1..MAX_CONNECT_RETRIES) {
-        logger.info("Спроба підключення до '$contextNameToLog' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
-        try {
-            val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) {
-                logger.info("[IO] Створення базового конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
-                // Отримуємо оброблену конфігурацію
-                val resolvedConfig: Config =
-                    Config.autoConfigure(targetContext) ?: throw KubernetesClientException(
-                        "Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'"
-                    )
-
-                // --- Починаємо аналіз сирого KubeConfig для перевірки ExecConfig ---
-                try {
-                    // Створюємо власну логіку для отримання та аналізу KubeConfig
-                    // Стандартні місця розташування kubeconfig
-                    val kubeConfigPath =
-                        System.getenv("KUBECONFIG") ?: "${System.getProperty("user.home")}/.kube/config"
-
-                    val kubeConfigFile = File(kubeConfigPath)
-                    if (!kubeConfigFile.exists()) {
-                        throw KubernetesClientException("Файл KubeConfig не знайдено за шляхом: $kubeConfigPath")
-                    }
-
-                    logger.info("Аналіз файлу KubeConfig: ${kubeConfigFile.absolutePath}")
-
-                    // Використовуємо Jackson для розбору YAML файлу
-                    val mapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
-                    val kubeConfigModel: KubeConfigModel = mapper.readValue(kubeConfigFile, KubeConfigModel::class.java)
-
-                    // Визначаємо ім'я контексту, яке було фактично використано
-                    val actualContextName = resolvedConfig.currentContext?.name
-                        ?: kubeConfigModel.currentContext // Беремо з resolvedConfig, або з моделі якщо там null
-                        ?: throw KubernetesClientException("Не вдалося визначити поточний контекст")
-
-                    // Знаходимо NamedContext у сирій моделі
-                    val namedContext: NamedContext? = kubeConfigModel.contexts?.find { it.name == actualContextName }
-                    val contextInfo = namedContext?.context
-                        ?: throw KubernetesClientException("Не знайдено деталей для контексту '$actualContextName' у KubeConfig моделі")
-
-                    // Отримуємо ім'я користувача з контексту
-                    val userName: String? = contextInfo.user
-
-                    if (userName != null) {
-                        // Отримуємо список користувачів (NamedAuthInfo) з сирої моделі
-                        val usersList: List<NamedAuthInfo> =
-                            kubeConfigModel.users ?: emptyList() // У моделі поле називається 'users'
-
-                        // Знаходимо NamedAuthInfo для нашого користувача
-                        val namedAuthInfo: NamedAuthInfo? = usersList.find { it.name == userName }
-                        val userAuth: AuthInfo? = namedAuthInfo?.user // AuthInfo з сирої моделі
-
-                        // Отримуємо ExecConfig
-                        val execConfig: ExecConfig? = userAuth?.exec
-
-                        // 9. Перевіряємо, чи це EKS exec
-                        if (execConfig != null && (execConfig.command == "aws" || execConfig.command.endsWith("/aws"))) {
-                            logger.info("Виявлено EKS конфігурацію з exec command: '${execConfig.command}'. Спроба використання кастомного TokenProvider.")
-
-                            val execArgs: List<String> = execConfig.args ?: emptyList()
-                            val execEnv: List<ExecEnvVar> =
-                                execConfig.env ?: emptyList() // Тип з моделі
-
-                            // Функції findArgumentValue/findEnvValue потрібно буде адаптувати під List<ExecEnvVar> з моделі
-                            val clusterName = findArgumentValue(execArgs, "--cluster-name") ?: findEnvValueModel(
-                                execEnv,
-                                "AWS_CLUSTER_NAME"
-                            ) // Використовуємо адаптовану функцію
-                            ?: throw KubernetesClientException("Не вдалося знайти 'cluster-name' в exec config для '$userName'")
-
-                            val region = findArgumentValue(execArgs, "--region") ?: findEnvValueModel(
-                                execEnv,
-                                "AWS_REGION"
-                            ) // Використовуємо адаптовану функцію
-                            ?: throw KubernetesClientException("Не вдалося знайти 'region' в exec config для '$userName'")
-
-                            val awsProfile = findArgumentValue(execArgs, "--profile") ?: findEnvValueModel(
-                                execEnv,
-                                "AWS_PROFILE"
-                            ) // Використовуємо адаптовану функцію
-
-                            logger.info("Параметри для EKS TokenProvider: cluster='$clusterName', region='$region', profile='${awsProfile ?: "(default)"}'")
-
-                            //Створюємо та встановлюємо наш кастомний провайдер токенів в ОБРОБЛЕНУ конфігурацію
-                            resolvedConfig.oauthTokenProvider = EksTokenProvider(clusterName, region, awsProfile)
-
-                            // Обнуляємо конфліктуючі методи аутентифікації в ОБРОБЛЕНІЙ конфігурації
-                            // Достатньо обнулити поля верхнього рівня в resolvedConfig
-                            resolvedConfig.username = null
-                            resolvedConfig.password = null
-                            resolvedConfig.oauthToken = null
-                            resolvedConfig.authProvider = null
-                            resolvedConfig.clientCertFile = null
-                            resolvedConfig.clientCertData = null
-                            resolvedConfig.clientKeyFile = null
-                            resolvedConfig.clientKeyData = null
-
-                            logger.info("Кастомний EksTokenProvider встановлено для контексту '$actualContextName'.")
-                        }
-                    } else {
-                        logger.warn("У контексті '$actualContextName' не вказано ім'я користувача (user). Неможливо перевірити ExecConfig.")
-                    }
-
-                } catch (kubeConfigEx: Exception) {
-                    // Логуємо помилку завантаження/аналізу KubeConfig, але продовжуємо з resolvedConfig
-                    logger.warn("Не вдалося проаналізувати KubeConfig для перевірки Exec: ${kubeConfigEx.message}")
-                    // Можливо, варто тут перервати, якщо EKS є критичним? Залежить від вимог.
-                    // throw KubernetesClientException("Помилка аналізу KubeConfig: ${kubeConfigEx.message}", kubeConfigEx)
-                }
-                // --- Кінець аналізу сирого KubeConfig ---
-
-
-                // Використовуємо resolvedConfig (потенційно модифікований для EKS) для створення клієнта
-                resolvedConfig.connectionTimeout = CONNECTION_TIMEOUT_MS
-                resolvedConfig.requestTimeout = REQUEST_TIMEOUT_MS
-                logger.info("[IO] Config context: ${resolvedConfig.currentContext?.name ?: "(не вказано)"}. Namespace: ${resolvedConfig.namespace}")
-
-                val client = KubernetesClientBuilder().withConfig(resolvedConfig).build()
-                logger.info("[IO] Fabric8 client created. Checking version...")
-                val ver = client.kubernetesVersion?.gitVersion ?: "невідомо"
-                logger.info("[IO] Версія сервера: $ver для '${resolvedConfig.currentContext?.name ?: contextNameToLog}'")
-                Pair(client, ver)
-            }
-            logger.info("Підключення до '${resultPair.first.configuration.currentContext?.name ?: contextNameToLog}' успішне (спроба $attempt).")
-            return Result.success(resultPair)
-        } catch (e: Exception) {
-            lastError = e
-            logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
-            //if (attempt < MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
-        }
-    }
-    logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
-    return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
-}
-
-// Потрібно адаптувати або створити нову функцію для роботи з List<io.fabric8.kubernetes.api.model.ExecEnvVar>
-fun findEnvValueModel(envVars: List<ExecEnvVar>, key: String): String? {
-    return envVars.find { it.name == key }?.value
-}
-fun findArgumentValue(args: List<String>, argName: String): String? {
-    val index = args.indexOf(argName)
-    return if (index != -1 && index + 1 < args.size) {
-        args[index + 1]
-    } else {
-        null
-    }
-}
-
-//private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
-//    return envList?.find { it.name == key }?.value
-//}
 
 fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
@@ -799,171 +534,6 @@ fun <T : HasMetadata> KubeTableRow(
     }
 }
 
-@Composable
-fun DetailRow(label: String, value: String?) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text( // M3 Text
-            text = "$label:",
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), // M3 Typography
-            modifier = Modifier.width(150.dp)
-        )
-        Text( // M3 Text
-            text = value ?: "<none>", style = MaterialTheme.typography.bodyMedium, // M3 Typography
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-// ===
-@Composable
-fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функція для базових метаданих
-    Text("Basic Metadata:", style = MaterialTheme.typography.titleMedium)
-    DetailRow("Name", resource.metadata?.name)
-    DetailRow("Namespace", resource.metadata?.namespace) // Буде null для кластерних ресурсів
-    DetailRow("Created", formatAge(resource.metadata?.creationTimestamp))
-    DetailRow("UID", resource.metadata?.uid)
-    // Можна додати Labels / Annotations за бажанням
-    DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
-    DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
-}
-
-
-// TODO: use this in all detailView functions
-@Composable
-fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded.value = !expanded.value }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = if (expanded.value) ICON_DOWN else ICON_RIGHT,
-            contentDescription = "Toggle $title"
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-    }
-    Divider(
-        color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-
-@Composable
-fun ResourceDetailPanel(
-    resource: Any?,
-    resourceType: String?,
-    onClose: () -> Unit,
-    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit // Додано callback
-) {
-    if (resource == null || resourceType == null) return
-
-    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-        // --- Верхня панель ---
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = onClose) {
-                Icon(ICON_LEFT, contentDescription = "Back"); Spacer(
-                Modifier.width(4.dp)
-            ); Text("Back")
-            }
-            Spacer(Modifier.weight(1f))
-            val name = if (resource is HasMetadata) resource.metadata?.name else "Details"
-            Text(
-                text = "$resourceType: $name",
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.weight(1f))
-        }
-        Divider(color = MaterialTheme.colorScheme.outlineVariant)
-        // ---
-
-        // --- Уміст деталей ---
-        Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                // --- Виклик відповідного DetailsView ---
-                when (resourceType) {
-                    // ВАЖЛИВО: Передаємо onShowLogsRequest в .PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(
-                        pod = resource,
-                        onShowLogsRequest = { containerName ->
-                            (resource as? HasMetadata)?.metadata?.let { meta ->
-                                onShowLogsRequest(
-                                    meta.namespace,
-                                    meta.name,
-                                    containerName
-                                )
-                            } ?: logger.error("Metadata is null for Pod.")
-                        }) else Text("Invalid Pod data")
-
-                    "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
-                    "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
-                    "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
-                    "Services" -> if (resource is Service) ServiceDetailsView(svc = resource) else Text("Invalid Service data")
-                    "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
-                    "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
-                    "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
-                        "Invalid PVC data"
-                    )
-
-                    "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
-                    "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
-                    "StatefulSets" -> if (resource is StatefulSet) StatefulSetDetailsView(sts = resource) else Text("Invalid StatefulSet data")
-                    "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
-                    "Jobs" -> if (resource is io.fabric8.kubernetes.api.model.batch.v1.Job) JobDetailsView(job = resource) else Text(
-                        "Invalid Job data"
-                    )
-
-                    "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text(
-                        "Invalid ReplicaSet data"
-                    )
-                    "NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(networkPolicy = resource) else Text("Invalid NetworkPolicy data")
-                    "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
-                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text(
-                        "Invalid RoleBinding data"
-                    )
-
-                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text(
-                        "Invalid ClusterRole data"
-                    )
-
-                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(
-                        clusterRoleBinding = resource
-                    ) else Text("Invalid ClusterRoleBinding data")
-
-                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text(
-                        "Invalid ServiceAccount data"
-                    )
-
-                    "Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
-                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text(
-                        "Invalid StorageClass data"
-                    )
-                    "CRDs" -> if (resource is CustomResourceDefinition) CrdDetailsView(crd = resource) else Text("Invalid CRD data")
-
-                    // TODO: Додати кейси для всіх інших типів ресурсів (NetworkPolicies, Events, CustomResourceDefinitions, etc.)
-                    else -> {
-                        Text("Simple detail view for '$resourceType'")
-                        if (resource is HasMetadata) {
-                            Spacer(Modifier.height(16.dp))
-                            BasicMetadataDetails(resource)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1422,7 +992,7 @@ fun App() {
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) {
                                                 if (selectedContext != contextName) {
-                                                    logger.info("Click on context: $contextName. Launching connectWithRetries...")
+                                                    logger.info("Click on context: $contextName. Launching .connectWithRetries...")
                                                     coroutineScope.launch {
                                                         isLoading = true
                                                         connectionStatus = "Connection to '$contextName'..."
@@ -1684,7 +1254,7 @@ fun App() {
                         }
 
                         val currentResourceType = selectedResourceType
-                        // Заголовок для таблиці та логів (для деталей він усередині ResourceDetailPanel)
+                        // Заголовок для таблиці та логів (для деталей він усередині .ResourceDetailPanel)
                         val headerTitle = when {
                             currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
                             currentView == "table" && currentResourceType != null && activeClient != null && resourceLoadError == null && errorMessage == null -> "$currentResourceType у $selectedContext"

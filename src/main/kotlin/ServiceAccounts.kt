@@ -370,7 +370,7 @@ fun ServiceAccountDetailsView(serviceAccount: ServiceAccount) {
 
                     Spacer(Modifier.Companion.height(8.dp))
                     val namespace = serviceAccount.metadata?.namespace
-                    val name = serviceAccount.metadata?.name
+                    val name: String? = serviceAccount.metadata?.name
 
                     val subjectReference = if (namespace != null && name != null) {
                         """
