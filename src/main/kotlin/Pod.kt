@@ -63,6 +63,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+const val LOG_LINES_TO_TAIL = 50
 suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) =
     fetchK8sResource(client, "Pods", namespace) { cl, ns ->
         if (ns == null) cl.pods().inAnyNamespace().list().items else cl.pods().inNamespace(ns).list().items
@@ -603,13 +604,8 @@ fun LogViewerPanel(
     val followLogs = remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     var isLogLoading by remember { mutableStateOf(false) }
-    // Fix the type to be kotlinx.coroutines.Job
     var logJob by remember { mutableStateOf<Job?>(null) }
-
-    // Add debug state to see if logs are actually being received
     var debugCounter by remember { mutableStateOf(0) }
-
-    // Define the extension function at the top level within the composable
     fun startLogPolling(
         scope: CoroutineScope,
         namespace: String,
@@ -778,7 +774,8 @@ fun LogViewerPanel(
                 Text("Back")
             }
             Text(
-                text = "Logs: $namespace/$podName [$containerName] (${if (debugCounter > 0) "Active" else "Inactive"})",
+//                text = "Logs: $namespace/$podName [$containerName] (${if (debugCounter > 0) "Active" else "Inactive"})",
+                text = "[$containerName] (${if (debugCounter > 0) "Active" else "Inactive"})",
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -825,4 +822,3 @@ fun LogViewerPanel(
     }
 }
 
-const val LOG_LINES_TO_TAIL = 50
