@@ -19,10 +19,13 @@ import compose.icons.feathericons.Info
 import compose.icons.feathericons.List
 import compose.icons.feathericons.Moon
 import compose.icons.feathericons.Plus
+import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Search
 import compose.icons.feathericons.Settings
 import compose.icons.feathericons.Sun
+import compose.icons.feathericons.X
 import compose.icons.feathericons.XCircle
+import compose.icons.feathericons.ZapOff
 import compose.icons.simpleicons.Kubernetes
 
 var ICON_UP = FeatherIcons.ArrowUp
@@ -40,9 +43,9 @@ var ICON_EYEOFF = FeatherIcons.EyeOff
 var ICON_CONTEXT = SimpleIcons.Kubernetes
 var ICON_RESOURCE = FeatherIcons.Aperture
 var ICON_NF = Icons.Filled.Place
-var ICON_CLOSE = FeatherIcons.XCircle
-var ICON_REFRESH = FeatherIcons.Aperture
-var ICON_DISCONNECT = FeatherIcons.DivideCircle
+var ICON_CLOSE = FeatherIcons.X
+var ICON_REFRESH = FeatherIcons.RefreshCw
+var ICON_DISCONNECT = FeatherIcons.ZapOff
 var ICON_ADD = FeatherIcons.Plus
 var ICON_SEARCH = FeatherIcons.Search
 var ICON_FILTER = FeatherIcons.Filter

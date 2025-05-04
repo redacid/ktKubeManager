@@ -10,3 +10,6 @@ https://github.com/jordond/MaterialKolor
 https://m3.material.io/components/
 
 https://m2.material.io/components
+
+https://feathericons.com/
+https://simpleicons.org/
