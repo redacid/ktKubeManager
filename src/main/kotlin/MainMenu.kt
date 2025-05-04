@@ -16,7 +16,7 @@ import androidx.compose.ui.window.WindowState
 import ua.`in`.ios.theme1.*
 import kotlin.system.exitProcess
 
-private val settingsManager = SettingsManager()
+//private val settingsManager = SettingsManager()
 
 // Створюємо клас для пункту меню
 data class MenuItem(
