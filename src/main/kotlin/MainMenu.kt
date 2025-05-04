@@ -132,13 +132,13 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             )
             HorizontalDivider()
             DropdownMenuItem(
-                text = { Text(if (ThemeManager.isDarkTheme()) "Світла тема" else "Темна тема") },
+                text = { Text(if (ThemeManager.isDarkTheme()) "Light Theme" else "Dark Theme") },
                 onClick = { ThemeManager.toggleTheme() },
 
                 leadingIcon = {
                     Icon(
                         if (ThemeManager.isDarkTheme()) ICON_LIGHT_THEME else ICON_DARK_THEME,
-                        if (ThemeManager.isDarkTheme()) "Світла тема" else "Темна тема"
+                        if (ThemeManager.isDarkTheme()) "Light Theme" else "Dark Theme"
                     )
                 }
             )
