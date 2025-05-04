@@ -1,3 +1,4 @@
+import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
@@ -69,6 +70,7 @@ suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) =
         if (ns == null) cl.pods().inAnyNamespace().list().items else cl.pods().inNamespace(ns).list().items
     }
 
+@Preview
 @Composable
 fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) {
     val showContainerDialog = remember { mutableStateOf(false) }

@@ -1,4 +1,3 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -70,7 +69,6 @@ import java.io.IOException
 
 
 @Composable
-@Preview
 fun App() {
     // --- Стани ---
     var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -108,15 +106,10 @@ fun App() {
     var clusterRolesList by remember { mutableStateOf<List<ClusterRole>>(emptyList()) }
     var clusterRoleBindingsList by remember { mutableStateOf<List<ClusterRoleBinding>>(emptyList()) }
     var crdsList by remember { mutableStateOf<List<CustomResourceDefinition>>(emptyList()) }
-
-    // Стани для деталей
     var detailedResource by remember { mutableStateOf<Any?>(null) }
     var detailedResourceType by remember { mutableStateOf<String?>(null) }
-    // Стани для лог вікна
     val showLogViewer = remember { mutableStateOf(false) } // Прапорець видимості
-    val logViewerParams =
-        remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
-    // Діалог помилки
+    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
     var allNamespaces by remember { mutableStateOf(listOf(ALL_NAMESPACES_OPTION)) }
@@ -126,7 +119,6 @@ fun App() {
 
     suspend fun handleResourceLoad(
         nodeId: String,
-        //activeClient: KubernetesClient,
         namespaceToUse: String?,
         onSuccess: suspend (Boolean, String?) -> Unit
     ) {
@@ -333,12 +325,10 @@ fun App() {
     // ---
 
     MaterialTheme { // M3 Theme
-
         Surface(
             modifier = Modifier.Companion.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) { // M3 Surface
-
             }
             Column(modifier = Modifier.Companion.fillMaxSize()) {
                 Column {
