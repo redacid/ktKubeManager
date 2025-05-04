@@ -44,6 +44,7 @@ dependencies {
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")
     implementation("io.fabric8:kubernetes-client:${fabric8Version}")
     implementation(compose.material3)
+    implementation("com.materialkolor:material-kolor:2.0.0") //DON`T UP VERSION
     implementation("ch.qos.logback:logback-classic:1.5.18") //1.4.14
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.23") // 1.9.23
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") //1.9.0

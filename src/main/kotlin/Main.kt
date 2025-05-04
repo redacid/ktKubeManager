@@ -1,8 +1,10 @@
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import ua.`in`.ios.theme1.AppTheme
 import kotlin.collections.firstOrNull
 
 fun main() = application {
@@ -12,13 +14,15 @@ fun main() = application {
     }
     Window(
         onCloseRequest = ::exitApplication,
-        title = "Kotlin Kube Manager",
+        title = "Kube Manager",
         icon = iconPainter
     ) {
-        LaunchedEffect(Unit) {
-            val awtWindow = java.awt.Window.getWindows().firstOrNull()
-            awtWindow?.let { IconsBase64.setWindowIcon(it) }
+        AppTheme {
+            LaunchedEffect(Unit) {
+                val awtWindow = java.awt.Window.getWindows().firstOrNull()
+                awtWindow?.let { IconsBase64.setWindowIcon(it) }
+            }
+            App()
         }
-        App()
     }
 }

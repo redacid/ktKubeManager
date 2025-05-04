@@ -1,3 +1,4 @@
+import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -68,6 +69,7 @@ private fun cleanup() {
     }
 }
 @Composable
+@Preview
 fun MainMenu() {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -100,7 +102,7 @@ fun MainMenu() {
             DropdownMenuItem(
                 text = { Text("Exit") },
                 onClick = { showExitDialog = true },
-                leadingIcon = { Icon(Icons.Default.ExitToApp, "Exit") }
+                leadingIcon = { Icon(Icons.Default.Close, "Exit") }
             )
         }
 
