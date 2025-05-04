@@ -48,6 +48,7 @@ private fun saveApplicationState(windowState: WindowState, settingsManager: Sett
 ) {
     settingsManager.updateSettings {
         copy(
+            theme = if (ThemeManager.isDarkTheme()) "dark" else "light",
             lastCluster = "currentCluster",
             windowSize = WindowSize(
                 width = windowState.size.width.value.toInt(),
@@ -134,15 +135,8 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(if (ThemeManager.isDarkTheme()) "Світла тема" else "Темна тема") },
-                onClick = {
-                    // Спочатку оновлюємо налаштування
-                    val newThemeState = !ThemeManager.isDarkTheme()
-                    settingsManager.updateSettings {
-                        copy(theme = if (newThemeState) "dark" else "light")
-                    }
-                    // Потім змінюємо тему
-                    ThemeManager.setDarkTheme(newThemeState)
-                },
+                onClick = { ThemeManager.toggleTheme() },
+
                 leadingIcon = {
                     Icon(
                         if (ThemeManager.isDarkTheme()) ICON_LIGHT_THEME else ICON_DARK_THEME,
@@ -150,9 +144,6 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
                     )
                 }
             )
-
-
-
         }
 
         Menu(
