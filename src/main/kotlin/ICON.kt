@@ -15,6 +15,7 @@ import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Filter
 import compose.icons.feathericons.HelpCircle
+import compose.icons.feathericons.Hexagon
 import compose.icons.feathericons.Info
 import compose.icons.feathericons.List
 import compose.icons.feathericons.Moon
@@ -41,7 +42,7 @@ var ICON_COPY = FeatherIcons.Copy
 var ICON_EYE = FeatherIcons.Eye
 var ICON_EYEOFF = FeatherIcons.EyeOff
 var ICON_CONTEXT = SimpleIcons.Kubernetes
-var ICON_RESOURCE = FeatherIcons.Aperture
+var ICON_RESOURCE = FeatherIcons.Hexagon
 var ICON_NF = Icons.Filled.Place
 var ICON_CLOSE = FeatherIcons.X
 var ICON_REFRESH = FeatherIcons.RefreshCw

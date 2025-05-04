@@ -69,7 +69,7 @@ fun NodeDetailsView(node: Node) {
                         },
                         contentDescription = "Node Status",
                         tint = when {
-                            nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.tertiary
+                            nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.primary
                             nodeStatus.contains("NotReady") -> MaterialTheme.colorScheme.error
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
@@ -80,7 +80,7 @@ fun NodeDetailsView(node: Node) {
                         text = "Status: $nodeStatus",
                         fontWeight = FontWeight.Bold,
                         color = when {
-                            nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.onTertiaryContainer
+                            nodeStatus.contains("Ready") -> MaterialTheme.colorScheme.onPrimaryContainer
                             nodeStatus.contains("NotReady") -> MaterialTheme.colorScheme.onErrorContainer
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
@@ -516,7 +516,7 @@ fun NodeDetailsView(node: Node) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(modifier = Modifier.heightIn(max = 200.dp).padding(12.dp)) {
+                    Column(modifier = Modifier.heightIn(max = 400.dp).padding(12.dp)) {
                         Text(
                             text = "Images cached on this node:",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
