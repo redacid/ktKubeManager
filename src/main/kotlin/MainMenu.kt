@@ -6,18 +6,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material3.Text
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import kotlin.system.exitProcess
-import java.util.prefs.Preferences
+import androidx.compose.ui.window.WindowState
 import ua.`in`.ios.theme1.*
+import kotlin.system.exitProcess
+
+private val settingsManager = SettingsManager()
 
 // Створюємо клас для пункту меню
 data class MenuItem(
@@ -25,10 +26,12 @@ data class MenuItem(
     val icon: ImageVector,
     val onClick: () -> Unit
 )
-fun exitApplication() {
+fun exitApplication(windowState: WindowState, settingsManager: SettingsManager
+) {
     try {
         // Save application state if needed
-        saveApplicationState()
+        saveApplicationState(windowState, settingsManager
+        )
         // Close all active connections
         closeConnections()
         // Cleanup resources
@@ -41,18 +44,21 @@ fun exitApplication() {
         exitProcess(1)
     }
 }
-private fun saveApplicationState() {
-    try {
-        val prefs = Preferences.userRoot().node("ua.in.ios.kubemanager")
-        // Save your application settings here
-        // For example:
-        prefs.put("lastCluster", "currentCluster")
-        prefs.put("windowSize", "800,500")
-        prefs.flush()
-    } catch (e: Exception) {
-        println("Failed to save application state: ${e.message}")
+private fun saveApplicationState(windowState: WindowState, settingsManager: SettingsManager
+) {
+    settingsManager.updateSettings {
+        copy(
+            lastCluster = "currentCluster",
+            windowSize = WindowSize(
+                width = windowState.size.width.value.toInt(),
+                height = windowState.size.height.value.toInt()
+
+
+        )
+        )
     }
 }
+
 private fun closeConnections() {
     try {
         // Close any active kubernetes connections
@@ -73,7 +79,8 @@ private fun cleanup() {
 }
 @Composable
 @Preview
-fun MainMenu() {
+fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
+) {
     var showMenu by remember { mutableStateOf(false) }
     val isDarkTheme = useTheme()
 
@@ -98,7 +105,7 @@ fun MainMenu() {
 
             if (showExitDialog) {
                 ConfirmExitDialog(
-                    onConfirm = { exitApplication() },
+                    onConfirm = { exitApplication(windowState, settingsManager) },
                     onDismiss = { showExitDialog = false }
                 )
             }
@@ -126,15 +133,25 @@ fun MainMenu() {
             )
             HorizontalDivider()
             DropdownMenuItem(
-                text = { Text(if (isDarkTheme.value) "Світла тема" else "Темна тема") },
-                onClick = { isDarkTheme.value = !isDarkTheme.value },
+                text = { Text(if (ThemeManager.isDarkTheme()) "Світла тема" else "Темна тема") },
+                onClick = {
+                    // Спочатку оновлюємо налаштування
+                    val newThemeState = !ThemeManager.isDarkTheme()
+                    settingsManager.updateSettings {
+                        copy(theme = if (newThemeState) "dark" else "light")
+                    }
+                    // Потім змінюємо тему
+                    ThemeManager.setDarkTheme(newThemeState)
+                },
                 leadingIcon = {
                     Icon(
-                        if (isDarkTheme.value) ICON_LIGHT_THEME else ICON_DARK_THEME,
-                        if (isDarkTheme.value) "Світла тема" else "Темна тема"
+                        if (ThemeManager.isDarkTheme()) ICON_LIGHT_THEME else ICON_DARK_THEME,
+                        if (ThemeManager.isDarkTheme()) "Світла тема" else "Темна тема"
                     )
                 }
             )
+
+
 
         }
 

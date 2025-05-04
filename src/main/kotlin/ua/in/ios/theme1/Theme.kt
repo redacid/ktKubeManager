@@ -12,7 +12,7 @@ import com.materialkolor.rememberDynamicMaterialThemeState
 private val LocalThemeState = compositionLocalOf { mutableStateOf(false) }
 
 object ThemeManager {
-    private val themeState = mutableStateOf(false)
+    val themeState = mutableStateOf(false)
 
     fun toggleTheme() {
         themeState.value = !themeState.value
@@ -30,37 +30,38 @@ fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val isDarkTheme = remember { mutableStateOf(darkTheme) }
+    LaunchedEffect(darkTheme) {
+        if (!ThemeManager.isDarkTheme() && darkTheme) {
+            ThemeManager.setDarkTheme(true)
+        }
+    }
 
-    CompositionLocalProvider(
-        LocalThemeState provides isDarkTheme
+    // Використовуємо ThemeManager замість локального стану
+    val isDarkTheme = remember { ThemeManager.themeState }.value
+
+    val dynamicThemeState = rememberDynamicMaterialThemeState(
+        isDark = isDarkTheme,
+        style = PaletteStyle.TonalSpot,
+        seedColor = SeedColor,
+    )
+
+    DynamicMaterialTheme(
+        state = dynamicThemeState,
+        animate = true
     ) {
-        val dynamicThemeState = rememberDynamicMaterialThemeState(
-            isDark = isDarkTheme.value,
-            style = PaletteStyle.TonalSpot,
-            seedColor = SeedColor,
-        )
-
-        DynamicMaterialTheme(
-            state = dynamicThemeState,
-            animate = true
+        CompositionLocalProvider(
+            LocalTextStyle provides MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface
+            )
         ) {
-            CompositionLocalProvider(
-                LocalTextStyle provides MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            ) {
-                content()
-            }
+            content()
         }
     }
 }
 
-
-
-
 @Composable
 fun useTheme(): MutableState<Boolean> {
-    return LocalThemeState.current
+    return remember { ThemeManager.themeState }
 }
+
 

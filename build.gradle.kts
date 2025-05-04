@@ -21,6 +21,7 @@ tasks.register("printDependencies") {
 
 plugins {
     kotlin("jvm") version "1.9.23"
+    kotlin("plugin.serialization") version "1.9.23"
     id("org.jetbrains.compose") version "1.7.3"
 }
 
@@ -49,6 +50,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.23") // 1.9.23
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") //1.9.0
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0") //1.9.0
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3") //DON`T UP VERSION
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.3")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.3")
