@@ -93,12 +93,12 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             DropdownMenuItem(
                 text = { Text("Connect to cluster") },
                 onClick = { /* Add connection logic */ },
-                leadingIcon = { Icon(Icons.Default.Add, "Connect") }
+                leadingIcon = { Icon(ICON_ADD, "Connect") }
             )
             DropdownMenuItem(
                 text = { Text("Disconnect") },
                 onClick = { /* Add disconnection logic */ },
-                leadingIcon = { Icon(Icons.Default.Close, "Disconnect") }
+                leadingIcon = { Icon(ICON_DISCONNECT, "Disconnect") }
             )
             HorizontalDivider()
 
@@ -114,7 +114,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             DropdownMenuItem(
                 text = { Text("Exit") },
                 onClick = { showExitDialog = true },
-                leadingIcon = { Icon(Icons.Default.Close, "Exit") }
+                leadingIcon = { Icon(ICON_CLOSE, "Exit") }
             )
         }
 
@@ -125,12 +125,12 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             DropdownMenuItem(
                 text = { Text("Refresh") },
                 onClick = { /* Add refresh logic */ },
-                leadingIcon = { Icon(Icons.Default.Refresh, "Refresh") }
+                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
             )
             DropdownMenuItem(
                 text = { Text("Settings") },
                 onClick = { /* Add settings logic */ },
-                leadingIcon = { Icon(Icons.Default.Settings, "Settings") }
+                leadingIcon = { Icon(ICON_SETTINGS, "Settings") }
             )
             HorizontalDivider()
             DropdownMenuItem(
@@ -153,12 +153,12 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             DropdownMenuItem(
                 text = { Text("Documentation") },
                 onClick = { /* Open documentation */ },
-                leadingIcon = { Icon(Icons.Default.Info, "Documentation") }
+                leadingIcon = { Icon(ICON_HELP, "Documentation") }
             )
             DropdownMenuItem(
                 text = { Text("About") },
                 onClick = { /* Show about info */ },
-                leadingIcon = { Icon(Icons.Default.Info, "About") }
+                leadingIcon = { Icon(ICON_INFO, "About") }
             )
         }
     }
