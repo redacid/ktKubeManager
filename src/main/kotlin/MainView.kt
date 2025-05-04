@@ -426,6 +426,7 @@ fun KubeTableHeaderRow(
                 fontWeight = FontWeight.Companion.Bold,
                 modifier = Modifier.Companion.width(width.dp).padding(horizontal = 8.dp),
                 maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurface,
                 overflow = TextOverflow.Companion.Ellipsis
             )
         }
@@ -443,13 +444,6 @@ fun <T : HasMetadata> KubeTableRow(
     ) {
         headers.forEachIndexed { colIndex, _ ->
             val width = if (colIndex < columnWidths.size) columnWidths[colIndex] else 100
-//            Text(
-//                text = getCellData(item, colIndex, resourceType),
-//                style = MaterialTheme.typography.bodyMedium,
-//                modifier = Modifier.Companion.width(width.dp).padding(horizontal = 8.dp),
-//                maxLines = 1,
-//                overflow = TextOverflow.Companion.Ellipsis
-//            )
             Text(
                 text = getCellData(item, colIndex, resourceType),
                 style = MaterialTheme.typography.bodyMedium,
@@ -463,6 +457,7 @@ fun <T : HasMetadata> KubeTableRow(
                         }
                     )
                     .padding(horizontal = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

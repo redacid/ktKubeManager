@@ -44,7 +44,7 @@ fun ErrorDialog(
             text = { Text(errorMessage) },
             confirmButton = {
                 Button(onClick = onDismiss) {
-                    Text("OK")
+                    Text("OK", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         )
@@ -127,12 +127,14 @@ fun DetailRow(label: String, value: String?) {
     Row(modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp)) {
         Text( // M3 Text
             text = "$label:",
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Companion.Bold), // M3 Typography
-            modifier = Modifier.Companion.width(150.dp)
+            style = MaterialTheme.typography.titleSmall.copy(/*fontWeight = FontWeight.Companion.Bold*/), // M3 Typography
+            modifier = Modifier.Companion.width(150.dp),
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text( // M3 Text
             text = value ?: "<none>", style = MaterialTheme.typography.bodyMedium, // M3 Typography
-            modifier = Modifier.Companion.weight(1f)
+            modifier = Modifier.Companion.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -155,7 +157,8 @@ fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
+            //fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
     HorizontalDivider(
