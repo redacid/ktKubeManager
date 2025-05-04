@@ -1,3 +1,4 @@
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import compose.icons.FeatherIcons
@@ -13,6 +14,8 @@ import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.HelpCircle
 import compose.icons.feathericons.List
+import compose.icons.feathericons.Moon
+import compose.icons.feathericons.Sun
 import compose.icons.feathericons.XCircle
 import compose.icons.simpleicons.Kubernetes
 
@@ -30,3 +33,6 @@ var ICON_EYEOFF = FeatherIcons.EyeOff
 var ICON_CONTEXT = SimpleIcons.Kubernetes
 var ICON_RESOURCE = FeatherIcons.Aperture
 var ICON_NF = Icons.Filled.Place
+
+var ICON_LIGHT_THEME = FeatherIcons.Sun
+var ICON_DARK_THEME = FeatherIcons.Moon

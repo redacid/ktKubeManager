@@ -94,7 +94,8 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
             Text(
                 text = "Pod Information",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.Companion.padding(bottom = 8.dp)
+                modifier = Modifier.Companion.padding(bottom = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Button(
@@ -302,7 +303,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                                 Spacer(Modifier.Companion.width(8.dp))
                                 Text(
                                     text = cs.name,
-                                    fontWeight = FontWeight.Companion.Bold
+                                    //fontWeight = FontWeight.Companion.Bold
                                 )
                             }
 
@@ -425,7 +426,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                             Column(modifier = Modifier.Companion.padding(12.dp)) {
                                 Text(
                                     text = volume.name ?: "Unnamed Volume",
-                                    fontWeight = FontWeight.Companion.Bold
+                                    //fontWeight = FontWeight.Companion.Bold
                                 )
 
                                 Spacer(Modifier.Companion.height(4.dp))
@@ -502,7 +503,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                             ) {
                                 Text(
                                     text = key,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Companion.SemiBold),
+                                    style = MaterialTheme.typography.bodyMedium.copy(/*fontWeight = FontWeight.Companion.SemiBold*/),
                                     modifier = Modifier.Companion.weight(0.4f)
                                 )
                                 Text(
@@ -551,7 +552,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                             ) {
                                 Text(
                                     text = key,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Companion.SemiBold),
+                                    style = MaterialTheme.typography.bodyMedium.copy(/*fontWeight = FontWeight.Companion.SemiBold*/),
                                 )
                                 Text(
                                     text = value,

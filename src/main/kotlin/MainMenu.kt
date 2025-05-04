@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.Text
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -16,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlin.system.exitProcess
 import java.util.prefs.Preferences
+import ua.`in`.ios.theme1.*
+
 // Створюємо клас для пункту меню
 data class MenuItem(
     val text: String,
@@ -72,6 +75,7 @@ private fun cleanup() {
 @Preview
 fun MainMenu() {
     var showMenu by remember { mutableStateOf(false) }
+    val isDarkTheme = useTheme()
 
     MenuBar {
         Menu(
@@ -120,6 +124,18 @@ fun MainMenu() {
                 onClick = { /* Add settings logic */ },
                 leadingIcon = { Icon(Icons.Default.Settings, "Settings") }
             )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(if (isDarkTheme.value) "Світла тема" else "Темна тема") },
+                onClick = { isDarkTheme.value = !isDarkTheme.value },
+                leadingIcon = {
+                    Icon(
+                        if (isDarkTheme.value) ICON_LIGHT_THEME else ICON_DARK_THEME,
+                        if (isDarkTheme.value) "Світла тема" else "Темна тема"
+                    )
+                }
+            )
+
         }
 
         Menu(
