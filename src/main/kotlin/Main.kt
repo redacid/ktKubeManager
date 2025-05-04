@@ -9,8 +9,6 @@ import androidx.compose.ui.unit.dp
 import ua.`in`.ios.theme1.*
 import kotlin.collections.firstOrNull
 
-
-
 fun main() = application {
     val settingsManager = remember { SettingsManager() }
     val savedSettings = remember { settingsManager.settings }
