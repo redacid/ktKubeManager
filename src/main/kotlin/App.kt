@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.WindowState
 import io.fabric8.kubernetes.api.model.ConfigMap
 import io.fabric8.kubernetes.api.model.Endpoints
 import io.fabric8.kubernetes.api.model.Event
@@ -73,7 +74,8 @@ import ua.`in`.ios.theme1.*
 
 
 @Composable
-fun App() {
+fun App(windowState: WindowState, settingsManager: SettingsManager
+) {
     // --- Стани ---
     var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
@@ -341,7 +343,8 @@ fun App() {
             Column(modifier = Modifier.Companion.fillMaxSize()) {
                 Column {
                     Row(modifier = Modifier.Companion.fillMaxWidth()) {
-                        MainMenu()  // Додаємо меню на початку основного вікна
+                        MainMenu(windowState = windowState, settingsManager = settingsManager
+                        )  // Додаємо меню на початку основного вікна
                     }
                 Row(modifier = Modifier.Companion.weight(1f)) {
                     // --- Ліва панель ---
