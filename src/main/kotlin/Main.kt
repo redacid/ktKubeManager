@@ -34,7 +34,7 @@ fun main() = application {
     }
 
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = { exitApplication(windowState, settingsManager) },
         title = "Kube Manager",
         state = windowState,
         icon = iconPainter
