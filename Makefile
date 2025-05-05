@@ -1,7 +1,7 @@
 -include .env
 export
 SHELL := /bin/bash
-APP_NAME := kotlinkubemanager
+APP_NAME := kubemanager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
 RELEASE_VERSION ?= 1.0.2
@@ -31,16 +31,16 @@ clean-workspace:
 	./gradlew clean
 
 build:
-	./gradlew packageDeb
+	./gradlew packageReleaseDeb
 
-git-release:
+git-release: build
 	gh release delete $(RELEASE_VERSION) --cleanup-tag -y --repo $(PRJ_REPO) 2>/dev/null;
 	git tag -d $(RELEASE_VERSION) 2>/dev/null;
 	gh release create $(RELEASE_VERSION) --generate-notes --notes "$(RELEASE_VERSION)" --repo $(PRJ_REPO)
 
 .ONESHELL:
 git-upload-release:
-	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb" --repo $(PRJ_REPO)
+	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb" --repo $(PRJ_REPO)
 
 
 #git-update:
