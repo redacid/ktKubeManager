@@ -10,6 +10,9 @@ https://github.com/jordond/MaterialKolor
 https://m3.material.io/components/
 
 https://m2.material.io/components
+https://m2.material.io/components/data-tables#anatomy
 
 https://feathericons.com/
 https://simpleicons.org/
+
+https://github.com/aleksandar-stefanovic/compose-material-data-table
