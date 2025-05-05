@@ -81,7 +81,7 @@ private fun cleanup() {
 fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    val isDarkTheme = useTheme()
+    //val isDarkTheme = useTheme()
 
     MenuBar {
         Menu(
