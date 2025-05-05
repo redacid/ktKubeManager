@@ -1,5 +1,6 @@
 -include .env
 export
+JAVA_HOME := /home/redacid/.jdks/jbr-17.0.14
 SHELL := /bin/bash
 APP_NAME := kubemanager
 
@@ -43,6 +44,7 @@ git-upload-release:
 	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb" --repo $(PRJ_REPO)
 
 
+.PHONY: build git-publish git-upload-release git-release clean-workspace all help
 #git-update:
 #	git pull && git fetch && git fetch --all
 
