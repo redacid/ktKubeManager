@@ -867,7 +867,7 @@ fun generateAllIcons() {
         resizeImage(mainIconPath, outputPath, size)
     }
 
-    // Створюємо іконку розміром 1024x1024 для використання в App Store (якщо потрібно)
+    // Створюємо іконку розміром 1024x1024 для використання в .App Store (якщо потрібно)
     // resizeImage(mainIconPath, "kubernetes_manager_icon_1024x1024.png", 1024)
 
     println("Всі іконки успішно згенеровано!")
