@@ -452,7 +452,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                 )
                                             ) {
                                                 Text(
-                                                    text = "Storage version",
+                                                    text = "Storage",
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                     fontSize = 12.sp,
                                                     modifier = Modifier.Companion.padding(
@@ -495,7 +495,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                     schema.openAPIV3Schema?.let { openAPISchema ->
                                         Row {
                                             Text(
-                                                text = "Тип схеми:",
+                                                text = "Schema:",
                                                 fontWeight = FontWeight.Companion.Medium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.Companion.width(120.dp)
@@ -781,7 +781,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                             )
                                         }
 
-                                        Text(text = "= ")
+                                        Text(text = " ")
                                     }
 
                                     if (isLongValue) {
