@@ -57,7 +57,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
         ) {
             Column(modifier = Modifier.Companion.padding(16.dp)) {
                 Text(
-                    text = crd.metadata?.name ?: "Невідомий CRD",
+                    text = crd.metadata?.name ?: "Unknown CRD",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontWeight = FontWeight.Companion.Bold
@@ -66,7 +66,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                 Spacer(Modifier.Companion.height(4.dp))
 
                 Text(
-                    text = "${crd.spec?.group ?: "Невідома група"} / ${crd.spec?.names?.kind ?: "Невідомий тип"}",
+                    text = "${crd.spec?.group ?: "Unknown group"} / ${crd.spec?.names?.kind ?: "Unknown type"}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
@@ -119,7 +119,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
         ) {
             Column(modifier = Modifier.Companion.padding(16.dp)) {
                 Text(
-                    text = "Інформація про ресурс",
+                    text = "Resource information",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Companion.Bold,
                     modifier = Modifier.Companion.padding(bottom = 8.dp)
@@ -140,7 +140,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                 modifier = Modifier.Companion.width(100.dp)
                             )
                             Text(
-                                text = names?.kind ?: "Невідомий",
+                                text = names?.kind ?: "Unknown",
                                 fontWeight = FontWeight.Companion.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -171,7 +171,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                 modifier = Modifier.Companion.width(100.dp)
                             )
                             Text(
-                                text = names?.plural ?: "Невідомий",
+                                text = names?.plural ?: "Unknown",
                                 fontWeight = FontWeight.Companion.Bold
                             )
                         }
@@ -197,7 +197,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                 if (!names?.shortNames.isNullOrEmpty()) {
                     Spacer(Modifier.Companion.height(12.dp))
                     Text(
-                        text = "Короткі назви:",
+                        text = "Short names:",
                         fontWeight = FontWeight.Companion.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -225,7 +225,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                 if (!names?.categories.isNullOrEmpty()) {
                     Spacer(Modifier.Companion.height(12.dp))
                     Text(
-                        text = "Категорії:",
+                        text = "Categories:",
                         fontWeight = FontWeight.Companion.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -266,7 +266,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
             ) {
                 Column(modifier = Modifier.Companion.padding(16.dp)) {
                     Text(
-                        text = "Статус CRD",
+                        text = "CRD status",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Companion.Bold,
                         modifier = Modifier.Companion.padding(bottom = 8.dp)
@@ -307,7 +307,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                     Spacer(Modifier.Companion.width(8.dp))
 
                                     Text(
-                                        text = condition.type ?: "Невідомий стан",
+                                        text = condition.type ?: "Unknown condition",
                                         fontWeight = FontWeight.Companion.Bold,
                                         style = MaterialTheme.typography.titleSmall
                                     )
@@ -315,7 +315,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                     Spacer(Modifier.Companion.weight(1f))
 
                                     Text(
-                                        text = condition.status ?: "Невідомо",
+                                        text = condition.status ?: "Unknown",
                                         color = if (isPositive)
                                             MaterialTheme.colorScheme.primary
                                         else
@@ -327,7 +327,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                 Spacer(Modifier.Companion.height(8.dp))
 
                                 Text(
-                                    text = "Причина: ${condition.reason ?: "Невідома"}",
+                                    text = "Reason: ${condition.reason ?: "Unknown"}",
                                     fontWeight = FontWeight.Companion.Medium
                                 )
 
@@ -343,7 +343,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
 
                                 Spacer(Modifier.Companion.height(4.dp))
                                 Text(
-                                    text = "Останнє оновлення: ${formatAge(condition.lastTransitionTime)}",
+                                    text = "Last update: ${formatAge(condition.lastTransitionTime)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontStyle = FontStyle.Companion.Italic
                                 )
@@ -366,7 +366,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
         ) {
             Column(modifier = Modifier.Companion.padding(16.dp)) {
                 Text(
-                    text = "Версії (${versions?.size ?: 0})",
+                    text = "Versions (${versions?.size ?: 0})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Companion.Bold,
                     modifier = Modifier.Companion.padding(bottom = 8.dp)
@@ -383,13 +383,13 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                     ) {
                         Icon(
                             imageVector = FeatherIcons.AlertTriangle,
-                            contentDescription = "Попередження",
+                            contentDescription = "Warning",
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.Companion.size(32.dp)
                         )
                         Spacer(Modifier.Companion.height(8.dp))
                         Text(
-                            "Жодної версії не визначено для цього CRD",
+                            "No version is defined for this CRD",
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.Companion.Bold,
                             textAlign = TextAlign.Companion.Center
@@ -427,7 +427,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                         )
                                     ) {
                                         Text(
-                                            text = version.name ?: "невідома",
+                                            text = version.name ?: "Unknown",
                                             color = if (isServed) {
                                                 if (version.storage == true)
                                                     MaterialTheme.colorScheme.onPrimary
@@ -452,7 +452,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                 )
                                             ) {
                                                 Text(
-                                                    text = "Версія зберігання",
+                                                    text = "Storage version",
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                     fontSize = 12.sp,
                                                     modifier = Modifier.Companion.padding(
@@ -473,7 +473,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                             )
                                         ) {
                                             Text(
-                                                text = if (isServed) "Активна" else "Неактивна",
+                                                text = if (isServed) "Active" else "Inactive",
                                                 color = if (isServed)
                                                     MaterialTheme.colorScheme.onTertiaryContainer
                                                 else
@@ -501,14 +501,14 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                 modifier = Modifier.Companion.width(120.dp)
                                             )
                                             Text(
-                                                text = openAPISchema.type ?: "не вказано",
+                                                text = openAPISchema.type ?: "not specified",
                                                 fontWeight = FontWeight.Companion.Bold
                                             )
                                         }
 
                                         if (openAPISchema.required?.isNotEmpty() == true) {
                                             Spacer(Modifier.Companion.height(8.dp))
-                                            Text("Обов'язкові поля:", fontWeight = FontWeight.Companion.Medium)
+                                            Text("Required fields:", fontWeight = FontWeight.Companion.Medium)
 
                                             FlowRow(
                                                 modifier = Modifier.Companion.padding(top = 4.dp),
@@ -542,7 +542,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                 version.subresources?.let { subresources ->
                                     if (subresources.status != null || subresources.scale != null) {
                                         Spacer(Modifier.Companion.height(12.dp))
-                                        Text("Субресурси:", fontWeight = FontWeight.Companion.Medium)
+                                        Text("Subresouces:", fontWeight = FontWeight.Companion.Medium)
 
                                         Row(
                                             modifier = Modifier.Companion.padding(top = 4.dp),
@@ -592,21 +592,21 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                             ) {
                                                 scale.specReplicasPath?.let {
                                                     Text(
-                                                        text = "Шлях до spec.replicas: $it",
+                                                        text = "Path to spec.replicas: $it",
                                                         style = MaterialTheme.typography.bodySmall
                                                     )
                                                 }
 
                                                 scale.statusReplicasPath?.let {
                                                     Text(
-                                                        text = "Шлях до status.replicas: $it",
+                                                        text = "Path to status.replicas: $it",
                                                         style = MaterialTheme.typography.bodySmall
                                                     )
                                                 }
 
                                                 scale.labelSelectorPath?.let {
                                                     Text(
-                                                        text = "Шлях до селектора міток: $it",
+                                                        text = "The path to the label selector: $it",
                                                         style = MaterialTheme.typography.bodySmall
                                                     )
                                                 }
@@ -619,7 +619,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                 if (!version.additionalPrinterColumns.isNullOrEmpty()) {
                                     Spacer(Modifier.Companion.height(12.dp))
                                     Text(
-                                        text = "Додаткові колонки виводу:",
+                                        text = "Additional printer columns:",
                                         fontWeight = FontWeight.Companion.Medium
                                     )
 
@@ -640,7 +640,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                     modifier = Modifier.Companion.width(110.dp)
                                                 ) {
                                                     Text(
-                                                        text = column.name ?: "без назви",
+                                                        text = column.name ?: "without a name",
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                         fontWeight = FontWeight.Companion.Medium,
                                                         textAlign = TextAlign.Companion.Center,
@@ -659,7 +659,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                         )
                                                     ) {
                                                         Text(
-                                                            text = column.type ?: "невідомий",
+                                                            text = column.type ?: "Unknown",
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                             fontSize = 13.sp,
                                                             modifier = Modifier.Companion.padding(
@@ -672,7 +672,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                     Spacer(Modifier.Companion.width(8.dp))
 
                                                     Text(
-                                                        text = column.jsonPath ?: "невідомий шлях",
+                                                        text = column.jsonPath ?: "Unknown path",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         modifier = Modifier.Companion.align(Alignment.Companion.CenterVertically)
                                                     )
@@ -704,7 +704,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
             ) {
                 Column(modifier = Modifier.Companion.padding(16.dp)) {
                     Text(
-                        text = "Мітки та анотації",
+                        text = "Labels and annotations",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Companion.Bold,
                         modifier = Modifier.Companion.padding(bottom = 8.dp)
@@ -715,7 +715,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                     // Мітки
                     if (!crd.metadata?.labels.isNullOrEmpty()) {
                         Text(
-                            text = "Мітки:",
+                            text = "Labels:",
                             fontWeight = FontWeight.Companion.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -756,7 +756,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                         }
 
                         Text(
-                            text = "Анотації:",
+                            text = "Annotations:",
                             fontWeight = FontWeight.Companion.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -806,7 +806,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
 
                                                     if (!valueExpanded) {
                                                         Text(
-                                                            text = "Натисніть, щоб розгорнути",
+                                                            text = "Click to expand",
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color = MaterialTheme.colorScheme.primary,
                                                             modifier = Modifier.Companion.padding(top = 4.dp)

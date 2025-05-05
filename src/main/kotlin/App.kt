@@ -141,7 +141,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             "Nodes" -> loadNodesFabric8(activeClient)
                 .onSuccess {nodesList = it; loadOk = true}
                 .onFailure { errorMsg = it.message }
-            "Events" -> loadEventsFabric8(activeClient)
+            "Events" -> loadEventsFabric8(activeClient, namespaceToUse)
                 .onSuccess {eventsList = it; loadOk = true}
                 .onFailure { errorMsg = it.message }
 
