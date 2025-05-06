@@ -732,7 +732,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                             text = key,
                                             fontWeight = FontWeight.Companion.Medium,
                                             color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.Companion.width(180.dp)
+                                            modifier = Modifier.Companion.width(300.dp)
                                         )
                                     }
 
@@ -777,7 +777,7 @@ fun CrdDetailsView(crd: CustomResourceDefinition) {
                                                 text = key,
                                                 fontWeight = FontWeight.Companion.Medium,
                                                 color = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.Companion.width(180.dp)
+                                                modifier = Modifier.Companion.width(300.dp)
                                             )
                                         }
 

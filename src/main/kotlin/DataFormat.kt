@@ -119,10 +119,11 @@ fun formatAge(creationTimestamp: String?): String {
         val creationTime = OffsetDateTime.parse(creationTimestamp)
         val now = OffsetDateTime.now(creationTime.offset)
         val duration = Duration.between(creationTime, now)
+        //return "${duration.seconds}s"
         return when {
             duration.toDays() > 0 -> "${duration.toDays()}d"
             duration.toHours() > 0 -> "${duration.toHours()}h"
-            duration.toMinutes() > 0 -> "${duration.toMinutes()}m"
+            duration.toMinutes() > 5 -> "${duration.toMinutes()}m"
             else -> "${duration.seconds}s"
         }
     } catch (e: Exception) {

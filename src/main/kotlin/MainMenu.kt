@@ -13,10 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
+import kotlinx.coroutines.launch
 import ua.`in`.ios.theme1.*
 import kotlin.system.exitProcess
 
-//private val settingsManager = SettingsManager()
+
 
 // Створюємо клас для пункту меню
 data class MenuItem(
@@ -76,11 +77,17 @@ private fun cleanup() {
         println("Failed to cleanup resources: ${e.message}")
     }
 }
+
 @Composable
 @Preview
 fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 ) {
     var showMenu by remember { mutableStateOf(false) }
+
+
+// В основній @Composable функції додайте:
+
+
     //val isDarkTheme = useTheme()
 
     MenuBar {
@@ -88,17 +95,19 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             text = "File",
             onClick = { showMenu = !showMenu }
         ) {
-            DropdownMenuItem(
-                text = { Text("Connect to cluster") },
-                onClick = { /* Add connection logic */ },
-                leadingIcon = { Icon(ICON_ADD, "Connect") }
-            )
-            DropdownMenuItem(
-                text = { Text("Disconnect") },
-                onClick = { /* Add disconnection logic */ },
-                leadingIcon = { Icon(ICON_DISCONNECT, "Disconnect") }
-            )
-            HorizontalDivider()
+//            DropdownMenuItem(
+//                text = { Text("Connect to cluster") },
+//                onClick = {}
+//                ,
+//                leadingIcon = { Icon(ICON_ADD, "Connect") }
+//            )
+//            DropdownMenuItem(
+//                text = { Text("Disconnect") },
+//                onClick = {}
+//                ,
+//                leadingIcon = { Icon(ICON_DISCONNECT, "Disconnect") }
+//            )
+//            HorizontalDivider()
 
             var showExitDialog by remember { mutableStateOf(false) }
 
@@ -120,17 +129,19 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             text = "View",
             onClick = { showMenu = !showMenu }
         ) {
-            DropdownMenuItem(
-                text = { Text("Refresh") },
-                onClick = { /* Add refresh logic */ },
-                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
-            )
-            DropdownMenuItem(
-                text = { Text("Settings") },
-                onClick = { /* Add settings logic */ },
-                leadingIcon = { Icon(ICON_SETTINGS, "Settings") }
-            )
-            HorizontalDivider()
+//            DropdownMenuItem(
+//                text = { Text("Refresh") },
+//                onClick = { recomposeScope?.invalidate() },
+//                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
+//            )
+
+
+//            DropdownMenuItem(
+//                text = { Text("Settings") },
+//                onClick = { /* Add settings logic */ },
+//                leadingIcon = { Icon(ICON_SETTINGS, "Settings") }
+//            )
+//            HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(if (ThemeManager.isDarkTheme()) "Light Theme" else "Dark Theme") },
                 onClick = { ThemeManager.toggleTheme() },
@@ -144,21 +155,21 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             )
         }
 
-        Menu(
-            text = "Help",
-            onClick = { showMenu = !showMenu }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Documentation") },
-                onClick = { /* Open documentation */ },
-                leadingIcon = { Icon(ICON_HELP, "Documentation") }
-            )
-            DropdownMenuItem(
-                text = { Text("About") },
-                onClick = { /* Show about info */ },
-                leadingIcon = { Icon(ICON_INFO, "About") }
-            )
-        }
+//        Menu(
+//            text = "Help",
+//            onClick = { showMenu = !showMenu }
+//        ) {
+//            DropdownMenuItem(
+//                text = { Text("Documentation") },
+//                onClick = { /* Open documentation */ },
+//                leadingIcon = { Icon(ICON_HELP, "Documentation") }
+//            )
+//            DropdownMenuItem(
+//                text = { Text("About") },
+//                onClick = { /* Show about info */ },
+//                leadingIcon = { Icon(ICON_INFO, "About") }
+//            )
+//        }
     }
 }
 @Composable

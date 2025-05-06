@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +33,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,17 +67,20 @@ import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import ua.`in`.ios.theme1.*
 
+var recomposeScope: RecomposeScope? = null
 
 
 
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager
 ) {
+    recomposeScope = currentRecomposeScope
     // --- Стани ---
     var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
@@ -125,6 +130,9 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     val isDarkTheme = useTheme()
 
 
+
+
+
     suspend fun handleResourceLoad(
         nodeId: String,
         namespaceToUse: String?,
@@ -141,6 +149,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             "Nodes" -> loadNodesFabric8(activeClient)
                 .onSuccess {nodesList = it; loadOk = true}
                 .onFailure { errorMsg = it.message }
+            
             "Events" -> loadEventsFabric8(activeClient, namespaceToUse)
                 .onSuccess {eventsList = it; loadOk = true}
                 .onFailure { errorMsg = it.message }
@@ -234,9 +243,9 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                 .onFailure { errorMsg = it.message }
 
             else -> {
-                logger.warn("The handler '$nodeId' not realized.")
+                logger.warn("The handler '$nodeId' not present.")
                 loadOk = false
-                errorMsg = "Not realized"
+                errorMsg = "Not present"
             }
         }
 
@@ -273,25 +282,25 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
         logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
-        isLoading = true; connectionStatus = "Завантаження Kubeconfig..."
+        isLoading = true; connectionStatus = "Loading Kubconfig..."
         var loadError: Exception? = null
         var loadedContextNames: List<String>
         try {
             loadedContextNames = withContext(Dispatchers.IO) {
                 logger.info("[IO] Calling Config.autoConfigure(null)...")
-                val config = Config.autoConfigure(null) ?: throw IOException("Не вдалося завантажити Kubeconfig")
+                val config = Config.autoConfigure(null) ?: throw IOException("Kubconfig could not loaded")
                 val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
-                logger.info("[IO] Знайдено контекстів: ${names.size}")
+                logger.info("[IO] Contexts found: ${names.size}")
                 names
             }
             contexts = loadedContextNames; errorMessage =
-                if (loadedContextNames.isEmpty()) "Контексти не знайдено" else null; connectionStatus =
-                if (loadedContextNames.isEmpty()) "Контексти не знайдено" else "Виберіть контекст"
+                if (loadedContextNames.isEmpty()) "Contexts not found" else null; connectionStatus =
+                if (loadedContextNames.isEmpty()) "Contexts not found" else "Choose a context"
         } catch (e: Exception) {
-            loadError = e; logger.error("Помилка завантаження контекстів: ${e.message}", e)
+            loadError = e; logger.error("Error loading contexts: ${e.message}", e)
         } finally {
             if (loadError != null) {
-                errorMessage = "Помилка завантаження: ${loadError.message}"; connectionStatus = "Помилка завантаження"
+                errorMessage = "Error loading: ${loadError.message}"; connectionStatus = "Error loading"
             }; isLoading = false
         }
     }
@@ -332,12 +341,20 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     }
     // ---
 
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5000) // затримка 1 секунда
+            recomposeScope?.invalidate()
+        }
+    }
+
+
     AppTheme(darkTheme = isDarkTheme.value)
     { AppTextStyle {
 
     Surface(
             modifier = Modifier.Companion.fillMaxSize(),
-           color = MaterialTheme.colorScheme.background
+            color = MaterialTheme.colorScheme.background
         ) { // M3 Surface
             }
             Column(modifier = Modifier.Companion.fillMaxSize()) {
@@ -355,7 +372,14 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                         Box(
                             modifier = Modifier.Companion
                                 .weight(1f)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clip(RoundedCornerShape(8.dp))
+
+
                         ) { // M3 колір
                             if (isLoading && contexts.isEmpty()) {
                                 CircularProgressIndicator(modifier = Modifier.Companion.align(Alignment.Companion.Center))
@@ -442,13 +466,17 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                     ); Spacer(modifier = Modifier.Companion.height(8.dp)) // M3 Text
                         Box(
                             modifier = Modifier.Companion.weight(2f)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                .border(1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clip(RoundedCornerShape(8.dp))
                         ) { // M3 колір
                             ResourceTreeView(
                                 rootIds = resourceTreeData[""] ?: emptyList(),
                                 expandedNodes = expandedNodes,
                                 onNodeClick = { nodeId, isLeaf ->
-                                    logger.info("Clicking on a node: $nodeId, It's a leaflet: $isLeaf")
+                                    logger.info("Click on a node: $nodeId, It's a leaflet: $isLeaf")
                                     if (isLeaf) {
                                         if (activeClient != null && !isLoading) {
                                             // Скидаємо показ деталей/логів при виборі нового типу ресурсу
@@ -487,7 +515,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                     } // Кінець лівої панелі
                     HorizontalDivider(
                         modifier = Modifier.Companion.fillMaxHeight().width(1.dp),
-                       color = MaterialTheme.colorScheme.outlineVariant
+                        color = MaterialTheme.colorScheme.outlineVariant
                     ) // M3 Divider
                     // --- Права панель (АБО Таблиця АБО Деталі АБО Логи) ---
                     Column(
@@ -877,3 +905,4 @@ private fun StatusBar(
 }
 
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
+
