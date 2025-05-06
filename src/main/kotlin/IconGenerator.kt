@@ -606,59 +606,59 @@ fun addCenterHighlight(g2d: Graphics2D, centerX: Int, centerY: Int, radius: Int)
 /**
  * Малює кнопку з текстом і градієнтом
  */
-fun drawButton(g2d: Graphics2D, size: Int, centerX: Int, colors: KubernetesColors) {
-    val buttonHeight = (size * 0.09).toInt()
-    val buttonWidth = (size * 0.55).toInt() // Трохи збільшуємо, щоб вмістити "Kube Manager"
-    val buttonY = size - (buttonHeight * 2)
-    val buttonX = centerX - buttonWidth / 2
-
-    // Новий градієнт для кнопки - темно-синій з більш насиченим синім
-    val buttonGradient = LinearGradientPaint(
-        buttonX.toFloat(), buttonY.toFloat(),  // Початкова точка
-        buttonX.toFloat(), (buttonY + buttonHeight).toFloat(),  // Кінцева точка
-        floatArrayOf(0.0f, 1.0f),
-        arrayOf(colors.k8sBlue, Color(20, 50, 150))  // Більш насичений темно-синій
-    )
-
-    // Малюємо кнопку з закругленими кутами
-    val roundRect = RoundRectangle2D.Float(
-        buttonX.toFloat(), buttonY.toFloat(),
-        buttonWidth.toFloat(), buttonHeight.toFloat(),
-        buttonHeight.toFloat(), buttonHeight.toFloat()
-    )
-
-    // Тінь для кнопки
-    val origComposite = g2d.composite
-    g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f)
-    g2d.color = Color.DARK_GRAY
-    g2d.fill(RoundRectangle2D.Float(
-        buttonX.toFloat() + 3, buttonY.toFloat() + 3,
-        buttonWidth.toFloat(), buttonHeight.toFloat(),
-        buttonHeight.toFloat(), buttonHeight.toFloat()
-    ))
-    g2d.composite = origComposite
-
-    // Малюємо градієнтну кнопку
-    g2d.paint = buttonGradient
-    g2d.fill(roundRect)
-
-    // Додаємо помірне світіння навколо кнопки
-    g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.1f)
-    g2d.stroke = BasicStroke(2f)
-    g2d.color = Color.WHITE
-    g2d.draw(RoundRectangle2D.Float(
-        buttonX.toFloat() - 2, buttonY.toFloat() - 2,
-        buttonWidth.toFloat() + 4, buttonHeight.toFloat() + 4,
-        buttonHeight.toFloat() + 4, buttonHeight.toFloat() + 4
-    ))
-    g2d.composite = origComposite
-
-    // Додаємо текст з гарним шрифтом
-    drawButtonText(g2d, "Kube Manager", buttonX, buttonY, buttonWidth, buttonHeight)
-
-    // Додаємо ефект блиску на кнопці
-    addButtonHighlight(g2d, buttonX, buttonY, buttonWidth, buttonHeight)
-}
+//fun drawButton(g2d: Graphics2D, size: Int, centerX: Int, colors: KubernetesColors) {
+//    val buttonHeight = (size * 0.09).toInt()
+//    val buttonWidth = (size * 0.55).toInt() // Трохи збільшуємо, щоб вмістити "Kube Manager"
+//    val buttonY = size - (buttonHeight * 2)
+//    val buttonX = centerX - buttonWidth / 2
+//
+//    // Новий градієнт для кнопки - темно-синій з більш насиченим синім
+//    val buttonGradient = LinearGradientPaint(
+//        buttonX.toFloat(), buttonY.toFloat(),  // Початкова точка
+//        buttonX.toFloat(), (buttonY + buttonHeight).toFloat(),  // Кінцева точка
+//        floatArrayOf(0.0f, 1.0f),
+//        arrayOf(colors.k8sBlue, Color(20, 50, 150))  // Більш насичений темно-синій
+//    )
+//
+//    // Малюємо кнопку з закругленими кутами
+//    val roundRect = RoundRectangle2D.Float(
+//        buttonX.toFloat(), buttonY.toFloat(),
+//        buttonWidth.toFloat(), buttonHeight.toFloat(),
+//        buttonHeight.toFloat(), buttonHeight.toFloat()
+//    )
+//
+//    // Тінь для кнопки
+//    val origComposite = g2d.composite
+//    g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f)
+//    g2d.color = Color.DARK_GRAY
+//    g2d.fill(RoundRectangle2D.Float(
+//        buttonX.toFloat() + 3, buttonY.toFloat() + 3,
+//        buttonWidth.toFloat(), buttonHeight.toFloat(),
+//        buttonHeight.toFloat(), buttonHeight.toFloat()
+//    ))
+//    g2d.composite = origComposite
+//
+//    // Малюємо градієнтну кнопку
+//    g2d.paint = buttonGradient
+//    g2d.fill(roundRect)
+//
+//    // Додаємо помірне світіння навколо кнопки
+//    g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.1f)
+//    g2d.stroke = BasicStroke(2f)
+//    g2d.color = Color.WHITE
+//    g2d.draw(RoundRectangle2D.Float(
+//        buttonX.toFloat() - 2, buttonY.toFloat() - 2,
+//        buttonWidth.toFloat() + 4, buttonHeight.toFloat() + 4,
+//        buttonHeight.toFloat() + 4, buttonHeight.toFloat() + 4
+//    ))
+//    g2d.composite = origComposite
+//
+//    // Додаємо текст з гарним шрифтом
+//    drawButtonText(g2d, "Kube Manager", buttonX, buttonY, buttonWidth, buttonHeight)
+//
+//    // Додаємо ефект блиску на кнопці
+//    addButtonHighlight(g2d, buttonX, buttonY, buttonWidth, buttonHeight)
+//}
 
 /**
  * Малює текст на кнопці
@@ -791,7 +791,7 @@ fun generateKubernetesIcon(
 
         // Малюємо кнопку з текстом тільки якщо розмір достатньо великий
         if (size >= 64) {
-            drawButton(g2d, size, centerX, colors)
+           // drawButton(g2d, size, centerX, colors)
         }
     }
 
