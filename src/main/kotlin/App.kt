@@ -823,12 +823,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
 @Composable
 fun AppTextStyle(
-    style: TextStyle = MaterialTheme.typography.labelMedium,
+    //style: TextStyle = MaterialTheme.typography.labelMedium,
     content: @Composable () -> Unit
 ) {
     CompositionLocalProvider(
         LocalContentColor provides MaterialTheme.colorScheme.onSurface,
-        LocalTextStyle provides style
+        //LocalTextStyle provides style
     )
  {
         content()
