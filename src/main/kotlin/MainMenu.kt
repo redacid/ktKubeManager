@@ -84,6 +84,14 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
+    var showAddClusterDialog by remember { mutableStateOf(false) }
+
+    if (showAddClusterDialog) {
+        ClusterAddDialog(
+            onDismiss = { showAddClusterDialog = false },
+            settingsManager = settingsManager
+        )
+    }
 
 // В основній @Composable функції додайте:
 
@@ -95,19 +103,13 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             text = "File",
             onClick = { showMenu = !showMenu }
         ) {
-//            DropdownMenuItem(
-//                text = { Text("Connect to cluster") },
-//                onClick = {}
-//                ,
-//                leadingIcon = { Icon(ICON_ADD, "Connect") }
-//            )
-//            DropdownMenuItem(
-//                text = { Text("Disconnect") },
-//                onClick = {}
-//                ,
-//                leadingIcon = { Icon(ICON_DISCONNECT, "Disconnect") }
-//            )
-//            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Connect to cluster") },
+                onClick = { showAddClusterDialog = true },
+                leadingIcon = { Icon(ICON_ADD, "Connect") }
+            )
+
+            HorizontalDivider()
 
             var showExitDialog by remember { mutableStateOf(false) }
 
