@@ -47,6 +47,7 @@ import compose.icons.feathericons.X
 import compose.icons.feathericons.XCircle
 import compose.icons.feathericons.Zap
 import compose.icons.feathericons.ZapOff
+import compose.icons.simpleicons.Googlecloud
 import compose.icons.simpleicons.Kubernetes
 
 var ICON_UP = FeatherIcons.ArrowUp
@@ -94,3 +95,5 @@ var ICON_SHARE = FeatherIcons.Share2
 var ICON_SERVER = FeatherIcons.Server
 var ICON_HOME = FeatherIcons.Home
 var ICON_SHUFFLE = FeatherIcons.Shuffle
+
+var ICON_CLOUD = SimpleIcons.Googlecloud

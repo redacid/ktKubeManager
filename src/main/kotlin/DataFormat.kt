@@ -131,6 +131,19 @@ fun formatAge(creationTimestamp: String?): String {
     }
 }
 
+fun formatContextNameForDisplay(context: ClusterContext): String {
+    return when (context.source) {
+        "saved" -> context.name // Для збережених кластерів показуємо ім'я як є
+        "kubeconfig" -> {
+            // Для kubeconfig контекстів можемо додати додаткове форматування
+            // Наприклад, якщо ім'я містить довгий шлях або специфічні префікси
+            context.name.split("/").last()
+        }
+        else -> context.name
+    }
+}
+
+
 //fun formatDataKeys(data: Map<String, String>?, stringData: Map<String, String>?): String {
 //    return (data?.size ?: 0).plus(stringData?.size ?: 0).toString()
 //}

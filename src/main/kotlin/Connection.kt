@@ -117,6 +117,46 @@ class EksTokenProvider(
     }
 }
 
+suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<KubernetesClient, String>> {
+    return try {
+        logger.info("Підключення до збереженого EKS кластера: ${config.alias}")
+
+        // Створюємо провайдер токенів для EKS
+        val tokenProvider = EksTokenProvider(
+            clusterName = config.clusterName,
+            region = config.region,
+            awsProfile = config.profileName
+        )
+
+        // Створюємо конфігурацію для клієнта
+        val clientConfig = Config.empty().apply {
+            masterUrl = config.endpoint
+            oauthTokenProvider = tokenProvider
+            caCertData = config.certificateAuthority
+            connectionTimeout = CONNECTION_TIMEOUT_MS
+            requestTimeout = REQUEST_TIMEOUT_MS
+        }
+
+        val result = withContext(Dispatchers.IO) {
+            val client = KubernetesClientBuilder()
+                .withConfig(clientConfig)
+                .build()
+
+            // Перевіряємо підключення, отримуючи версію сервера
+            val version = client.kubernetesVersion?.gitVersion ?: "невідомо"
+            logger.info("Успішно підключено до EKS кластера ${config.alias} (версія: $version)")
+
+            Pair(client, version)
+        }
+
+        Result.success(result)
+    } catch (e: Exception) {
+        logger.error("Помилка підключення до збереженого EKS кластера ${config.alias}: ${e.message}", e)
+        Result.failure(e)
+    }
+}
+
+
 
 suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
     val targetContext = if (contextName.isNullOrBlank()) null else contextName

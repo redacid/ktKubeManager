@@ -75,6 +75,11 @@ import ua.`in`.ios.theme1.*
 
 var recomposeScope: RecomposeScope? = null
 
+data class ClusterContext(
+    val name: String,
+    val source: String, // "kubeconfig" або "saved"
+    val config: ClusterConfig? = null
+)
 
 
 @Composable
@@ -82,7 +87,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 ) {
     recomposeScope = currentRecomposeScope
     // --- Стани ---
-    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
+//    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
+    var contexts by remember { mutableStateOf<List<ClusterContext>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
     var selectedContext by remember { mutableStateOf<String?>(null) }
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
@@ -128,10 +134,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
-
-
-
-
 
     suspend fun handleResourceLoad(
         nodeId: String,
@@ -281,29 +283,44 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     }
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
-        logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
-        isLoading = true; connectionStatus = "Loading Kubconfig..."
-        var loadError: Exception? = null
-        var loadedContextNames: List<String>
+        logger.info("LaunchedEffect: Завантаження контекстів...")
+        isLoading = true
+        connectionStatus = "Завантаження конфігурації..."
+
         try {
-            loadedContextNames = withContext(Dispatchers.IO) {
-                logger.info("[IO] Calling Config.autoConfigure(null)...")
-                val config = Config.autoConfigure(null) ?: throw IOException("Kubconfig could not loaded")
-                val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
-                logger.info("[IO] Contexts found: ${names.size}")
-                names
+            val kubeConfigContexts = withContext(Dispatchers.IO) {
+                val config = Config.autoConfigure(null)
+                    ?: throw IOException("Не вдалося завантажити kubeconfig")
+
+                config.contexts?.mapNotNull { context ->
+                    context.name?.let { name ->
+                        ClusterContext(name = name, source = "kubeconfig")
+                    }
+                } ?: emptyList()
             }
-            contexts = loadedContextNames; errorMessage =
-                if (loadedContextNames.isEmpty()) "Contexts not found" else null; connectionStatus =
-                if (loadedContextNames.isEmpty()) "Contexts not found" else "Choose a context"
+
+            val savedContexts = settingsManager.settings.clusters.map { cluster ->
+                ClusterContext(
+                    name = cluster.alias,
+                    source = "saved",
+                    config = cluster
+                )
+            }
+
+            contexts = (kubeConfigContexts + savedContexts)
+
+            errorMessage = if (contexts.isEmpty()) "Контексти не знайдено" else null
+            connectionStatus = if (contexts.isEmpty()) "Контексти не знайдено" else "Оберіть контекст"
+
         } catch (e: Exception) {
-            loadError = e; logger.error("Error loading contexts: ${e.message}", e)
-        } finally {
-            if (loadError != null) {
-                errorMessage = "Error loading: ${loadError.message}"; connectionStatus = "Error loading"
-            }; isLoading = false
+            logger.error("Помилка завантаження контекстів: ${e.message}", e)
+            errorMessage = "Помилка завантаження: ${e.message}"
+            connectionStatus = "Помилка завантаження"
         }
+
+        isLoading = false
     }
+
     // --- Кінець LaunchedEffect ---
     // --- Завантаження неймспейсів ПІСЛЯ успішного підключення ---
     LaunchedEffect(activeClient) {
@@ -391,17 +408,17 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                 )
                             } // M3 Text
                             else {
-                                LazyColumn(modifier = Modifier.Companion.fillMaxSize()) {
-                                    items(contexts) { contextName ->
+                                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                    items(contexts) { context -> // змінено параметр з contextName на context
                                         Row(
-                                            verticalAlignment = Alignment.Companion.CenterVertically,
-                                            modifier = Modifier.Companion.fillMaxWidth()
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
                                                 .clickable(enabled = !isLoading) {
-                                                    if (selectedContext != contextName) {
-                                                        logger.info("Click on context: $contextName. Launching .connectWithRetries...")
+                                                    if (selectedContext != context.name) { // порівнюємо з context.name
+                                                        logger.info("Click on context: ${context.name}. Launching .connectWithRetries...")
                                                         coroutineScope.launch {
                                                             isLoading = true
-                                                            connectionStatus = "Connection to '$contextName'..."
+                                                            connectionStatus = "Connection to '${context.name}'..."
                                                             activeClient?.close()
                                                             activeClient = null
                                                             selectedResourceType = null
@@ -413,52 +430,86 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                             showLogViewer.value = false
                                                             logViewerParams.value = null // Скидаємо все
 
-                                                            val connectionResult = connectWithRetries(contextName)
+                                                            val connectionResult = when {
+                                                                // Використовуємо різні методи підключення в залежності від джерела
+                                                                context.source == "saved" && context.config != null -> {
+                                                                    logger.info("Connecting to saved cluster: ${context.name}")
+                                                                    connectToSavedCluster(context.config)
+                                                                }
+                                                                else -> {
+                                                                    logger.info("Connecting to kubeconfig context: ${context.name}")
+                                                                    connectWithRetries(context.name)
+                                                                }
+                                                            }
+
                                                             isLoading = false
 
                                                             connectionResult.onSuccess { (newClient, serverVersion) ->
                                                                 activeClient = newClient
-                                                                selectedContext = contextName
+                                                                selectedContext = context.name
                                                                 connectionStatus =
-                                                                    "Connected to: $contextName (v$serverVersion)"
+                                                                    "Connected to: ${context.name} (v$serverVersion)"
                                                                 errorMessage = null
-                                                                logger.info("UI State updated on Success for $contextName")
+                                                                logger.info("UI State updated on Success for ${context.name}")
                                                             }.onFailure { error ->
                                                                 connectionStatus =
-                                                                    "Connection Error to '$contextName'"
+                                                                    "Connection Error to '${context.name}'"
                                                                 errorMessage =
                                                                     error.localizedMessage ?: "Unknown error"
-                                                                logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
+                                                                logger.info("Setting up error dialog for: ${context.name}. Error: ${error.message}")
                                                                 dialogErrorMessage.value =
-                                                                    "Failed to connect to '$contextName' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
+                                                                    "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
                                                                 showErrorDialog.value = true
                                                                 activeClient = null
                                                                 selectedContext = null
                                                             }
-                                                            logger.info("Attempting to connect to '$contextName' Completed (the result is processed).")
+                                                            logger.info("Attempting to connect to '${context.name}' Completed (the result is processed).")
                                                         }
                                                     }
                                                 }.padding(horizontal = 8.dp, vertical = 6.dp)
                                         ) {
-                                            // Додаємо іконку
                                             Icon(
-                                                imageVector = ICON_CONTEXT, // Ви можете змінити цю іконку на іншу
-                                                contentDescription = "Kubernetes Context",
-                                                tint = if (contextName == selectedContext) MaterialTheme.colorScheme.primary
+                                                imageVector = if (context.source == "saved") ICON_CLOUD else ICON_CONTEXT,
+                                                contentDescription = if (context.source == "saved") "Saved EKS Cluster" else "Kubernetes Context",
+                                                tint = if (context.name == selectedContext) MaterialTheme.colorScheme.primary
                                                 else MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.Companion.size(24.dp).padding(end = 8.dp)
+                                                modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
 
-                                            // Текст після іконки
-                                            Text(
-                                                text = formatContextNameForDisplay(contextName),
-                                                fontSize = 14.sp,
-                                                color = if (contextName == selectedContext) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurface
-                                            )
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(
+                                                    text = formatContextNameForDisplay(context),
+                                                    fontSize = 14.sp,
+                                                    color = if (context.name == selectedContext)
+                                                        MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (context.source == "saved") {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "EKS: ${context.config?.region ?: "unknown region"}",
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = "Profile: ${context.config?.profileName ?: "default"}",
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+
                                         }
                                     }
                                 }
+
                             }
                         } // Кінець Box списку
                         Spacer(modifier = Modifier.Companion.height(16.dp)); Text(
