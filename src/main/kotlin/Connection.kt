@@ -50,6 +50,18 @@ class EksTokenProvider(
 ) : OAuthTokenProvider {
     private val logger = LoggerFactory.getLogger(EksTokenProvider::class.java)
 
+    private data class CachedToken(
+        val token: String,
+        val expiresAt: Instant
+    )
+    @Volatile
+    private var cachedToken: CachedToken? = null
+
+    companion object {
+        private const val TOKEN_DURATION_SECONDS = 60L
+        private const val TOKEN_REFRESH_BEFORE_SECONDS = 10L // Оновлюємо за 10 секунд до закінчення
+    }
+
     private val credentialsProvider: AwsCredentialsProvider = when {
         accessKeyId != null && secretAccessKey != null -> {
             logger.info("Using static AWS credentials for eks authentication")
@@ -68,6 +80,26 @@ class EksTokenProvider(
     }
 
     override fun getToken(): String {
+        // Перевіряємо кешований токен
+        cachedToken?.let { cached ->
+            if (Instant.now().plusSeconds(TOKEN_REFRESH_BEFORE_SECONDS).isBefore(cached.expiresAt)) {
+                logger.debug("Використовуємо кешований токен для EKS кластера '$clusterName' (дійсний до ${cached.expiresAt})")
+                return cached.token
+            }
+        }
+
+        return generateNewToken().also { token ->
+            // Зберігаємо новий токен в кеші
+            cachedToken = CachedToken(
+                token = token,
+                expiresAt = Instant.now().plusSeconds(TOKEN_DURATION_SECONDS)
+            )
+        }
+    }
+
+
+    private fun generateNewToken(): String {
+
         try {
             logger.debug("Генерація нового токену для EKS кластера '$clusterName'")
 
