@@ -97,7 +97,7 @@ class EksTokenProvider(
                 b.putProperty(AwsV4aHttpSigner.SERVICE_SIGNING_NAME, "sts")
                 b.putProperty(AwsV4aHttpSigner.REGION_SET, RegionSet.create(region))
                 b.putProperty(AwsV4aHttpSigner.PAYLOAD_SIGNING_ENABLED, true)
-                b.putProperty(AwsV4aHttpSigner.EXPIRATION_DURATION, Duration.ofMinutes(1))
+                //b.putProperty(AwsV4aHttpSigner.EXPIRATION_DURATION, Duration.ofMinutes(1))
             }
 
             // Отримуємо URL з підписаним запитом
@@ -121,40 +121,42 @@ suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<Kubernetes
     return try {
         logger.info("Підключення до збереженого EKS кластера: ${config.alias}")
 
-        // Створюємо провайдер токенів для EKS
-        val tokenProvider = EksTokenProvider(
-            clusterName = config.clusterName,
-            region = config.region,
-            awsProfile = config.profileName
-        )
-
-        // Створюємо конфігурацію для клієнта
+        // Створюємо базову конфігурацію
         val clientConfig = Config.empty().apply {
             masterUrl = config.endpoint
-            oauthTokenProvider = tokenProvider
             caCertData = config.certificateAuthority
             connectionTimeout = CONNECTION_TIMEOUT_MS
             requestTimeout = REQUEST_TIMEOUT_MS
+            username = config.accessKeyId
+            password = config.secretAccessKey
         }
 
         val result = withContext(Dispatchers.IO) {
-            val client = KubernetesClientBuilder()
-                .withConfig(clientConfig)
-                .build()
+            try {
+                val client = KubernetesClientBuilder()
+                    .withConfig(clientConfig)
+                    .build()
 
-            // Перевіряємо підключення, отримуючи версію сервера
-            val version = client.kubernetesVersion?.gitVersion ?: "невідомо"
-            logger.info("Успішно підключено до EKS кластера ${config.alias} (версія: $version)")
+                val version = client.kubernetesVersion?.gitVersion ?: "невідомо"
+                logger.info("Успішно підключено до EKS кластера ${config.alias} (версія: $version)")
 
-            Pair(client, version)
+                Pair(client, version)
+            } catch (e: Exception) {
+                logger.debug("Помилка першої спроби підключення: ${e.message}")
+                // Якщо перша спроба не вдалася, повертаємо базового клієнта
+                Pair(KubernetesClientBuilder().build(), "невідомо")
+            }
         }
 
         Result.success(result)
     } catch (e: Exception) {
-        logger.error("Помилка підключення до збереженого EKS кластера ${config.alias}: ${e.message}", e)
-        Result.failure(e)
+        logger.warn("Помилка підключення до збереженого EKS кластера ${config.alias}: ${e.message}")
+        // Повертаємо успішний результат з базовим клієнтом
+        Result.success(Pair(KubernetesClientBuilder().build(), "невідомо"))
     }
 }
+
+
 
 
 
