@@ -1,11 +1,11 @@
 -include .env
 export
-JAVA_HOME := /home/redacid/.jdks/jbr-17.0.14
+JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
 SHELL := /bin/bash
 APP_NAME := kubemanager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
-RELEASE_VERSION ?= 1.0.2
+RELEASE_VERSION ?= 1.0.3
 
 # colors
 GREEN = $(shell tput -Txterm setaf 2)
@@ -23,6 +23,7 @@ all: help
 git-publish:
 	make clean-workspace
 	make build
+	make package
 	make git-release
 	make git-upload-release
 	make clean-workspace
@@ -32,6 +33,9 @@ clean-workspace:
 	./gradlew clean
 
 build:
+	./gradlew build
+
+package:
 	./gradlew packageReleaseDeb
 
 git-release: build

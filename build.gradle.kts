@@ -82,7 +82,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "KubeManager"
-            packageVersion = "1.0.2"
+            packageVersion = "1.0.3"
             macOS {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
             }
