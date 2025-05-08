@@ -14,15 +14,20 @@ import io.fabric8.kubernetes.client.OAuthTokenProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.http.SdkHttpFullRequest
 import software.amazon.awssdk.http.SdkHttpMethod
 import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner
 import software.amazon.awssdk.http.auth.aws.signer.RegionSet
 import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
+
+
+
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -32,131 +37,182 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Base64
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import java.security.MessageDigest
+
+
 
 class EksTokenProvider(
-    private val clusterName: String, private val region: String, private val awsProfile: String? = null
+    private val clusterName: String,
+    private val region: String,
+    private val awsProfile: String? = null,
+    private val accessKeyId: String? = null,
+    private val secretAccessKey: String? = null
 ) : OAuthTokenProvider {
-
     private val logger = LoggerFactory.getLogger(EksTokenProvider::class.java)
 
-    // Провайдер AWS облікових даних
-    private val credentialsProvider: AwsCredentialsProvider = if (awsProfile != null) {
-        logger.info("Using AWS profile '$awsProfile' for eks authentication")
-        ProfileCredentialsProvider.builder().profileName(awsProfile).build()
-    } else {
-        logger.info("Using the standard AWS providers' chain for EKS authentication")
-        DefaultCredentialsProvider.create()
+    private val credentialsProvider: AwsCredentialsProvider = when {
+        accessKeyId != null && secretAccessKey != null -> {
+            logger.info("Using static AWS credentials for eks authentication")
+            StaticCredentialsProvider.create(
+                AwsBasicCredentials.create(accessKeyId, secretAccessKey)
+            )
+        }
+        awsProfile != null -> {
+            logger.info("Using AWS profile '$awsProfile' for eks authentication")
+            ProfileCredentialsProvider.builder().profileName(awsProfile).build()
+        }
+        else -> {
+            logger.info("Using the standard AWS providers' chain for EKS authentication")
+            DefaultCredentialsProvider.create()
+        }
     }
 
-    // Підписувач HTTP запитів за алгоритмом AWS SigV4
-    private val signer = AwsV4aHttpSigner.create()
 
-    // Форматер для дати в заголовку X-Amz-Date
-    private val amzDateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneId.of("UTC"))
-
-    /**
-     * Отримує токен для аутентифікації з кластером EKS.
-     */
     override fun getToken(): String {
         try {
-            logger.debug("Generation of a new EKS token for cluster '$clusterName' in the region '$region'")
+            logger.debug("Генерація нового токену для EKS кластера '$clusterName'")
 
-            // Отримуємо облікові дані AWS
             val credentials = credentialsProvider.resolveCredentials()
-
-            // Поточний час для генерації підпису
             val now = Instant.now()
-            val formattedDate = amzDateFormatter.format(now)
-            //val datestamp = formattedDate.substring(0, 8)
+            val amzDate = DateTimeFormatter
+                .ofPattern("yyyyMMdd'T'HHmmss'Z'")
+                .withZone(ZoneId.of("UTC"))
+                .format(now)
+            val datestamp = amzDate.substring(0, 8)
 
-            // Створюємо базовий запит STS GetCallerIdentity
             val host = "sts.$region.amazonaws.com"
-            val requestBuilder =
-                SdkHttpFullRequest.builder().method(SdkHttpMethod.GET).uri(URI.create("https://$host/"))
-                    .putRawQueryParameter("Action", "GetCallerIdentity").putRawQueryParameter("Version", "2011-06-15")
-                    .appendHeader("host", host).appendHeader("x-k8s-aws-id", clusterName)
-                    .appendHeader("x-amz-date", formattedDate)
 
-            // Додаємо токен сесії, якщо присутній
-            if (credentials is AwsSessionCredentials) {
-                requestBuilder.appendHeader("x-amz-security-token", credentials.sessionToken())
+            // Формуємо параметри запиту в правильному порядку
+            val queryParams = listOf(
+                "Action=GetCallerIdentity",
+                "Version=2011-06-15",
+                "X-Amz-Algorithm=AWS4-HMAC-SHA256",
+                "X-Amz-Credential=${credentials.accessKeyId()}%2F$datestamp%2F$region%2Fsts%2Faws4_request",
+                "X-Amz-Date=$amzDate",
+                "X-Amz-Expires=60",
+                "X-Amz-SignedHeaders=host%3Bx-k8s-aws-id"
+            ).sorted().joinToString("&")
+
+            // Канонічні заголовки повинні бути відсортовані
+            val canonicalHeaders = "host:$host\nx-k8s-aws-id:$clusterName\n"
+            val signedHeaders = "host;x-k8s-aws-id"
+
+            // Формуємо канонічний запит
+            val canonicalRequest = listOf(
+                "GET",
+                "/",
+                queryParams,
+                canonicalHeaders,
+                signedHeaders,
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ).joinToString("\n")
+
+            val stringToSign = listOf(
+                "AWS4-HMAC-SHA256",
+                amzDate,
+                "$datestamp/$region/sts/aws4_request",
+                sha256Hex(canonicalRequest)
+            ).joinToString("\n")
+
+            val kSecret = ("AWS4" + credentials.secretAccessKey()).toByteArray(StandardCharsets.UTF_8)
+            val kDate = hmacSha256(datestamp.toByteArray(StandardCharsets.UTF_8), kSecret)
+            val kRegion = hmacSha256(region.toByteArray(StandardCharsets.UTF_8), kDate)
+            val kService = hmacSha256("sts".toByteArray(StandardCharsets.UTF_8), kRegion)
+            val kSigning = hmacSha256("aws4_request".toByteArray(StandardCharsets.UTF_8), kService)
+
+            val signature = bytesToHex(hmacSha256(stringToSign.toByteArray(StandardCharsets.UTF_8), kSigning))
+
+            // Формуємо кінцевий URL з усіма параметрами
+            val presignedUrl = buildString {
+                append("https://$host/?")
+                append(queryParams)
+                append("&X-Amz-Signature=")
+                append(signature)
             }
 
-            val request = requestBuilder.build()
+            val token = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(presignedUrl.toByteArray(StandardCharsets.UTF_8))
 
-            // Створюємо об'єкт SignRequest за допомогою функціонального інтерфейсу Consumer
-            val signedRequest = signer.sign { b ->
-                // Встановлюємо HTTP запит
-                b.request(request)
-                // Створюємо ідентичність AWS з облікових даних
-                val identity = AwsCredentialsIdentity.create(
-                    credentials.accessKeyId(), credentials.secretAccessKey()
-                )
-                b.identity(identity)
-                // Додаємо інші необхідні властивості з використанням констант
-                b.putProperty(AwsV4aHttpSigner.SERVICE_SIGNING_NAME, "sts")
-                b.putProperty(AwsV4aHttpSigner.REGION_SET, RegionSet.create(region))
-                b.putProperty(AwsV4aHttpSigner.PAYLOAD_SIGNING_ENABLED, true)
-                //b.putProperty(AwsV4aHttpSigner.EXPIRATION_DURATION, Duration.ofMinutes(1))
-            }
-
-            // Отримуємо URL з підписаним запитом
-            val signedUrl = signedRequest.request().getUri().toString()
-
-            // Кодуємо URL в Base64 та форматуємо токен
-            val base64SignedUrl =
-                Base64.getUrlEncoder().withoutPadding().encodeToString(signedUrl.toByteArray(StandardCharsets.UTF_8))
-
-            return "k8s-aws-v1.$base64SignedUrl"
-
+            return "k8s-aws-v1.$token"
         } catch (e: Exception) {
             val errorMsg = "Failed to generate eks token: ${e.message}"
             logger.error(errorMsg, e)
             throw RuntimeException(errorMsg, e)
         }
     }
+
+    private fun sha256Hex(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(input.toByteArray(StandardCharsets.UTF_8))
+        return bytesToHex(hash)
+    }
+
+    private fun hmacSha256(data: ByteArray, key: ByteArray): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key, "HmacSHA256"))
+        return mac.doFinal(data)
+    }
+
+    private fun bytesToHex(bytes: ByteArray): String {
+        val hexChars = CharArray(bytes.size * 2)
+        for (j in bytes.indices) {
+            val v = bytes[j].toInt() and 0xFF
+            hexChars[j * 2] = "0123456789abcdef"[v ushr 4]
+            hexChars[j * 2 + 1] = "0123456789abcdef"[v and 0x0F]
+        }
+        return String(hexChars)
+    }
+
+
+
 }
 
 suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<KubernetesClient, String>> {
     return try {
         logger.info("Підключення до збереженого EKS кластера: ${config.alias}")
 
-        // Створюємо базову конфігурацію
         val clientConfig = Config.empty().apply {
             masterUrl = config.endpoint
             caCertData = config.certificateAuthority
             connectionTimeout = CONNECTION_TIMEOUT_MS
             requestTimeout = REQUEST_TIMEOUT_MS
-            username = config.accessKeyId
-            password = config.secretAccessKey
+            namespace = null
+
+            // Використовуємо EksTokenProvider замість анонімного об'єкту
+            oauthTokenProvider = EksTokenProvider(
+                clusterName = config.clusterName,
+                region = config.region,
+                accessKeyId = config.accessKeyId,
+                secretAccessKey = config.secretAccessKey
+            )
+
+            // Обнуляємо конфліктуючі методи аутентифікації
+            username = null
+            password = null
+            oauthToken = null
+            authProvider = null
+            clientCertFile = null
+            clientCertData = null
+            clientKeyFile = null
+            clientKeyData = null
         }
 
-        val result = withContext(Dispatchers.IO) {
-            try {
-                val client = KubernetesClientBuilder()
-                    .withConfig(clientConfig)
-                    .build()
+        Result.success(withContext(Dispatchers.IO) {
+            val client = KubernetesClientBuilder()
+                .withConfig(clientConfig)
+                .build()
+            val version = client.kubernetesVersion?.gitVersion ?: "невідомо"
+            Pair(client, version)
+        })
 
-                val version = client.kubernetesVersion?.gitVersion ?: "невідомо"
-                logger.info("Успішно підключено до EKS кластера ${config.alias} (версія: $version)")
-
-                Pair(client, version)
-            } catch (e: Exception) {
-                logger.debug("Помилка першої спроби підключення: ${e.message}")
-                // Якщо перша спроба не вдалася, повертаємо базового клієнта
-                Pair(KubernetesClientBuilder().build(), "невідомо")
-            }
-        }
-
-        Result.success(result)
     } catch (e: Exception) {
-        logger.warn("Помилка підключення до збереженого EKS кластера ${config.alias}: ${e.message}")
-        // Повертаємо успішний результат з базовим клієнтом
-        Result.success(Pair(KubernetesClientBuilder().build(), "невідомо"))
+        logger.error("Помилка підключення до збереженого EKS кластера ${config.alias}: ${e.message}")
+        Result.failure(e)
     }
 }
-
-
 
 
 
@@ -318,6 +374,9 @@ fun findArgumentValue(args: List<String>, argName: String): String? {
 private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
     return envList?.find { it.name == key }?.value
 }
+
+private val ClusterConfig.awsProfile: String?
+    get() = if (profileName.isNullOrBlank()) null else profileName
 
 const val MAX_CONNECT_RETRIES = 1
 
