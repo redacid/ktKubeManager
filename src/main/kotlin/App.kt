@@ -491,13 +491,13 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = "EKS: ${context.config?.region ?: "unknown region"}",
+                                                            text = "${context.config?.profileName ?: "default"}",
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
                                                         Spacer(modifier = Modifier.width(4.dp))
                                                         Text(
-                                                            text = "Profile: ${context.config?.profileName ?: "default"}",
+                                                            text = "${context.config?.region ?: "unknown region"}",
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
