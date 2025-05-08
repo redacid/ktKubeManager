@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,11 +32,15 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowState
@@ -82,6 +88,7 @@ data class ClusterContext(
 )
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager
 ) {
@@ -476,6 +483,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                 modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
 
+
                                             Column(
                                                 modifier = Modifier.weight(1f)
                                             ) {
@@ -487,21 +495,147 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                     else MaterialTheme.colorScheme.onSurface
                                                 )
                                                 if (context.source == "saved") {
+
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        Text(
-                                                            text = "${context.config?.profileName ?: "default"}",
-                                                            fontSize = 12.sp,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        TooltipBox(
+                                                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                                            tooltip = {
+                                                                Surface(
+                                                                    modifier = Modifier
+                                                                        .padding(8.dp)
+                                                                        .widthIn(max = 600.dp)
+                                                                        .heightIn(max = 300.dp)
+                                                                        .border(
+                                                                            width = 1.dp,
+                                                                            color = MaterialTheme.colorScheme.outline,
+                                                                            shape = RoundedCornerShape(4.dp)
+                                                                        ),
+                                                                    shape = RoundedCornerShape(4.dp),
+                                                                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+
+                                                                ) {
+                                                                    Column(modifier = Modifier.padding(10.dp)) {
+                                                                        // Основна інформація
+                                                                        Text(
+                                                                            text = "Cluster Context Details",
+                                                                            style = MaterialTheme.typography.titleSmall,
+                                                                            color = MaterialTheme.colorScheme.primary
+                                                                        )
+                                                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                                                        // Тип джерела
+                                                                        Text(
+                                                                            text = "Source: ${context.source.uppercase()}",
+                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                            color = MaterialTheme.colorScheme.secondary
+                                                                        )
+
+                                                                        // AWS деталі
+                                                                        context.config?.let { config ->
+                                                                            HorizontalDivider(
+                                                                                modifier = Modifier.padding(vertical = 4.dp)
+                                                                            )
+
+                                                                            // AWS Profile
+                                                                            Row {
+                                                                                Text(
+                                                                                    text = "Profile: ",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Text(
+                                                                                    text = config.profileName ?: "default",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                            }
+
+                                                                            // AWS Region
+                                                                            Row {
+                                                                                Text(
+                                                                                    text = "Region: ",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Text(
+                                                                                    text = config.region,
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                            }
+
+                                                                            // Cluster Name
+                                                                            Row {
+                                                                                Text(
+                                                                                    text = "Cluster: ",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Text(
+                                                                                    text = config.clusterName,
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                            }
+
+                                                                            // Endpoint
+                                                                            if (config.endpoint.isNotBlank()) {
+                                                                                Row {
+                                                                                    Text(
+                                                                                        text = "Endpoint: ",
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                    )
+                                                                                    Text(
+                                                                                        text = config.endpoint,
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        fontWeight = FontWeight.Medium
+                                                                                    )
+                                                                                }
+                                                                            }
+
+                                                                            // Role ARN (якщо є)
+                                                                            config.roleArn?.let { role ->
+                                                                                Row {
+                                                                                    Text(
+                                                                                        text = "Role ARN: ",
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                    )
+                                                                                    Text(
+                                                                                        text = role,
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        fontWeight = FontWeight.Medium
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            state = rememberTooltipState(),
+
                                                         )
+                                                        {
+                                                            Text(
+                                                                text = "${context.config?.profileName ?: "default"}",
+                                                                fontSize = 12.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+
                                                         Spacer(modifier = Modifier.width(4.dp))
+
                                                         Text(
                                                             text = "${context.config?.region ?: "unknown region"}",
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
                                                     }
+
+
                                                 }
                                             }
 
