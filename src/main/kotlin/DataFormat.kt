@@ -9,22 +9,6 @@ import java.time.Duration
 import java.time.OffsetDateTime
 
 // --- Допоміжні функції форматування ---
-fun formatContextNameForDisplay(contextName: String): String {
-    // Регулярний вираз для AWS EKS ARN
-    val eksArnPattern = "arn:aws:eks:[a-z0-9-]+:([0-9]+):cluster/([a-zA-Z0-9-]+)".toRegex()
-
-    val matchResult = eksArnPattern.find(contextName)
-
-    return if (matchResult != null) {
-        // Групи: 1 - account ID, 2 - cluster name
-        val accountId = matchResult.groupValues[1]
-        val clusterName = matchResult.groupValues[2]
-        "$accountId:$clusterName"
-    } else {
-        // Повертаємо оригінальне ім'я, якщо не відповідає формату AWS EKS ARN
-        contextName
-    }
-}
 
 fun formatPodContainers(statuses: List<ContainerStatus>?): String {
     val total = statuses?.size ?: 0
@@ -131,13 +115,39 @@ fun formatAge(creationTimestamp: String?): String {
     }
 }
 
+//fun formatContextNameForDisplay(contextName: String): String {
+//    // Регулярний вираз для AWS EKS ARN
+//    val eksArnPattern = "arn:aws:eks:[a-z0-9-]+:([0-9]+):cluster/([a-zA-Z0-9-]+)".toRegex()
+//
+//    val matchResult = eksArnPattern.find(contextName)
+//
+//    return if (matchResult != null) {
+//        // Групи: 1 - account ID, 2 - cluster name
+//        val accountId = matchResult.groupValues[1]
+//        val clusterName = matchResult.groupValues[2]
+//        "$accountId:$clusterName"
+//    } else {
+//        contextName
+//    }
+//}
+
 fun formatContextNameForDisplay(context: ClusterContext): String {
+    val eksArnPattern = "arn:aws:eks:[a-z0-9-]+:([0-9]+):cluster/([a-zA-Z0-9-]+)".toRegex()
+
     return when (context.source) {
         "saved" -> context.name // Для збережених кластерів показуємо ім'я як є
         "kubeconfig" -> {
-            // Для kubeconfig контекстів можемо додати додаткове форматування
-            // Наприклад, якщо ім'я містить довгий шлях або специфічні префікси
-            context.name.split("/").last()
+            val matchResult = eksArnPattern.find(context.name)
+            if (matchResult != null) {
+                // Групи: 1 - account ID, 2 - cluster name
+                val accountId = matchResult.groupValues[1]
+                val clusterName = matchResult.groupValues[2]
+                "$accountId:$clusterName"
+            } else {
+                context.name
+            }
+
+            //context.name.split("/").last()
         }
         else -> context.name
     }
