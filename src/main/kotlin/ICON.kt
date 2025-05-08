@@ -16,6 +16,7 @@ import compose.icons.feathericons.Clock
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Database
 import compose.icons.feathericons.DivideCircle
+import compose.icons.feathericons.Edit
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Filter
@@ -41,6 +42,7 @@ import compose.icons.feathericons.Sun
 import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Trash2
 import compose.icons.feathericons.Unlock
+import compose.icons.feathericons.UserPlus
 import compose.icons.feathericons.X
 import compose.icons.feathericons.XCircle
 import compose.icons.feathericons.Zap
@@ -74,6 +76,9 @@ var ICON_REFRESH = FeatherIcons.RefreshCw
 var ICON_DISCONNECT = FeatherIcons.ZapOff
 var ICON_CONNECT = FeatherIcons.Zap
 var ICON_ADD = FeatherIcons.Plus
+var ICON_ADD_USER = FeatherIcons.UserPlus
+var ICON_EDIT = FeatherIcons.Edit
+var ICON_DELETE = ICON_TRASH
 var ICON_SEARCH = FeatherIcons.Search
 var ICON_FILTER = FeatherIcons.Filter
 var ICON_SETTINGS = FeatherIcons.Settings

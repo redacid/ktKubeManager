@@ -83,8 +83,10 @@ private fun cleanup() {
 fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 ) {
     var showMenu by remember { mutableStateOf(false) }
-
     var showAddClusterDialog by remember { mutableStateOf(false) }
+    var showAddProfileDialog by remember { mutableStateOf(false) }
+    var showEditProfilesDialog by remember { mutableStateOf(false) }
+
 
     if (showAddClusterDialog) {
         ClusterAddDialog(
@@ -93,21 +95,44 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         )
     }
 
-// В основній @Composable функції додайте:
+    if (showAddProfileDialog) {  // Додаємо відображення діалогу профілю
+        AwsProfileAddDialog(
+            onDismiss = { showAddProfileDialog = false },
+            settingsManager = settingsManager
+        )
+    }
+
+    if (showEditProfilesDialog) {
+        AwsProfilesEditDialog(
+            onDismiss = { showEditProfilesDialog = false },
+            settingsManager = settingsManager
+        )
+    }
 
 
     //val isDarkTheme = useTheme()
-
     MenuBar {
         Menu(
             text = "File",
             onClick = { showMenu = !showMenu }
         ) {
             DropdownMenuItem(
+                text = { Text("Add AWS Profile") },
+                onClick = { showAddProfileDialog = true },
+                leadingIcon = { Icon(ICON_ADD_USER, "Add Profile") }
+            )
+            DropdownMenuItem(
+                text = { Text("Edit AWS Profiles") },  // Новий пункт меню
+                onClick = { showEditProfilesDialog = true },
+                leadingIcon = { Icon(ICON_EDIT, "Edit Profiles") }
+            )
+
+            DropdownMenuItem(
                 text = { Text("Connect to cluster") },
                 onClick = { showAddClusterDialog = true },
                 leadingIcon = { Icon(ICON_ADD, "Connect") }
             )
+
 
             HorizontalDivider()
 

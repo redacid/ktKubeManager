@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 
 @Serializable
 data class ClusterConfig(
+    val alias: String,
     val profileName: String,
     val accessKeyId: String,
     val secretAccessKey: String,
@@ -18,14 +19,23 @@ data class ClusterConfig(
     val roleArn: String? = null
 )
 
+@Serializable
+data class AwsProfile(
+    val profileName: String,
+    val accessKeyId: String,
+    val secretAccessKey: String
+)
+
 
 @Serializable
 data class AppSettings(
     val theme: String = "system",
     val windowSize: WindowSize = WindowSize(800, 600),
     val lastCluster: String = "",
+    val awsProfiles: List<AwsProfile> = emptyList(),
     val clusters: List<ClusterConfig> = emptyList()
 )
+
 
 @Serializable
 data class WindowSize(
