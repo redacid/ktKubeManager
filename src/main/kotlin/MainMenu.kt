@@ -86,7 +86,14 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
     var showAddClusterDialog by remember { mutableStateOf(false) }
     var showAddProfileDialog by remember { mutableStateOf(false) }
     var showEditProfilesDialog by remember { mutableStateOf(false) }
+    var showEditClustersDialog by remember { mutableStateOf(false) }
 
+    if (showEditClustersDialog) {
+        EditClustersDialog(
+            onDismiss = { showEditClustersDialog = false },
+            settingsManager = settingsManager
+        )
+    }
 
     if (showAddClusterDialog) {
         ClusterAddDialog(
@@ -128,11 +135,15 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             )
 
             DropdownMenuItem(
-                text = { Text("Connect to cluster") },
+                text = { Text("Add cluster connection") },
                 onClick = { showAddClusterDialog = true },
                 leadingIcon = { Icon(ICON_ADD, "Connect") }
             )
-
+            DropdownMenuItem(
+                text = { Text("Edit cluster connections") },
+                onClick = { showEditClustersDialog = true },
+                leadingIcon = { Icon(ICON_EDIT, "Edit") }
+            )
 
             HorizontalDivider()
 

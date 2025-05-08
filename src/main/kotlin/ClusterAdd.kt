@@ -621,3 +621,187 @@ private fun EditProfileDialog(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditClustersDialog(
+    onDismiss: () -> Unit,
+    settingsManager: SettingsManager
+) {
+    var editingCluster by remember { mutableStateOf<ClusterConfig?>(null) }
+    var showDeleteConfirmation by remember { mutableStateOf<ClusterConfig?>(null) }
+    var showError by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.width(600.dp).height(400.dp),
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 5.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Кластери EKS",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    tonalElevation = 1.dp
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        items(settingsManager.settings.clusters) { cluster ->
+                            ListItem(
+                                headlineContent = { Text(cluster.alias) },
+                                supportingContent = {
+                                    Column {
+                                        Text(cluster.clusterName)
+                                        Text(
+                                            cluster.region,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                },
+                                trailingContent = {
+                                    Row {
+                                        IconButton(onClick = { editingCluster = cluster }) {
+                                            Icon(ICON_EDIT, "Редагувати")
+                                        }
+                                        IconButton(onClick = { showDeleteConfirmation = cluster }) {
+                                            Icon(ICON_DELETE, "Видалити")
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Закрити")
+                    }
+                }
+            }
+        }
+    }
+
+    // Діалог редагування кластера
+    editingCluster?.let { cluster ->
+        EditClusterDialog(
+            cluster = cluster,
+            onDismiss = { editingCluster = null },
+            onSave = { updatedCluster ->
+                settingsManager.updateSettings {
+                    copy(
+                        clusters = clusters.map {
+                            if (it.alias == cluster.alias) updatedCluster else it
+                        }
+                    )
+                }
+                editingCluster = null
+            }
+        )
+    }
+
+    // Діалог підтвердження видалення
+    showDeleteConfirmation?.let { cluster ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Підтвердження видалення") },
+            text = { Text("Ви впевнені, що хочете видалити кластер '${cluster.alias}'?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        settingsManager.updateSettings {
+                            copy(
+                                clusters = clusters.filter { it.alias != cluster.alias }
+                            )
+                        }
+                        showDeleteConfirmation = null
+                    }
+                ) {
+                    Text("Так")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Ні")
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditClusterDialog(
+    cluster: ClusterConfig,
+    onDismiss: () -> Unit,
+    onSave: (ClusterConfig) -> Unit
+) {
+    var alias by remember { mutableStateOf(cluster.alias) }
+    var showError by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.width(400.dp),
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 5.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Редагувати кластер",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                OutlinedTextField(
+                    value = alias,
+                    onValueChange = { alias = it },
+                    label = { Text("Назва з'єднання") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Скасувати")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onSave(
+                                cluster.copy(alias = alias)
+                            )
+                        },
+                        enabled = alias.isNotEmpty()
+                    ) {
+                        Text("Зберегти")
+                    }
+                }
+
+                if (showError != null) {
+                    Text(
+                        text = showError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    }
+}
