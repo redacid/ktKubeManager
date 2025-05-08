@@ -41,8 +41,6 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
 
-
-
 class EksTokenProvider(
     private val clusterName: String,
     private val region: String,
@@ -68,7 +66,6 @@ class EksTokenProvider(
             DefaultCredentialsProvider.create()
         }
     }
-
 
     override fun getToken(): String {
         try {
@@ -165,9 +162,6 @@ class EksTokenProvider(
         }
         return String(hexChars)
     }
-
-
-
 }
 
 suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<KubernetesClient, String>> {
