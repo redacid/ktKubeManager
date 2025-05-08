@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,11 +32,15 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowState
@@ -75,14 +81,21 @@ import ua.`in`.ios.theme1.*
 
 var recomposeScope: RecomposeScope? = null
 
+data class ClusterContext(
+    val name: String,
+    val source: String, // "kubeconfig" або "saved"
+    val config: ClusterConfig? = null
+)
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager
 ) {
     recomposeScope = currentRecomposeScope
     // --- Стани ---
-    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
+//    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
+    var contexts by remember { mutableStateOf<List<ClusterContext>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
     var selectedContext by remember { mutableStateOf<String?>(null) }
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
@@ -128,10 +141,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
-
-
-
-
 
     suspend fun handleResourceLoad(
         nodeId: String,
@@ -281,29 +290,44 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     }
     // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
     LaunchedEffect(Unit) {
-        logger.info("LaunchedEffect: Starting context load via Config.autoConfigure(null)...")
-        isLoading = true; connectionStatus = "Loading Kubconfig..."
-        var loadError: Exception? = null
-        var loadedContextNames: List<String>
+        logger.info("LaunchedEffect: Завантаження контекстів...")
+        isLoading = true
+        connectionStatus = "Завантаження конфігурації..."
+
         try {
-            loadedContextNames = withContext(Dispatchers.IO) {
-                logger.info("[IO] Calling Config.autoConfigure(null)...")
-                val config = Config.autoConfigure(null) ?: throw IOException("Kubconfig could not loaded")
-                val names = config.contexts?.mapNotNull { it.name }?.sorted() ?: emptyList()
-                logger.info("[IO] Contexts found: ${names.size}")
-                names
+            val kubeConfigContexts = withContext(Dispatchers.IO) {
+                val config = Config.autoConfigure(null)
+                    ?: throw IOException("Не вдалося завантажити kubeconfig")
+
+                config.contexts?.mapNotNull { context ->
+                    context.name?.let { name ->
+                        ClusterContext(name = name, source = "kubeconfig")
+                    }
+                } ?: emptyList()
             }
-            contexts = loadedContextNames; errorMessage =
-                if (loadedContextNames.isEmpty()) "Contexts not found" else null; connectionStatus =
-                if (loadedContextNames.isEmpty()) "Contexts not found" else "Choose a context"
+
+            val savedContexts = settingsManager.settings.clusters.map { cluster ->
+                ClusterContext(
+                    name = cluster.alias,
+                    source = "saved",
+                    config = cluster
+                )
+            }
+
+            contexts = (kubeConfigContexts + savedContexts)
+
+            errorMessage = if (contexts.isEmpty()) "Контексти не знайдено" else null
+            connectionStatus = if (contexts.isEmpty()) "Контексти не знайдено" else "Оберіть контекст"
+
         } catch (e: Exception) {
-            loadError = e; logger.error("Error loading contexts: ${e.message}", e)
-        } finally {
-            if (loadError != null) {
-                errorMessage = "Error loading: ${loadError.message}"; connectionStatus = "Error loading"
-            }; isLoading = false
+            logger.error("Помилка завантаження контекстів: ${e.message}", e)
+            errorMessage = "Помилка завантаження: ${e.message}"
+            connectionStatus = "Помилка завантаження"
         }
+
+        isLoading = false
     }
+
     // --- Кінець LaunchedEffect ---
     // --- Завантаження неймспейсів ПІСЛЯ успішного підключення ---
     LaunchedEffect(activeClient) {
@@ -348,7 +372,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
         }
     }
 
-
     AppTheme(darkTheme = isDarkTheme.value)
     { AppTextStyle {
 
@@ -378,8 +401,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clip(RoundedCornerShape(8.dp))
-
-
                         ) { // M3 колір
                             if (isLoading && contexts.isEmpty()) {
                                 CircularProgressIndicator(modifier = Modifier.Companion.align(Alignment.Companion.Center))
@@ -391,17 +412,17 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                 )
                             } // M3 Text
                             else {
-                                LazyColumn(modifier = Modifier.Companion.fillMaxSize()) {
-                                    items(contexts) { contextName ->
+                                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                    items(contexts) { context -> // змінено параметр з contextName на context
                                         Row(
-                                            verticalAlignment = Alignment.Companion.CenterVertically,
-                                            modifier = Modifier.Companion.fillMaxWidth()
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
                                                 .clickable(enabled = !isLoading) {
-                                                    if (selectedContext != contextName) {
-                                                        logger.info("Click on context: $contextName. Launching .connectWithRetries...")
+                                                    if (selectedContext != context.name) { // порівнюємо з context.name
+                                                        logger.info("Click on context: ${context.name}. Launching .connectWithRetries...")
                                                         coroutineScope.launch {
                                                             isLoading = true
-                                                            connectionStatus = "Connection to '$contextName'..."
+                                                            connectionStatus = "Connection to '${context.name}'..."
                                                             activeClient?.close()
                                                             activeClient = null
                                                             selectedResourceType = null
@@ -413,52 +434,213 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                             showLogViewer.value = false
                                                             logViewerParams.value = null // Скидаємо все
 
-                                                            val connectionResult = connectWithRetries(contextName)
+                                                            val connectionResult = when {
+                                                                // Використовуємо різні методи підключення в залежності від джерела
+                                                                context.source == "saved" && context.config != null -> {
+                                                                    logger.info("Connecting to saved cluster: ${context.name}")
+                                                                    connectToSavedCluster(context.config)
+                                                                }
+                                                                else -> {
+                                                                    logger.info("Connecting to kubeconfig context: ${context.name}")
+                                                                    connectWithRetries(context.name)
+                                                                }
+                                                            }
+
                                                             isLoading = false
 
                                                             connectionResult.onSuccess { (newClient, serverVersion) ->
                                                                 activeClient = newClient
-                                                                selectedContext = contextName
+                                                                selectedContext = context.name
                                                                 connectionStatus =
-                                                                    "Connected to: $contextName (v$serverVersion)"
+                                                                    "Connected to: ${context.name} (v$serverVersion)"
                                                                 errorMessage = null
-                                                                logger.info("UI State updated on Success for $contextName")
+                                                                logger.info("UI State updated on Success for ${context.name}")
                                                             }.onFailure { error ->
                                                                 connectionStatus =
-                                                                    "Connection Error to '$contextName'"
+                                                                    "Connection Error to '${context.name}'"
                                                                 errorMessage =
                                                                     error.localizedMessage ?: "Unknown error"
-                                                                logger.info("Setting up error dialog for: $contextName. Error: ${error.message}")
+                                                                logger.info("Setting up error dialog for: ${context.name}. Error: ${error.message}")
                                                                 dialogErrorMessage.value =
-                                                                    "Failed to connect to '$contextName' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
+                                                                    "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
                                                                 showErrorDialog.value = true
                                                                 activeClient = null
                                                                 selectedContext = null
                                                             }
-                                                            logger.info("Attempting to connect to '$contextName' Completed (the result is processed).")
+                                                            logger.info("Attempting to connect to '${context.name}' Completed (the result is processed).")
                                                         }
                                                     }
                                                 }.padding(horizontal = 8.dp, vertical = 6.dp)
                                         ) {
-                                            // Додаємо іконку
                                             Icon(
-                                                imageVector = ICON_CONTEXT, // Ви можете змінити цю іконку на іншу
-                                                contentDescription = "Kubernetes Context",
-                                                tint = if (contextName == selectedContext) MaterialTheme.colorScheme.primary
+                                                imageVector = if (context.source == "saved") ICON_CLOUD else ICON_CONTEXT,
+                                                contentDescription = if (context.source == "saved") "Saved EKS Cluster" else "Kubernetes Context",
+                                                tint = if (context.name == selectedContext) MaterialTheme.colorScheme.primary
                                                 else MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.Companion.size(24.dp).padding(end = 8.dp)
+                                                modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
 
-                                            // Текст після іконки
-                                            Text(
-                                                text = formatContextNameForDisplay(contextName),
-                                                fontSize = 14.sp,
-                                                color = if (contextName == selectedContext) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurface
-                                            )
+
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(
+                                                    text = formatContextNameForDisplay(context),
+                                                    fontSize = 14.sp,
+                                                    color = if (context.name == selectedContext)
+                                                        MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (context.source == "saved") {
+
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        TooltipBox(
+                                                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                                            tooltip = {
+                                                                Surface(
+                                                                    modifier = Modifier
+                                                                        .padding(8.dp)
+                                                                        .widthIn(max = 600.dp)
+                                                                        .heightIn(max = 300.dp)
+                                                                        .border(
+                                                                            width = 1.dp,
+                                                                            color = MaterialTheme.colorScheme.outline,
+                                                                            shape = RoundedCornerShape(4.dp)
+                                                                        ),
+                                                                    shape = RoundedCornerShape(4.dp),
+                                                                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+
+                                                                ) {
+                                                                    Column(modifier = Modifier.padding(10.dp)) {
+                                                                        // Основна інформація
+                                                                        Text(
+                                                                            text = "Cluster Context Details",
+                                                                            style = MaterialTheme.typography.titleSmall,
+                                                                            color = MaterialTheme.colorScheme.primary
+                                                                        )
+                                                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                                                        // Тип джерела
+                                                                        Text(
+                                                                            text = "Source: ${context.source.uppercase()}",
+                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                            color = MaterialTheme.colorScheme.secondary
+                                                                        )
+
+                                                                        // AWS деталі
+                                                                        context.config?.let { config ->
+                                                                            HorizontalDivider(
+                                                                                modifier = Modifier.padding(vertical = 4.dp)
+                                                                            )
+
+                                                                            // AWS Profile
+                                                                            Row {
+                                                                                Text(
+                                                                                    text = "Profile: ",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Text(
+                                                                                    text = config.profileName ?: "default",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                            }
+
+                                                                            // AWS Region
+                                                                            Row {
+                                                                                Text(
+                                                                                    text = "Region: ",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Text(
+                                                                                    text = config.region,
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                            }
+
+                                                                            // Cluster Name
+                                                                            Row {
+                                                                                Text(
+                                                                                    text = "Cluster: ",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                )
+                                                                                Text(
+                                                                                    text = config.clusterName,
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                            }
+
+                                                                            // Endpoint
+                                                                            if (config.endpoint.isNotBlank()) {
+                                                                                Row {
+                                                                                    Text(
+                                                                                        text = "Endpoint: ",
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                    )
+                                                                                    Text(
+                                                                                        text = config.endpoint,
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        fontWeight = FontWeight.Medium
+                                                                                    )
+                                                                                }
+                                                                            }
+
+                                                                            // Role ARN (якщо є)
+                                                                            config.roleArn?.let { role ->
+                                                                                Row {
+                                                                                    Text(
+                                                                                        text = "Role ARN: ",
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                    )
+                                                                                    Text(
+                                                                                        text = role,
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        fontWeight = FontWeight.Medium
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            state = rememberTooltipState(),
+
+                                                        )
+                                                        {
+                                                            Text(
+                                                                text = "${context.config?.profileName ?: "default"}",
+                                                                fontSize = 12.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+
+                                                        Spacer(modifier = Modifier.width(4.dp))
+
+                                                        Text(
+                                                            text = "${context.config?.region ?: "unknown region"}",
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+
+
+                                                }
+                                            }
+
+
                                         }
                                     }
                                 }
+
                             }
                         } // Кінець Box списку
                         Spacer(modifier = Modifier.Companion.height(16.dp)); Text(
@@ -823,12 +1005,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
 @Composable
 fun AppTextStyle(
-    style: TextStyle = MaterialTheme.typography.labelMedium,
+    //style: TextStyle = MaterialTheme.typography.labelMedium,
     content: @Composable () -> Unit
 ) {
     CompositionLocalProvider(
         LocalContentColor provides MaterialTheme.colorScheme.onSurface,
-        LocalTextStyle provides style
+        //LocalTextStyle provides style
     )
  {
         content()

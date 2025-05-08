@@ -119,7 +119,7 @@ fun PVDetailsView(pv: PersistentVolume) {
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            formatAccessModes(pv.spec?.accessModes) ?: "N/A",
+                            formatAccessModes(pv.spec?.accessModes),
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }

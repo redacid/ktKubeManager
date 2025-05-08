@@ -83,31 +83,58 @@ private fun cleanup() {
 fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showAddClusterDialog by remember { mutableStateOf(false) }
+    var showAddProfileDialog by remember { mutableStateOf(false) }
+    var showEditProfilesDialog by remember { mutableStateOf(false) }
 
 
-// В основній @Composable функції додайте:
+    if (showAddClusterDialog) {
+        ClusterAddDialog(
+            onDismiss = { showAddClusterDialog = false },
+            settingsManager = settingsManager
+        )
+    }
+
+    if (showAddProfileDialog) {  // Додаємо відображення діалогу профілю
+        AwsProfileAddDialog(
+            onDismiss = { showAddProfileDialog = false },
+            settingsManager = settingsManager
+        )
+    }
+
+    if (showEditProfilesDialog) {
+        AwsProfilesEditDialog(
+            onDismiss = { showEditProfilesDialog = false },
+            settingsManager = settingsManager
+        )
+    }
 
 
     //val isDarkTheme = useTheme()
-
     MenuBar {
         Menu(
             text = "File",
             onClick = { showMenu = !showMenu }
         ) {
-//            DropdownMenuItem(
-//                text = { Text("Connect to cluster") },
-//                onClick = {}
-//                ,
-//                leadingIcon = { Icon(ICON_ADD, "Connect") }
-//            )
-//            DropdownMenuItem(
-//                text = { Text("Disconnect") },
-//                onClick = {}
-//                ,
-//                leadingIcon = { Icon(ICON_DISCONNECT, "Disconnect") }
-//            )
-//            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Add AWS Profile") },
+                onClick = { showAddProfileDialog = true },
+                leadingIcon = { Icon(ICON_ADD_USER, "Add Profile") }
+            )
+            DropdownMenuItem(
+                text = { Text("Edit AWS Profiles") },  // Новий пункт меню
+                onClick = { showEditProfilesDialog = true },
+                leadingIcon = { Icon(ICON_EDIT, "Edit Profiles") }
+            )
+
+            DropdownMenuItem(
+                text = { Text("Connect to cluster") },
+                onClick = { showAddClusterDialog = true },
+                leadingIcon = { Icon(ICON_ADD, "Connect") }
+            )
+
+
+            HorizontalDivider()
 
             var showExitDialog by remember { mutableStateOf(false) }
 

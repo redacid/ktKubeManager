@@ -6,12 +6,36 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 @Serializable
+data class ClusterConfig(
+    val alias: String,
+    val profileName: String,
+    val accessKeyId: String,
+    val secretAccessKey: String,
+    val region: String,
+    val clusterName: String,
+    val endpoint: String = "",
+    val certificateAuthority: String = "",
+    val token: String = "",
+    val roleArn: String? = null
+)
+
+@Serializable
+data class AwsProfile(
+    val profileName: String,
+    val accessKeyId: String,
+    val secretAccessKey: String
+)
+
+
+@Serializable
 data class AppSettings(
     val theme: String = "system",
     val windowSize: WindowSize = WindowSize(800, 600),
     val lastCluster: String = "",
-    // Додайте інші налаштування тут
+    val awsProfiles: List<AwsProfile> = emptyList(),
+    val clusters: List<ClusterConfig> = emptyList()
 )
+
 
 @Serializable
 data class WindowSize(
