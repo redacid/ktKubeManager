@@ -372,7 +372,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
         }
     }
 
-
     AppTheme(darkTheme = isDarkTheme.value)
     { AppTextStyle {
 
@@ -402,8 +401,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clip(RoundedCornerShape(8.dp))
-
-
                         ) { // M3 колір
                             if (isLoading && contexts.isEmpty()) {
                                 CircularProgressIndicator(modifier = Modifier.Companion.align(Alignment.Companion.Center))
