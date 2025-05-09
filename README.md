@@ -1,7 +1,7 @@
 # ktKubeManager
 
-/opt/kotlinkubemanager/bin/KotlinKubeManager
+/opt/kubemanager/bin/KubeManager
 
 requirements:
-* aws-cli installed & configured
+* NO aws-cli needed
 

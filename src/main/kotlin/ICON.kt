@@ -1,10 +1,8 @@
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
 import compose.icons.feathericons.AlertCircle
-import compose.icons.feathericons.Aperture
 import compose.icons.feathericons.ArrowDown
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.ArrowRight
@@ -15,7 +13,6 @@ import compose.icons.feathericons.CheckCircle
 import compose.icons.feathericons.Clock
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Database
-import compose.icons.feathericons.DivideCircle
 import compose.icons.feathericons.Edit
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff

@@ -9,7 +9,7 @@ import com.materialkolor.DynamicMaterialTheme
 import com.materialkolor.PaletteStyle
 import com.materialkolor.rememberDynamicMaterialThemeState
 
-private val LocalThemeState = compositionLocalOf { mutableStateOf(false) }
+//private val LocalThemeState = compositionLocalOf { mutableStateOf(false) }
 
 object ThemeManager {
     val themeState = mutableStateOf(false)

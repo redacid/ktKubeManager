@@ -76,21 +76,21 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
         return when (resourceType) {
             "Namespaces" -> if (resource is Namespace) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name ?: na;
-                    1 -> resource.status?.phase ?: na;
-                    2 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.name ?: na
+                    1 -> resource.status?.phase ?: na
+                    2 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Nodes" -> if (resource is Node) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name ?: na;
-                    1 -> formatNodeStatus(resource.status?.conditions);
-                    2 -> formatNodeRoles(resource.metadata?.labels);
-                    3 -> resource.status?.nodeInfo?.kubeletVersion ?: na;
-                    4 -> formatTaints(resource.spec?.taints);
-                    5 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.name ?: na
+                    1 -> formatNodeStatus(resource.status?.conditions)
+                    2 -> formatNodeRoles(resource.metadata?.labels)
+                    3 -> resource.status?.nodeInfo?.kubeletVersion ?: na
+                    4 -> formatTaints(resource.spec?.taints)
+                    5 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
@@ -113,35 +113,35 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 
             "Pods" -> if (resource is Pod) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> formatPodContainers(resource.status?.containerStatuses);
-                    3 -> resource.status?.phase ?: na;
-                    4 -> formatPodRestarts(resource.status?.containerStatuses);
-                    5 -> resource.spec?.nodeName ?: "<none>";
-                    6 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> formatPodContainers(resource.status?.containerStatuses)
+                    3 -> resource.status?.phase ?: na
+                    4 -> formatPodRestarts(resource.status?.containerStatuses)
+                    5 -> resource.spec?.nodeName ?: "<none>"
+                    6 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Deployments" -> if (resource is Deployment) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}";
-                    3 -> resource.status?.updatedReplicas?.toString() ?: "0";
-                    4 -> resource.status?.availableReplicas?.toString() ?: "0";
-                    5 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"
+                    3 -> resource.status?.updatedReplicas?.toString() ?: "0"
+                    4 -> resource.status?.availableReplicas?.toString() ?: "0"
+                    5 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "StatefulSets" -> if (resource is StatefulSet) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}";
-                    3 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> "${resource.status?.readyReplicas ?: 0}/${resource.spec?.replicas ?: 0}"
+                    3 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
@@ -154,77 +154,77 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
                     ?: "0"; 4 -> resource.status?.numberReady?.toString()
                     ?: "0"; 5 -> resource.status?.updatedNumberScheduled?.toString()
                     ?: "0"; 6 -> resource.status?.numberAvailable?.toString()
-                    ?: "0"; 7 -> formatAge(resource.metadata?.creationTimestamp);
+                    ?: "0"; 7 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "ReplicaSets" -> if (resource is ReplicaSet) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.spec?.replicas?.toString() ?: "0";
-                    3 -> resource.status?.replicas?.toString() ?: "0";
-                    4 -> resource.status?.readyReplicas?.toString() ?: "0";
-                    5 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.spec?.replicas?.toString() ?: "0"
+                    3 -> resource.status?.replicas?.toString() ?: "0"
+                    4 -> resource.status?.readyReplicas?.toString() ?: "0"
+                    5 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Jobs" -> if (resource is Job) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> "${resource.status?.succeeded ?: 0}/${resource.spec?.completions ?: '?'}";
-                    3 -> formatJobDuration(resource.status);
-                    4 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> "${resource.status?.succeeded ?: 0}/${resource.spec?.completions ?: '?'}"
+                    3 -> formatJobDuration(resource.status)
+                    4 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "CronJobs" -> if (resource is CronJob) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.spec?.schedule ?: na;
-                    3 -> resource.spec?.suspend?.toString() ?: "false";
-                    4 -> resource.status?.active?.size?.toString() ?: "0";
-                    5 -> resource.status?.lastScheduleTime?.let { formatAge(it) } ?: "<never>";
-                    6 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.spec?.schedule ?: na
+                    3 -> resource.spec?.suspend?.toString() ?: "false"
+                    4 -> resource.status?.active?.size?.toString() ?: "0"
+                    5 -> resource.status?.lastScheduleTime?.let { formatAge(it) } ?: "<never>"
+                    6 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Services" -> if (resource is Service) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.spec?.type ?: na;
-                    3 -> resource.spec?.clusterIPs?.joinToString(",") ?: na;
-                    4 -> formatServiceExternalIP(resource);
-                    5 -> formatPorts(resource.spec?.ports);
-                    6 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.spec?.type ?: na
+                    3 -> resource.spec?.clusterIPs?.joinToString(",") ?: na
+                    4 -> formatServiceExternalIP(resource)
+                    5 -> formatPorts(resource.spec?.ports)
+                    6 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Ingresses" -> if (resource is Ingress) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.spec?.ingressClassName ?: "<none>";
-                    3 -> formatIngressHosts(resource.spec?.rules);
-                    4 -> formatIngressAddress(resource.status?.loadBalancer?.ingress);
-                    5 -> formatIngressPorts(resource.spec?.tls);
-                    6 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.spec?.ingressClassName ?: "<none>"
+                    3 -> formatIngressHosts(resource.spec?.rules)
+                    4 -> formatIngressAddress(resource.status?.loadBalancer?.ingress)
+                    5 -> formatIngressPorts(resource.spec?.tls)
+                    6 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Endpoints" -> if (resource is Endpoints) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
                     2 -> {
                         // Збираємо всі адреси (готові та неготові) з усіх підмножин
                         val allAddresses = mutableListOf<String>()
@@ -283,109 +283,109 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 
             "PersistentVolumes" -> if (resource is PersistentVolume) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name ?: na;
-                    1 -> resource.spec?.capacity?.get("storage")?.toString() ?: na;
-                    2 -> formatAccessModes(resource.spec?.accessModes);
-                    3 -> resource.spec?.persistentVolumeReclaimPolicy ?: na;
-                    4 -> resource.status?.phase ?: na;
-                    5 -> resource.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" } ?: "<none>";
-                    6 -> resource.spec?.storageClassName ?: "<none>";
-                    7 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.name ?: na
+                    1 -> resource.spec?.capacity?.get("storage")?.toString() ?: na
+                    2 -> formatAccessModes(resource.spec?.accessModes)
+                    3 -> resource.spec?.persistentVolumeReclaimPolicy ?: na
+                    4 -> resource.status?.phase ?: na
+                    5 -> resource.spec?.claimRef?.let { "${it.namespace ?: "-"}/${it.name ?: "-"}" } ?: "<none>"
+                    6 -> resource.spec?.storageClassName ?: "<none>"
+                    7 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.status?.phase ?: na;
-                    3 -> resource.spec?.volumeName ?: "<none>";
-                    4 -> resource.status?.capacity?.get("storage")?.toString() ?: na;
-                    5 -> formatAccessModes(resource.spec?.accessModes);
-                    6 -> resource.spec?.storageClassName ?: "<none>";
-                    7 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.status?.phase ?: na
+                    3 -> resource.spec?.volumeName ?: "<none>"
+                    4 -> resource.status?.capacity?.get("storage")?.toString() ?: na
+                    5 -> formatAccessModes(resource.spec?.accessModes)
+                    6 -> resource.spec?.storageClassName ?: "<none>"
+                    7 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "StorageClasses" -> if (resource is StorageClass) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name ?: na;
-                    1 -> resource.provisioner ?: na;
-                    2 -> resource.reclaimPolicy ?: na;
-                    3 -> resource.volumeBindingMode ?: na;
-                    4 -> resource.allowVolumeExpansion?.toString() ?: "false";
-                    5 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.name ?: na
+                    1 -> resource.provisioner ?: na
+                    2 -> resource.reclaimPolicy ?: na
+                    3 -> resource.volumeBindingMode ?: na
+                    4 -> resource.allowVolumeExpansion?.toString() ?: "false"
+                    5 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "ConfigMaps" -> if (resource is ConfigMap) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.data?.size?.toString() ?: "0";
-                    3 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.data?.size?.toString() ?: "0"
+                    3 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Secrets" -> if (resource is Secret) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.type ?: na;
-                    3 -> (resource.data?.size ?: 0).plus(resource.stringData?.size ?: 0).toString();
-                    4 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.type ?: na
+                    3 -> (resource.data?.size ?: 0).plus(resource.stringData?.size ?: 0).toString()
+                    4 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "ServiceAccounts" -> if (resource is ServiceAccount) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.secrets?.size?.toString() ?: "0";
-                    3 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.secrets?.size?.toString() ?: "0"
+                    3 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "Roles" -> if (resource is Role) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "RoleBindings" -> if (resource is RoleBinding) {
                 when (colIndex) {
-                    0 -> resource.metadata?.namespace ?: na;
-                    1 -> resource.metadata?.name ?: na;
-                    2 -> resource.roleRef?.kind ?: na;
-                    3 -> resource.roleRef.name ?: na;
-                    4 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.namespace ?: na
+                    1 -> resource.metadata?.name ?: na
+                    2 -> resource.roleRef?.kind ?: na
+                    3 -> resource.roleRef.name ?: na
+                    4 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "ClusterRoles" -> if (resource is ClusterRole) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name ?: na;
-                    1 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.name ?: na
+                    1 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""
 
             "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) {
                 when (colIndex) {
-                    0 -> resource.metadata?.name ?: na;
-                    1 -> resource.roleRef?.kind ?: na;
-                    2 -> resource.roleRef.name ?: na;
-                    3 -> formatAge(resource.metadata?.creationTimestamp);
+                    0 -> resource.metadata?.name ?: na
+                    1 -> resource.roleRef?.kind ?: na
+                    2 -> resource.roleRef.name ?: na
+                    3 -> formatAge(resource.metadata?.creationTimestamp)
                     else -> ""
                 }
             } else ""

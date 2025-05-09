@@ -16,23 +16,12 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
-import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
-import software.amazon.awssdk.http.SdkHttpFullRequest
-import software.amazon.awssdk.http.SdkHttpMethod
-import software.amazon.awssdk.http.auth.aws.signer.AwsV4aHttpSigner
-import software.amazon.awssdk.http.auth.aws.signer.RegionSet
-import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity
-
-
-
 import java.io.File
 import java.io.IOException
-import java.net.URI
 import java.nio.charset.StandardCharsets
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -40,6 +29,11 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
+
+const val MAX_CONNECT_RETRIES = 1
+//const val RETRY_DELAY_MS = 1000L
+const val CONNECTION_TIMEOUT_MS = 5000
+const val REQUEST_TIMEOUT_MS = 15000
 
 class EksTokenProvider(
     private val clusterName: String,
@@ -83,7 +77,11 @@ class EksTokenProvider(
         // Перевіряємо кешований токен
         cachedToken?.let { cached ->
             if (Instant.now().plusSeconds(TOKEN_REFRESH_BEFORE_SECONDS).isBefore(cached.expiresAt)) {
-                logger.debug("Використовуємо кешований токен для EKS кластера '$clusterName' (дійсний до ${cached.expiresAt})")
+                logger.debug(
+                    "Using a cached token for an EKS cluster '{}' (valid until {})",
+                    clusterName,
+                    cached.expiresAt
+                )
                 return cached.token
             }
         }
@@ -101,7 +99,7 @@ class EksTokenProvider(
     private fun generateNewToken(): String {
 
         try {
-            logger.debug("Генерація нового токену для EKS кластера '$clusterName'")
+            logger.debug("Generating a new token for the EKS cluster '$clusterName'")
 
             val credentials = credentialsProvider.resolveCredentials()
             val now = Instant.now()
@@ -198,7 +196,7 @@ class EksTokenProvider(
 
 suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<KubernetesClient, String>> {
     return try {
-        logger.info("Підключення до збереженого EKS кластера: ${config.alias}")
+        logger.info("Connecting to a Stored EKS Cluster: ${config.alias}")
 
         val clientConfig = Config.empty().apply {
             masterUrl = config.endpoint
@@ -230,12 +228,12 @@ suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<Kubernetes
             val client = KubernetesClientBuilder()
                 .withConfig(clientConfig)
                 .build()
-            val version = client.kubernetesVersion?.gitVersion ?: "невідомо"
+            val version = client.kubernetesVersion?.gitVersion ?: "Unknown"
             Pair(client, version)
         })
 
     } catch (e: Exception) {
-        logger.error("Помилка підключення до збереженого EKS кластера ${config.alias}: ${e.message}")
+        logger.error("Failed to connect to a stored EKS cluster ${config.alias}: ${e.message}")
         Result.failure(e)
     }
 }
@@ -249,14 +247,14 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
     val contextNameToLog = targetContext ?: "(default)"
 
     for (attempt in 1..MAX_CONNECT_RETRIES) {
-        logger.info("Спроба підключення до '$contextNameToLog' (спроба $attempt/$MAX_CONNECT_RETRIES)...")
+        logger.info("Trying to connect to '$contextNameToLog' (attempt $attempt/$MAX_CONNECT_RETRIES)...")
         try {
             val resultPair: Pair<KubernetesClient, String> = withContext(Dispatchers.IO) {
-                logger.info("[IO] Створення базового конфігу та клієнта для '$contextNameToLog' через Config.autoConfigure...")
+                logger.info("[IO] Creating a base config and client for '$contextNameToLog' through Config.autoConfigure...")
                 // Отримуємо оброблену конфігурацію
                 val resolvedConfig: Config =
                     Config.autoConfigure(targetContext) ?: throw KubernetesClientException(
-                        "Не вдалося автоматично налаштувати конфігурацію для контексту '$contextNameToLog'"
+                        "Could not automatically configure the configuration for the context '$contextNameToLog'"
                     )
 
                 // --- Починаємо аналіз сирого KubeConfig для перевірки ExecConfig ---
@@ -268,10 +266,10 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 
                     val kubeConfigFile = File(kubeConfigPath)
                     if (!kubeConfigFile.exists()) {
-                        throw KubernetesClientException("Файл KubeConfig не знайдено за шляхом: $kubeConfigPath")
+                        throw KubernetesClientException("KubeConfig file not found on path: $kubeConfigPath")
                     }
 
-                    logger.info("Аналіз файлу KubeConfig: ${kubeConfigFile.absolutePath}")
+                    logger.info("KubeConfig File Analysis: ${kubeConfigFile.absolutePath}")
 
                     // Використовуємо Jackson для розбору YAML файлу
                     val mapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
@@ -281,12 +279,12 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                     // Визначаємо ім'я контексту, яке було фактично використано
                     val actualContextName = resolvedConfig.currentContext?.name
                         ?: kubeConfigModel.currentContext // Беремо з resolvedConfig, або з моделі якщо там null
-                        ?: throw KubernetesClientException("Не вдалося визначити поточний контекст")
+                        ?: throw KubernetesClientException("Unable to determine the current context")
 
                     // Знаходимо NamedContext у сирій моделі
                     val namedContext: NamedContext? = kubeConfigModel.contexts?.find { it.name == actualContextName }
                     val contextInfo = namedContext?.context
-                        ?: throw KubernetesClientException("Не знайдено деталей для контексту '$actualContextName' у KubeConfig моделі")
+                        ?: throw KubernetesClientException("No details found for context '$actualContextName' in KubeConfig model")
 
                     // Отримуємо ім'я користувача з контексту
                     val userName: String? = contextInfo.user
@@ -305,7 +303,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 
                         // 9. Перевіряємо, чи це EKS exec
                         if (execConfig != null && (execConfig.command == "aws" || execConfig.command.endsWith("/aws"))) {
-                            logger.info("Виявлено EKS конфігурацію з exec command: '${execConfig.command}'. Спроба використання кастомного TokenProvider.")
+                            logger.info("Detected EKS configuration with exec command: '${execConfig.command}'. Trying to use a custom TokenProvider.")
 
                             val execArgs: List<String> = execConfig.args ?: emptyList()
                             val execEnv: List<ExecEnvVar> =
@@ -316,20 +314,20 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                                 execEnv,
                                 "AWS_CLUSTER_NAME"
                             ) // Використовуємо адаптовану функцію
-                            ?: throw KubernetesClientException("Не вдалося знайти 'cluster-name' в exec config для '$userName'")
+                            ?: throw KubernetesClientException("Could not find 'cluster-name' in exec config for '$userName'")
 
                             val region = findArgumentValue(execArgs, "--region") ?: findEnvValueModel(
                                 execEnv,
                                 "AWS_REGION"
                             ) // Використовуємо адаптовану функцію
-                            ?: throw KubernetesClientException("Не вдалося знайти 'region' в exec config для '$userName'")
+                            ?: throw KubernetesClientException("Could not find 'region' in exec config for '$userName'")
 
                             val awsProfile = findArgumentValue(execArgs, "--profile") ?: findEnvValueModel(
                                 execEnv,
                                 "AWS_PROFILE"
                             ) // Використовуємо адаптовану функцію
 
-                            logger.info("Параметри для EKS TokenProvider: cluster='$clusterName', region='$region', profile='${awsProfile ?: "(default)"}'")
+                            logger.info("Parameters for EKS TokenProvider: cluster='$clusterName', region='$region', profile='${awsProfile ?: "(default)"}'")
 
                             //Створюємо та встановлюємо наш кастомний провайдер токенів в ОБРОБЛЕНУ конфігурацію
                             resolvedConfig.oauthTokenProvider = EksTokenProvider(clusterName, region, awsProfile)
@@ -345,15 +343,15 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                             resolvedConfig.clientKeyFile = null
                             resolvedConfig.clientKeyData = null
 
-                            logger.info("Кастомний EksTokenProvider встановлено для контексту '$actualContextName'.")
+                            logger.info("Custom EksTokenProvider is set for context '$actualContextName'.")
                         }
                     } else {
-                        logger.warn("У контексті '$actualContextName' не вказано ім'я користувача (user). Неможливо перевірити ExecConfig.")
+                        logger.warn("In context '$actualContextName' No user name is specified. Unable to check ExecConfig.")
                     }
 
                 } catch (kubeConfigEx: Exception) {
                     // Логуємо помилку завантаження/аналізу KubeConfig, але продовжуємо з resolvedConfig
-                    logger.warn("Не вдалося проаналізувати KubeConfig для перевірки Exec: ${kubeConfigEx.message}")
+                    logger.warn("Failed to parse KubeConfig for Exec validation: ${kubeConfigEx.message}")
                     // Можливо, варто тут перервати, якщо EKS є критичним? Залежить від вимог.
                     // throw KubernetesClientException("Помилка аналізу KubeConfig: ${kubeConfigEx.message}", kubeConfigEx)
                 }
@@ -363,24 +361,24 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
                 // Використовуємо resolvedConfig (потенційно модифікований для EKS) для створення клієнта
                 resolvedConfig.connectionTimeout = CONNECTION_TIMEOUT_MS
                 resolvedConfig.requestTimeout = REQUEST_TIMEOUT_MS
-                logger.info("[IO] Config context: ${resolvedConfig.currentContext?.name ?: "(не вказано)"}. Namespace: ${resolvedConfig.namespace}")
+                logger.info("[IO] Config context: ${resolvedConfig.currentContext?.name ?: "(not set)"}. Namespace: ${resolvedConfig.namespace}")
 
                 val client = KubernetesClientBuilder().withConfig(resolvedConfig).build()
                 logger.info("[IO] Fabric8 client created. Checking version...")
-                val ver = client.kubernetesVersion?.gitVersion ?: "невідомо"
-                logger.info("[IO] Версія сервера: $ver для '${resolvedConfig.currentContext?.name ?: contextNameToLog}'")
+                val ver = client.kubernetesVersion?.gitVersion ?: "Unknown"
+                logger.info("[IO] Server version: $ver for '${resolvedConfig.currentContext?.name ?: contextNameToLog}'")
                 Pair(client, ver)
             }
-            logger.info("Підключення до '${resultPair.first.configuration.currentContext?.name ?: contextNameToLog}' успішне (спроба $attempt).")
+            logger.info("Connecting to '${resultPair.first.configuration.currentContext?.name ?: contextNameToLog}' successful (attempt $attempt).")
             return Result.success(resultPair)
         } catch (e: Exception) {
             lastError = e
-            logger.warn("Помилка підключення '$contextNameToLog' (спроба $attempt): ${e.message}")
+            logger.warn("Connection error '$contextNameToLog' (Attempt $attempt): ${e.message}")
             //if (attempt < .MAX_CONNECT_RETRIES) { kotlinx.coroutines.delay(RETRY_DELAY_MS) }
         }
     }
-    logger.error("Не вдалося підключитися до '$contextNameToLog' після $MAX_CONNECT_RETRIES спроб.")
-    return Result.failure(lastError ?: IOException("Невідома помилка підключення"))
+    logger.error("Failed to connect to '$contextNameToLog' after $MAX_CONNECT_RETRIES attempts.")
+    return Result.failure(lastError ?: IOException("Unknown connection error"))
 }
 
 // Потрібно адаптувати або створити нову функцію для роботи з List<io.fabric8.kubernetes.api.model.ExecEnvVar>
@@ -402,10 +400,5 @@ private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
 }
 
 private val ClusterConfig.awsProfile: String?
-    get() = if (profileName.isNullOrBlank()) null else profileName
+    get() = profileName.ifBlank { null }
 
-const val MAX_CONNECT_RETRIES = 1
-
-//const val RETRY_DELAY_MS = 1000L
-const val CONNECTION_TIMEOUT_MS = 5000
-const val REQUEST_TIMEOUT_MS = 15000
