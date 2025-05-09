@@ -790,9 +790,9 @@ fun generateKubernetesIcon(
         drawNetworkSymbol(g2d, centerX, centerY, symbolSize, /*spokeWidth,*/ colors)
 
         // Малюємо кнопку з текстом тільки якщо розмір достатньо великий
-        if (size >= 64) {
-           // drawButton(g2d, size, centerX, colors)
-        }
+        //if (size >= 64) {
+        // drawButton(g2d, size, centerX, colors)
+        //}
     }
 
     // Завершуємо роботу з графічним контекстом

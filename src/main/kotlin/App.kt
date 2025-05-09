@@ -87,13 +87,11 @@ data class ClusterContext(
     val config: ClusterConfig? = null
 )
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager
 ) {
     recomposeScope = currentRecomposeScope
-    // --- Стани ---
 //    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
     var contexts by remember { mutableStateOf<List<ClusterContext>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
@@ -101,7 +99,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>() }
     var activeClient by remember { mutableStateOf<KubernetesClient?>(null) } // Fabric8 Client
-    var connectionStatus by remember { mutableStateOf("Завантаження конфігурації...") }
+    var connectionStatus by remember { mutableStateOf("Configuration Loading...") }
     var isLoading by remember { mutableStateOf(false) } // Загальний індикатор
     var resourceLoadError by remember { mutableStateOf<String?>(null) } // Помилка завантаження ресурсів
     // Стан для всіх типів ресурсів (Моделі Fabric8)
@@ -262,42 +260,42 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     }
 
     fun clearResourceLists() {
-        namespacesList = emptyList();
-        nodesList = emptyList();
-        podsList = emptyList();
-        deploymentsList = emptyList();
-        statefulSetsList = emptyList();
-        daemonSetsList = emptyList();
-        replicaSetsList = emptyList();
-        jobsList = emptyList();
-        cronJobsList = emptyList();
-        servicesList = emptyList();
-        ingressesList = emptyList();
-        endpointsList = emptyList();
-        pvsList = emptyList();
-        pvcsList = emptyList();
-        storageClassesList = emptyList();
-        configMapsList = emptyList();
-        secretsList = emptyList();
-        serviceAccountsList = emptyList();
-        rolesList = emptyList();
-        roleBindingsList = emptyList();
-        clusterRolesList = emptyList();
-        clusterRoleBindingsList = emptyList();
-        eventsList = emptyList();
-        networkPoliciesList = emptyList();
-        crdsList = emptyList();
+        namespacesList = emptyList()
+        nodesList = emptyList()
+        podsList = emptyList()
+        deploymentsList = emptyList()
+        statefulSetsList = emptyList()
+        daemonSetsList = emptyList()
+        replicaSetsList = emptyList()
+        jobsList = emptyList()
+        cronJobsList = emptyList()
+        servicesList = emptyList()
+        ingressesList = emptyList()
+        endpointsList = emptyList()
+        pvsList = emptyList()
+        pvcsList = emptyList()
+        storageClassesList = emptyList()
+        configMapsList = emptyList()
+        secretsList = emptyList()
+        serviceAccountsList = emptyList()
+        rolesList = emptyList()
+        roleBindingsList = emptyList()
+        clusterRolesList = emptyList()
+        clusterRoleBindingsList = emptyList()
+        eventsList = emptyList()
+        networkPoliciesList = emptyList()
+        crdsList = emptyList()
     }
-    // --- Завантаження контекстів через Config.autoConfigure(null).contexts ---
+
     LaunchedEffect(Unit) {
-        logger.info("LaunchedEffect: Завантаження контекстів...")
+        logger.info("LaunchedEffect: Loading contexts...")
         isLoading = true
-        connectionStatus = "Завантаження конфігурації..."
+        connectionStatus = "Configuration Loading..."
 
         try {
             val kubeConfigContexts = withContext(Dispatchers.IO) {
                 val config = Config.autoConfigure(null)
-                    ?: throw IOException("Не вдалося завантажити kubeconfig")
+                    ?: throw IOException("Failed to load kubeconfig")
 
                 config.contexts?.mapNotNull { context ->
                     context.name?.let { name ->
@@ -316,36 +314,33 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
             contexts = (kubeConfigContexts + savedContexts)
 
-            errorMessage = if (contexts.isEmpty()) "Контексти не знайдено" else null
-            connectionStatus = if (contexts.isEmpty()) "Контексти не знайдено" else "Оберіть контекст"
+            errorMessage = if (contexts.isEmpty()) "Contexts not found" else null
+            connectionStatus = if (contexts.isEmpty()) "Contexts not found" else "Choose a context"
 
         } catch (e: Exception) {
-            logger.error("Помилка завантаження контекстів: ${e.message}", e)
-            errorMessage = "Помилка завантаження: ${e.message}"
-            connectionStatus = "Помилка завантаження"
+            logger.error("Error loading contexts: ${e.message}", e)
+            errorMessage = "Loading error: ${e.message}"
+            connectionStatus = "Loading error"
         }
 
         isLoading = false
     }
-
-    // --- Кінець LaunchedEffect ---
-    // --- Завантаження неймспейсів ПІСЛЯ успішного підключення ---
     LaunchedEffect(activeClient) {
         if (activeClient != null) {
             logger.info("Client connected, fetching all namespaces for filter...")
             isLoading = true // Можна використовувати інший індикатор або оновити статус
-            connectionStatus = "Завантаження просторів імен..."
+            connectionStatus = "Loading namespaces..."
             val nsResult = loadNamespacesFabric8(activeClient) // Викликаємо завантаження
             nsResult.onSuccess { loadedNs ->
                 // Додаємо опцію "All" і сортуємо
                 allNamespaces =
                     (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(compareBy { it != ALL_NAMESPACES_OPTION } // "<All>" завжди зверху
                     )
-                connectionStatus = "Підключено до: $selectedContext" // Повертаємо статус
+                connectionStatus = "Connected to: $selectedContext" // Повертаємо статус
                 logger.info("Loaded ${allNamespaces.size - 1} namespaces for filter.")
             }.onFailure {
                 logger.error("Failed to load namespaces for filter: ${it.message}")
-                connectionStatus = "Помилка завантаження неймспейсів"
+                connectionStatus = "Error loading namespaces"
                 // Не скидаємо allNamespaces, щоб залишилася хоча б опція "All"
             }
             isLoading = false
@@ -355,7 +350,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             selectedNamespaceFilter = ALL_NAMESPACES_OPTION
         }
     }
-    // --- Діалогове вікно помилки (M3) ---
+
     if (showErrorDialog.value) {
         ErrorDialog(
             showDialog = showErrorDialog.value,
@@ -363,7 +358,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             onDismiss = { showErrorDialog.value = false }
         )
     }
-    // ---
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -378,20 +372,20 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     Surface(
             modifier = Modifier.Companion.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
-        ) { // M3 Surface
+        ) {
             }
             Column(modifier = Modifier.Companion.fillMaxSize()) {
                 Column {
                     Row(modifier = Modifier.Companion.fillMaxWidth()) {
                         MainMenu(windowState = windowState, settingsManager = settingsManager
-                        )  // Додаємо меню на початку основного вікна
+                        )
                     }
                 Row(modifier = Modifier.Companion.weight(1f)) {
                     // --- Ліва панель ---
                     Column(modifier = Modifier.Companion.fillMaxHeight().width(300.dp).padding(16.dp)) {
                         Text(
                             "Kubernetes Contexts:", style = MaterialTheme.typography.titleMedium
-                        ); Spacer(modifier = Modifier.Companion.height(8.dp)) // M3 Text + Typography
+                        ); Spacer(modifier = Modifier.Companion.height(8.dp))
                         Box(
                             modifier = Modifier.Companion
                                 .weight(1f)
@@ -401,28 +395,28 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clip(RoundedCornerShape(8.dp))
-                        ) { // M3 колір
+                        ) {
                             if (isLoading && contexts.isEmpty()) {
                                 CircularProgressIndicator(modifier = Modifier.Companion.align(Alignment.Companion.Center))
-                            } // M3 Indicator
+                            }
                             else if (!isLoading && contexts.isEmpty()) {
                                 Text(
-                                    errorMessage ?: "Контексти не знайдено",
+                                    errorMessage ?: "Contexts not found",
                                     modifier = Modifier.Companion.align(Alignment.Companion.Center)
                                 )
-                            } // M3 Text
+                            }
                             else {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(contexts) { context -> // змінено параметр з contextName на context
+                                    items(contexts) { context ->
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.fillMaxWidth()
                                                 .clickable(enabled = !isLoading) {
-                                                    if (selectedContext != context.name) { // порівнюємо з context.name
+                                                    if (selectedContext != context.name) {
                                                         logger.info("Click on context: ${context.name}. Launching .connectWithRetries...")
                                                         coroutineScope.launch {
                                                             isLoading = true
-                                                            connectionStatus = "Connection to '${context.name}'..."
+                                                            connectionStatus = "Connect to '${context.name}'..."
                                                             activeClient?.close()
                                                             activeClient = null
                                                             selectedResourceType = null
@@ -432,7 +426,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                             detailedResource = null
                                                             detailedResourceType = null
                                                             showLogViewer.value = false
-                                                            logViewerParams.value = null // Скидаємо все
+                                                            logViewerParams.value = null
 
                                                             val connectionResult = when {
                                                                 // Використовуємо різні методи підключення в залежності від джерела
@@ -543,7 +537,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                                 )
                                                                                 Text(
-                                                                                    text = config.profileName ?: "default",
+                                                                                    text = config.profileName,
                                                                                     style = MaterialTheme.typography.bodySmall,
                                                                                     fontWeight = FontWeight.Medium
                                                                                 )
@@ -617,7 +611,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                         )
                                                         {
                                                             Text(
-                                                                text = "${context.config?.profileName ?: "default"}",
+                                                                text = context.config?.profileName ?: "default",
                                                                 fontSize = 12.sp,
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
@@ -626,7 +620,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                         Spacer(modifier = Modifier.width(4.dp))
 
                                                         Text(
-                                                            text = "${context.config?.region ?: "unknown region"}",
+                                                            text = context.config?.region ?: "unknown region",
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
@@ -662,12 +656,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                     if (isLeaf) {
                                         if (activeClient != null && !isLoading) {
                                             // Скидаємо показ деталей/логів при виборі нового типу ресурсу
-                                            detailedResource = null;
-                                            detailedResourceType = null;
-                                            showLogViewer.value = false;
+                                            detailedResource = null
+                                            detailedResourceType = null
+                                            showLogViewer.value = false
                                             logViewerParams.value = null
-                                            selectedResourceType = nodeId;
-                                            resourceLoadError = null;
+                                            selectedResourceType = nodeId
+                                            resourceLoadError = null
                                             clearResourceLists()
                                             connectionStatus = "Loading $nodeId..."; isLoading = true
                                             coroutineScope.launch {
@@ -827,13 +821,16 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                 horizontalAlignment = Alignment.Companion.CenterHorizontally,
                                                 modifier = Modifier.Companion.align(Alignment.Companion.Center)
                                             ) {
-                                                CircularProgressIndicator(); Spacer(
-                                                modifier = Modifier.Companion.height(
-                                                    8.dp
-                                                )
-                                            ); Text(
-                                                connectionStatus
-                                            )
+                                                Box(
+                                                    modifier = Modifier.Companion.fillMaxSize(),
+                                                    contentAlignment = Alignment.Companion.Center,
+                                                ) {
+                                                CircularProgressIndicator();
+                                                Spacer(modifier = Modifier.Companion.height(20.dp));
+                                                    Text(
+                                                        text = connectionStatus
+                                                    )
+                                                }
                                             }
                                         }
                                         currentErrorMessageForPanel != null -> {
@@ -874,31 +871,31 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                 crdsList
                                             ) {
                                                 when (currentResourceType) {
-                                                    "Namespaces" -> namespacesList;
-                                                    "Nodes" -> nodesList;
-                                                    "Events" -> eventsList;
-                                                    "Pods" -> podsList;
-                                                    "Deployments" -> deploymentsList;
-                                                    "StatefulSets" -> statefulSetsList;
-                                                    "DaemonSets" -> daemonSetsList;
-                                                    "ReplicaSets" -> replicaSetsList;
-                                                    "Jobs" -> jobsList;
-                                                    "CronJobs" -> cronJobsList;
-                                                    "Services" -> servicesList;
-                                                    "Ingresses" -> ingressesList;
-                                                    "Endpoints" -> endpointsList;
-                                                    "NetworkPolicies" -> networkPoliciesList;
-                                                    "PersistentVolumes" -> pvsList;
-                                                    "PersistentVolumeClaims" -> pvcsList;
-                                                    "StorageClasses" -> storageClassesList;
-                                                    "ConfigMaps" -> configMapsList;
-                                                    "Secrets" -> secretsList;
-                                                    "ServiceAccounts" -> serviceAccountsList;
-                                                    "Roles" -> rolesList;
-                                                    "RoleBindings" -> roleBindingsList;
-                                                    "ClusterRoles" -> clusterRolesList;
-                                                    "ClusterRoleBindings" -> clusterRoleBindingsList;
-                                                    "CRDs" -> crdsList;
+                                                    "Namespaces" -> namespacesList
+                                                    "Nodes" -> nodesList
+                                                    "Events" -> eventsList
+                                                    "Pods" -> podsList
+                                                    "Deployments" -> deploymentsList
+                                                    "StatefulSets" -> statefulSetsList
+                                                    "DaemonSets" -> daemonSetsList
+                                                    "ReplicaSets" -> replicaSetsList
+                                                    "Jobs" -> jobsList
+                                                    "CronJobs" -> cronJobsList
+                                                    "Services" -> servicesList
+                                                    "Ingresses" -> ingressesList
+                                                    "Endpoints" -> endpointsList
+                                                    "NetworkPolicies" -> networkPoliciesList
+                                                    "PersistentVolumes" -> pvsList
+                                                    "PersistentVolumeClaims" -> pvcsList
+                                                    "StorageClasses" -> storageClassesList
+                                                    "ConfigMaps" -> configMapsList
+                                                    "Secrets" -> secretsList
+                                                    "ServiceAccounts" -> serviceAccountsList
+                                                    "Roles" -> rolesList
+                                                    "RoleBindings" -> roleBindingsList
+                                                    "ClusterRoles" -> clusterRolesList
+                                                    "ClusterRoleBindings" -> clusterRoleBindingsList
+                                                    "CRDs" -> crdsList
                                                     else -> emptyList()
                                                 }
                                             }
@@ -972,17 +969,24 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                         }
                                         // --- Стани за замовчуванням (M3 Text) ---
                                         activeClient != null -> {
-                                            Text(
+                                            Box(
+                                                modifier = Modifier.Companion.fillMaxSize(),
+                                                contentAlignment = Alignment.Companion.Center
+                                            ) { Text(
                                                 "Connected to $selectedContext.\nChoose a resource type.",
                                                 modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                            )
+                                            )}
                                         }
 
                                         else -> {
+                                            Box(
+                                                modifier = Modifier.Companion.fillMaxSize(),
+                                                contentAlignment = Alignment.Companion.Center
+                                            ) {
                                             Text(
-                                                errorMessage ?: "Choose a context.",
+                                                text = "Choose a context.",
                                                 modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                            )
+                                            )}
                                         }
                                     }
                                 } // Кінець table case
@@ -1005,12 +1009,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
 @Composable
 fun AppTextStyle(
-    //style: TextStyle = MaterialTheme.typography.labelMedium,
+    style: TextStyle = MaterialTheme.typography.labelMedium,
     content: @Composable () -> Unit
 ) {
     CompositionLocalProvider(
         LocalContentColor provides MaterialTheme.colorScheme.onSurface,
-        //LocalTextStyle provides style
+        LocalTextStyle provides style
     )
  {
         content()

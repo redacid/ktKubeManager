@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -40,7 +39,7 @@ fun ErrorDialog(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Помилка Підключення") },
+            title = { Text("Connection error") },
             text = { Text(errorMessage) },
             confirmButton = {
                 Button(onClick = onDismiss) {
@@ -235,4 +234,4 @@ val resourceLeafNodes: Set<String> = setOf(
 
 val NSResources: Set<String> =
     resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
-val logger = LoggerFactory.getLogger("KKM")
+val logger = LoggerFactory.getLogger("KKM")!!

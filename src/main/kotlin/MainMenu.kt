@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
-import kotlinx.coroutines.launch
 import ua.`in`.ios.theme1.*
 import kotlin.system.exitProcess
 
@@ -25,6 +24,7 @@ data class MenuItem(
     val icon: ImageVector,
     val onClick: () -> Unit
 )
+
 fun exitApplication(windowState: WindowState, settingsManager: SettingsManager
 ) {
     try {

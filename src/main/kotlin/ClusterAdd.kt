@@ -1,4 +1,3 @@
-import ICON_ERROR
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -96,7 +95,7 @@ fun AwsProfileAddDialog(
                                         .credentialsProvider(StaticCredentialsProvider.create(credentials))
                                         .build()
 
-                                    stsClient.getCallerIdentity()
+                                    stsClient.callerIdentity
 
                                     // Зберігаємо профіль
                                     val awsProfile = AwsProfile(
@@ -211,7 +210,10 @@ fun ClusterAddDialog(
                         value = selectedProfile?.profileName ?: "",
                         onValueChange = {},
                         label = { Text("AWS Profile") },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(
+                            type = MenuAnchorType.PrimaryNotEditable,
+                            enabled = true
+                        ),
                         readOnly = true
                     )
 
@@ -252,7 +254,10 @@ fun ClusterAddDialog(
                             value = selectedRegion,
                             onValueChange = {},
                             label = { Text("Region") },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            modifier = Modifier.fillMaxWidth().menuAnchor(
+                                type = MenuAnchorType.PrimaryNotEditable,
+                                enabled = true
+                            ),
                             readOnly = true
                         )
 
@@ -302,7 +307,10 @@ fun ClusterAddDialog(
                             value = selectedCluster,
                             onValueChange = {},
                             label = { Text("Cluster") },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            modifier = Modifier.fillMaxWidth().menuAnchor(
+                                type = MenuAnchorType.PrimaryNotEditable,
+                                enabled = true
+                            ),
                             readOnly = true
                         )
 
@@ -430,7 +438,7 @@ fun AwsProfilesEditDialog(
 ) {
     var editingProfile by remember { mutableStateOf<AwsProfile?>(null) }
     var showDeleteConfirmation by remember { mutableStateOf<AwsProfile?>(null) }
-    var showError by remember { mutableStateOf<String?>(null) }
+    //var showError by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -630,7 +638,7 @@ fun EditClustersDialog(
 ) {
     var editingCluster by remember { mutableStateOf<ClusterConfig?>(null) }
     var showDeleteConfirmation by remember { mutableStateOf<ClusterConfig?>(null) }
-    var showError by remember { mutableStateOf<String?>(null) }
+    //var showError by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -643,7 +651,7 @@ fun EditClustersDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    "Кластери EKS",
+                    "EKS Clusters",
                     style = MaterialTheme.typography.headlineSmall
                 )
 
@@ -670,10 +678,10 @@ fun EditClustersDialog(
                                 trailingContent = {
                                     Row {
                                         IconButton(onClick = { editingCluster = cluster }) {
-                                            Icon(ICON_EDIT, "Редагувати")
+                                            Icon(ICON_EDIT, "Edit")
                                         }
                                         IconButton(onClick = { showDeleteConfirmation = cluster }) {
-                                            Icon(ICON_DELETE, "Видалити")
+                                            Icon(ICON_DELETE, "Remove")
                                         }
                                     }
                                 },
@@ -688,7 +696,7 @@ fun EditClustersDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Закрити")
+                        Text("Close")
                     }
                 }
             }
@@ -717,8 +725,8 @@ fun EditClustersDialog(
     showDeleteConfirmation?.let { cluster ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = null },
-            title = { Text("Підтвердження видалення") },
-            text = { Text("Ви впевнені, що хочете видалити кластер '${cluster.alias}'?") },
+            title = { Text("Deletion confirmation") },
+            text = { Text("Are you sure you want to delete the context '${cluster.alias}'?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -730,12 +738,12 @@ fun EditClustersDialog(
                         showDeleteConfirmation = null
                     }
                 ) {
-                    Text("Так")
+                    Text("Yes")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmation = null }) {
-                    Text("Ні")
+                    Text("No")
                 }
             }
         )
@@ -763,14 +771,14 @@ private fun EditClusterDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    "Редагувати кластер",
+                    "Edit cluster context",
                     style = MaterialTheme.typography.headlineSmall
                 )
 
                 OutlinedTextField(
                     value = alias,
                     onValueChange = { alias = it },
-                    label = { Text("Назва з'єднання") },
+                    label = { Text("Connection Name") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -779,7 +787,7 @@ private fun EditClusterDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Скасувати")
+                        Text("Cancel")
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(
@@ -790,7 +798,7 @@ private fun EditClusterDialog(
                         },
                         enabled = alias.isNotEmpty()
                     ) {
-                        Text("Зберегти")
+                        Text("Store")
                     }
                 }
 

@@ -14,9 +14,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-//import compose.icons.FeatherIcons
 import compose.icons.SimpleIcons
-import compose.icons.feathericons.*
 import compose.icons.simpleicons.*
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.KubernetesClient

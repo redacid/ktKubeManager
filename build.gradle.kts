@@ -65,8 +65,7 @@ dependencies {
     implementation("software.amazon.awssdk:http-auth-aws:${awssdkVersion}")
     implementation("software.amazon.awssdk:http-auth-spi:${awssdkVersion}")
     implementation("software.amazon.awssdk:eks:${awssdkVersion}")
-    implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}") // DON'T ENABLE IT, CONNECT TO CONTEXT NOT WORKED
-    //implementation("software.amazon.awssdk:auth.signer:${awssdkVersion}")
+    implementation("software.amazon.awssdk:http-auth-aws-crt:${awssdkVersion}")
     implementation("software.amazon.awssdk:aws-query-protocol:${awssdkVersion}")
     testImplementation(kotlin("test"))
 }

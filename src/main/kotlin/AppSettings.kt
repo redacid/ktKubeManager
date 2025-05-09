@@ -52,7 +52,6 @@ class SettingsManager {
     }
 
     var settings by mutableStateOf(loadSettings())
-        private set
 
     init {
         configDir.mkdirs()
@@ -66,7 +65,7 @@ class SettingsManager {
                 AppSettings()
             }
         } catch (e: Exception) {
-            println("Помилка завантаження налаштувань: ${e.message}")
+            println("Error lading settings: ${e.message}")
             AppSettings()
         }
     }
@@ -76,7 +75,7 @@ class SettingsManager {
             settings = settings.update()
             saveSettings()
         } catch (e: Exception) {
-            println("Помилка оновлення налаштувань: ${e.message}")
+            println("Error upgrading settings: ${e.message}")
         }
     }
 
@@ -84,7 +83,7 @@ class SettingsManager {
         try {
             configFile.writeText(json.encodeToString(AppSettings.serializer(), settings))
         } catch (e: Exception) {
-            println("Помилка збереження налаштувань: ${e.message}")
+            println("Error saving settings: ${e.message}")
         }
     }
 }
