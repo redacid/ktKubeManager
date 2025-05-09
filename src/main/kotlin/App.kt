@@ -92,7 +92,6 @@ data class ClusterContext(
 fun App(windowState: WindowState, settingsManager: SettingsManager
 ) {
     recomposeScope = currentRecomposeScope
-//    var contexts by remember { mutableStateOf<List<String>>(emptyList()) }
     var contexts by remember { mutableStateOf<List<ClusterContext>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
     var selectedContext by remember { mutableStateOf<String?>(null) }
@@ -102,7 +101,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
     var connectionStatus by remember { mutableStateOf("Configuration Loading...") }
     var isLoading by remember { mutableStateOf(false) } // Загальний індикатор
     var resourceLoadError by remember { mutableStateOf<String?>(null) } // Помилка завантаження ресурсів
-    // Стан для всіх типів ресурсів (Моделі Fabric8)
     var namespacesList by remember { mutableStateOf<List<Namespace>>(emptyList()) }
     var nodesList by remember { mutableStateOf<List<Node>>(emptyList()) }
     var eventsList by remember { mutableStateOf<List<Event>>(emptyList()) }
@@ -361,7 +359,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(5000) // затримка 1 секунда
+            delay(5000) // затримка 5 секунд
             recomposeScope?.invalidate()
         }
     }
@@ -473,8 +471,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                 else MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                             )
-
-
                                             Column(
                                                 modifier = Modifier.weight(1f)
                                             ) {
@@ -508,27 +504,17 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
                                                                 ) {
                                                                     Column(modifier = Modifier.padding(10.dp)) {
-                                                                        // Основна інформація
-                                                                        Text(
-                                                                            text = "Cluster Context Details",
-                                                                            style = MaterialTheme.typography.titleSmall,
-                                                                            color = MaterialTheme.colorScheme.primary
-                                                                        )
-                                                                        Spacer(modifier = Modifier.height(4.dp))
-
                                                                         // Тип джерела
                                                                         Text(
                                                                             text = "Source: ${context.source.uppercase()}",
                                                                             style = MaterialTheme.typography.bodySmall,
                                                                             color = MaterialTheme.colorScheme.secondary
                                                                         )
-
                                                                         // AWS деталі
                                                                         context.config?.let { config ->
                                                                             HorizontalDivider(
                                                                                 modifier = Modifier.padding(vertical = 4.dp)
                                                                             )
-
                                                                             // AWS Profile
                                                                             Row {
                                                                                 Text(
@@ -629,8 +615,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
 
                                                 }
                                             }
-
-
                                         }
                                     }
                                 }

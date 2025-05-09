@@ -8,12 +8,24 @@ import io.fabric8.kubernetes.api.model.networking.v1.IngressTLS
 import java.time.Duration
 import java.time.OffsetDateTime
 
-// --- Допоміжні функції форматування ---
+
+
+//fun formatPodContainers(statuses: List<ContainerStatus>?): String {
+//    val total = statuses?.size ?: 0
+//    val ready = statuses?.count { it.ready == true } ?: 0;
+//    return "$ready/$total"
+//}
 
 fun formatPodContainers(statuses: List<ContainerStatus>?): String {
     val total = statuses?.size ?: 0
-    val ready = statuses?.count { it.ready == true } ?: 0; return "$ready/$total"
+    val ready = statuses?.count { it.ready == true } ?: 0
+
+    val readySquares = "■".repeat(ready)
+    val notReadySquares = "□".repeat(total - ready)
+
+    return "$readySquares$notReadySquares"
 }
+
 
 fun formatPodRestarts(statuses: List<ContainerStatus>?): String {
     return statuses?.sumOf { it.restartCount ?: 0 }?.toString() ?: "0"
@@ -75,8 +87,10 @@ fun formatJobDuration(status: JobStatus?): String {
     val start = status?.startTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     val end = status?.completionTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     return when {
-        start == null -> "<pending>"; end == null -> Duration.between(
-            start, OffsetDateTime.now(start.offset)
+        start == null -> "<pending>"; 
+        end == null -> Duration.between(
+            start, 
+            OffsetDateTime.now(start.offset)
         ).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s"
     }
 }
@@ -114,22 +128,6 @@ fun formatAge(creationTimestamp: String?): String {
         logger.warn("Failed to format timestamp '$creationTimestamp': ${e.message}"); return "Invalid"
     }
 }
-
-//fun formatContextNameForDisplay(contextName: String): String {
-//    // Регулярний вираз для AWS EKS ARN
-//    val eksArnPattern = "arn:aws:eks:[a-z0-9-]+:([0-9]+):cluster/([a-zA-Z0-9-]+)".toRegex()
-//
-//    val matchResult = eksArnPattern.find(contextName)
-//
-//    return if (matchResult != null) {
-//        // Групи: 1 - account ID, 2 - cluster name
-//        val accountId = matchResult.groupValues[1]
-//        val clusterName = matchResult.groupValues[2]
-//        "$accountId:$clusterName"
-//    } else {
-//        contextName
-//    }
-//}
 
 fun formatContextNameForDisplay(context: ClusterContext): String {
     val eksArnPattern = "arn:aws:eks:[a-z0-9-]+:([0-9]+):cluster/([a-zA-Z0-9-]+)".toRegex()

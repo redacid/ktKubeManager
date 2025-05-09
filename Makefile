@@ -38,6 +38,11 @@ build:
 package:
 	./gradlew packageReleaseDeb
 
+install: package
+	sudo apt purge kubemanager -y
+	sudo dpkg -i "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb"
+
+
 git-release: build
 	gh release delete $(RELEASE_VERSION) --cleanup-tag -y --repo $(PRJ_REPO) 2>/dev/null;
 	git tag -d $(RELEASE_VERSION) 2>/dev/null;
