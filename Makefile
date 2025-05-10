@@ -2,7 +2,8 @@
 export
 #JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
 SHELL := /bin/bash
-APP_NAME := KubeManager
+APP_NAME := kubemanager
+#APP_NAME_MAC := KubeManager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
 RELEASE_VERSION ?= 1.0.3
@@ -25,7 +26,7 @@ git-publish:
 	make build
 	make package
 	make git-release
-	make git-upload-deb-release
+	make git-upload-release
 	make clean-workspace
 
 .ONESHELL:
@@ -38,10 +39,13 @@ build:
 package-deb:
 	./gradlew packageReleaseDeb
 
+package-rpm:
+	./gradlew packageReleaseRpm
+
 package-dmg:
 	./gradlew packageReleaseDmg
 
-install: package-deb
+install-deb: package-deb
 	sudo apt purge kubemanager -y
 	sudo dpkg -i "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb"
 
@@ -50,17 +54,24 @@ git-release: build
 	git tag -d $(RELEASE_VERSION) 2>/dev/null;
 	gh release create $(RELEASE_VERSION) --generate-notes --notes "$(RELEASE_VERSION)" --repo $(PRJ_REPO)
 
+git-upload-release: git-upload-deb-release git-upload-rpm-release
+
 .ONESHELL:
-git-upload-deb-release:
+git-upload-deb-release: package-deb
 	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb" --repo $(PRJ_REPO)
 
 .ONESHELL:
-git-upload-mac-release: package-dmg
+git-upload-rpm-release: package-rpm
+	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/rpm/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1.x86_64.deb" --repo $(PRJ_REPO)
+
+.ONESHELL:
+git-upload-mac-release: mac-install-req package-dmg
 	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/dmg/$(APP_NAME)-$(RELEASE_VERSION).dmg --repo $(PRJ_REPO)
 
+mac-install-req:
+	brew install gh
+
 .PHONY: build git-publish git-upload-release git-release clean-workspace all help
-#git-update:
-#	git pull && git fetch && git fetch --all
 
 ## Shows help. | Help
 help:
