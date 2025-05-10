@@ -1,8 +1,8 @@
 -include .env
 export
-JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
+#JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
 SHELL := /bin/bash
-APP_NAME := kubemanager
+APP_NAME := KubeManager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
 RELEASE_VERSION ?= 1.0.3
@@ -38,6 +38,9 @@ build:
 package:
 	./gradlew packageReleaseDeb
 
+package-dmg:
+	./gradlew packageReleaseDmg
+
 git-release: build
 	gh release delete $(RELEASE_VERSION) --cleanup-tag -y --repo $(PRJ_REPO) 2>/dev/null;
 	git tag -d $(RELEASE_VERSION) 2>/dev/null;
@@ -47,6 +50,9 @@ git-release: build
 git-upload-release:
 	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb" --repo $(PRJ_REPO)
 
+.ONESHELL:
+git-upload-mac-release: package-dmg
+	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/dmg/$(APP_NAME)-$(RELEASE_VERSION).dmg --repo $(PRJ_REPO)
 
 .PHONY: build git-publish git-upload-release git-release clean-workspace all help
 #git-update:
