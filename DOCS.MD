@@ -16,3 +16,5 @@ https://feathericons.com/
 https://simpleicons.org/
 
 https://github.com/aleksandar-stefanovic/compose-material-data-table
+
+Exception in thread "AWT-EventQueue-0" java.lang.NoClassDefFoundError: javax/naming/NamingException
