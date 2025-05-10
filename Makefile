@@ -1,7 +1,7 @@
 -include .env
 export
 #JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
-SHELL := /bin/bash
+#SHELL := /bin/bash
 APP_NAME := kubemanager
 #APP_NAME_MAC := KubeManager
 
@@ -45,6 +45,9 @@ package-rpm:
 package-dmg:
 	./gradlew packageReleaseDmg
 
+package-msi:
+	./gradlew.bat packageReleaseMsi
+
 install-deb: package-deb
 	sudo apt purge kubemanager -y
 	sudo dpkg -i "./build/compose/binaries/main-release/deb/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1_amd64.deb"
@@ -67,6 +70,10 @@ git-upload-rpm-release: package-rpm
 .ONESHELL:
 git-upload-mac-release: mac-install-req package-dmg
 	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/dmg/$(APP_NAME)-$(RELEASE_VERSION).dmg --repo $(PRJ_REPO)
+
+.ONESHELL:
+git-upload-win-release:
+	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/msi/$(APP_NAME)-$(RELEASE_VERSION).msi --repo $(PRJ_REPO)
 
 mac-install-req:
 	brew install gh
