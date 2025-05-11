@@ -76,7 +76,7 @@ git-upload-mac-release: package-dmg
 
 .ONESHELL:
 git-upload-win-release: package-msi
-	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/msi/$(APP_NAME)-$(RELEASE_VERSION).msi --repo $(PRJ_REPO)
+	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/msi/$(APP_NAME)-$(RELEASE_VERSION).msi --repo $(PRJ_REPO) $(CLOBBER)
 
 mac-install-req:
 	brew install gh
