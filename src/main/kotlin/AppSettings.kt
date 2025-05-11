@@ -44,8 +44,9 @@ data class WindowSize(
 )
 
 class SettingsManager {
-    private val configDir = File(System.getProperty("user.home"), ".kubemanager")
-    private val configFile = File(configDir, "settings.json")
+    private val configDir = File(System.getProperty("user.home")).resolve(".kubemanager")
+    private val configFile = configDir.resolve("settings.json")
+
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true

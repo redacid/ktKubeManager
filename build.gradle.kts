@@ -74,19 +74,58 @@ compose.desktop {
     application {
         mainClass = "MainKt"
 
+        jvmArgs += listOf(
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+            "--add-opens=java.base/java.text=ALL-UNNAMED",
+            "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED"
+        )
+
+
         buildTypes.release.proguard {
             isEnabled.set(false)
             //configurationFiles.from("proguard-rules.pro")
         }
         nativeDistributions {
+            jvmArgs += listOf(
+                "--add-modules=java.naming"
+            )
+            modules("java.naming")
+            modules("java.security.jgss")
+            modules("java.security.sasl")
+            includeAllModules = true
+
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
-            packageName = "KubeManager"
+            packageName = "kubemanager"
             packageVersion = "1.0.3"
+            description = "Kubernetes Manager"
+
             macOS {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
+                bundleID = "ua.in.ios.kubemanager"
+//                signing {
+//                    sign.set(true)
+//                    identity.set("<NAME>")
+//                    keychain.set("/Users/user/Library/Keychains/login.keychain-db")
+//                }
+//                notarization {
+//                    appleID.set("<EMAIL>")
+//                    password.set("<PASSWORD>")
+//                }
             }
             windows {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
+                exePackageVersion = packageVersion
+                msiPackageVersion = packageVersion
+                menuGroup = "Development;System;Network"
+                shortcut = true
+                upgradeUuid = "3181D6E5-84E3-4F1F-9153-531F1534859B"
+                perUserInstall = true
+                console = true
+                dirChooser = true
+                menu = true
+                description = "Kubernetes Manager"
             }
             linux {
                 iconFile.set(project.file("kubernetes_manager_icon.png"))
@@ -96,6 +135,8 @@ compose.desktop {
                 appCategory = "System"
                 appRelease = "1"
                 debPackageVersion = packageVersion
+                rpmPackageVersion = packageVersion
+                appCategory = "Development/Tools"
             }
 
         }

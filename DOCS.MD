@@ -16,3 +16,9 @@ https://feathericons.com/
 https://simpleicons.org/
 
 https://github.com/aleksandar-stefanovic/compose-material-data-table
+
+https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28
+
+https://www.figma.com/
+
+Exception in thread "AWT-EventQueue-0" java.lang.NoClassDefFoundError: javax/naming/NamingException
