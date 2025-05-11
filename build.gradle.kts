@@ -91,10 +91,17 @@ compose.desktop {
             jvmArgs += listOf(
                 "--add-modules=java.naming"
             )
-            modules("java.naming")
-            modules("java.security.jgss")
-            modules("java.security.sasl")
-            includeAllModules = true
+            modules(
+                "java.naming",
+                "java.security.jgss",
+                "java.security.sasl",
+                "jdk.naming.dns",  // Add this for DNS support
+                "java.management", // Add this for JMX support
+                "java.net.http"   // Add this for HTTP client support
+            )
+
+
+            //includeAllModules = true
 
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "kubemanager"
