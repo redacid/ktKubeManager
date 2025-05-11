@@ -68,7 +68,7 @@ git-upload-deb-release: package-deb
 
 .ONESHELL:
 git-upload-rpm-release: package-rpm
-	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/rpm/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1.x86_64.deb" --repo $(PRJ_REPO) $(CLOBBER)
+	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/rpm/"$(APP_NAME)"-"$(RELEASE_VERSION)"-1.x86_64.rpm" --repo $(PRJ_REPO) $(CLOBBER)
 
 .ONESHELL:
 git-upload-mac-release: package-dmg
