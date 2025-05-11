@@ -102,6 +102,8 @@ compose.desktop {
                 exePackageVersion = packageVersion
                 msiPackageVersion = packageVersion
                 packageVersion = packageVersion
+                vendor = "Serhii Rudenko sr@ios.in.ua"
+                copyright = "Copyright © 2025 Serhii Rudenko. All rights reserved."
                 menuGroup = "Development;System;Network"
                 shortcut = true
                 upgradeUuid = "3181D6E5-84E3-4F1F-9153-531F1534859B"
