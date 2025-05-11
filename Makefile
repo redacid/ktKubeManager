@@ -6,7 +6,9 @@ APP_NAME := kubemanager
 #APP_NAME_MAC := KubeManager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
+PRJ_REPO_HTTP := https://github.com/redacid/ktKubeManager.git
 RELEASE_VERSION ?= 1.0.3
+CLOBBER := --clobber
 
 # colors
 GREEN = $(shell tput -Txterm setaf 2)
@@ -68,11 +70,11 @@ git-upload-rpm-release: package-rpm
 	gh release upload $(RELEASE_VERSION) "./build/compose/binaries/main-release/rpm/"$(APP_NAME)"_"$(RELEASE_VERSION)"-1.x86_64.deb" --repo $(PRJ_REPO)
 
 .ONESHELL:
-git-upload-mac-release: mac-install-req package-dmg
-	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/dmg/$(APP_NAME)-$(RELEASE_VERSION).dmg --repo $(PRJ_REPO)
+git-upload-mac-release: package-dmg
+	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/dmg/$(APP_NAME)-$(RELEASE_VERSION).dmg --repo $(PRJ_REPO_HTTP) $(CLOBBER)
 
 .ONESHELL:
-git-upload-win-release:
+git-upload-win-release: package-msi
 	gh release upload $(RELEASE_VERSION) ./build/compose/binaries/main-release/msi/$(APP_NAME)-$(RELEASE_VERSION).msi --repo $(PRJ_REPO)
 
 mac-install-req:
