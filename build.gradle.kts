@@ -5,28 +5,30 @@ tasks.wrapper {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-tasks.register("printDependencies") {
-    doLast {
-        configurations
-            .filter { it.isCanBeResolved }
-            .forEach { config ->
-                println("\nConfiguration ${config.name}")
-                config.resolvedConfiguration.resolvedArtifacts.forEach {
-                    println("${it.moduleVersion.id}:${it.classifier ?: ""}")
-                }
-            }
-    }
-}
-
-
 plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.serialization") version "1.9.23"
     id("org.jetbrains.compose") version "1.7.3"
+    id("co.uzzu.dotenv.gradle") version "2.0.0" //https://github.com/uzzu/dotenv-gradle/
 }
 
+
+fun getGitHash(): String {
+    return try {
+        val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+
+        process.inputStream.bufferedReader().use { it.readText().trim() }
+    } catch (e: Exception) {
+        "unknown"
+    }
+}
+
+val buildNumber = getGitHash()
+version = "1.0.3"
+val buildVersion = "$version-$buildNumber"
 group = "ua.in.ios.kubemanager"
-version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -70,6 +72,72 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+tasks.register("uploadDebToGithub") {
+    group = "publishing"
+    dependsOn("packageReleaseDeb")
+    doLast {
+        println("Upload DEB package...")
+        providers.exec {
+            workingDir = projectDir
+            environment("GH_TOKEN", env.GITHUB_TOKEN.value)
+            commandLine("gh", "release", "upload", project.version.toString(),
+                "./build/compose/binaries/main-release/deb/kubemanager_${project.version}-1_amd64.deb",
+                "--repo", env.GIT_REPO.value,
+                "--clobber")
+        }.standardOutput
+    }
+}
+tasks.register("uploadRpmToGithub") {
+    group = "publishing"
+    dependsOn("packageReleaseRpm")
+    doLast {
+        println("Upload RPM package...")
+        providers.exec {
+            workingDir = projectDir
+            environment("GH_TOKEN", env.GITHUB_TOKEN.value)
+            commandLine("gh", "release", "upload", project.version.toString(),
+                "./build/compose/binaries/main-release/rpm/kubemanager-${project.version}-1.x86_64.rpm",
+                "--repo", env.GIT_REPO.value,
+                "--clobber")
+        }
+    }
+}
+tasks.register("createGithubRelease") {
+    group = "publishing"
+    doLast {
+        println("Create GitHub release...")
+
+        providers.exec {
+            workingDir = projectDir
+            environment("GH_TOKEN", env.GITHUB_TOKEN.value)
+            commandLine("gh", "release", "delete", project.version.toString(),
+                "--cleanup-tag", "-y",
+                "--repo", env.GIT_REPO.value)
+            isIgnoreExitValue = true
+        }
+
+        providers.exec {
+            workingDir = projectDir
+            commandLine("git", "tag", "-d", project.version.toString())
+            isIgnoreExitValue = true
+        }
+
+        providers.exec {
+            workingDir = projectDir
+            environment("GH_TOKEN", env.GITHUB_TOKEN.value)
+            commandLine("gh", "release", "create", project.version.toString(),
+                "--generate-notes",
+                "--notes", project.version.toString(),
+                "--repo", env.GIT_REPO.value)
+        }
+    }
+}
+tasks.register("uploadToGithubRelease") {
+    group = "publishing"
+    description = "Upload built artifacts into release on GitHub"
+    dependsOn("createGithubRelease", "uploadDebToGithub", "uploadRpmToGithub")
+}
+
 compose.desktop {
     application {
         mainClass = "MainKt"
@@ -82,30 +150,31 @@ compose.desktop {
             "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED"
         )
 
-
         buildTypes.release.proguard {
             isEnabled.set(false)
             //configurationFiles.from("proguard-rules.pro")
+            jvmArgs += "-DbuildVersion=$buildVersion"
+
         }
         nativeDistributions {
             jvmArgs += listOf(
-                "--add-modules=java.naming"
+                "--add-modules=java.naming",
+                "-DbuildVersion=$buildVersion"
             )
             modules(
                 "java.naming",
                 "java.security.jgss",
                 "java.security.sasl",
-                "jdk.naming.dns",  // Add this for DNS support
-                "java.management", // Add this for JMX support
-                "java.net.http"   // Add this for HTTP client support
+                "jdk.naming.dns",
+                "java.management",
+                "java.net.http"
             )
-
 
             //includeAllModules = true
 
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "kubemanager"
-            packageVersion = "1.0.3"
+            packageVersion = version.toString()
             description = "Kubernetes Manager"
 
             macOS {

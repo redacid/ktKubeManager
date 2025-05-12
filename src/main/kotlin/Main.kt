@@ -33,7 +33,7 @@ fun main() = application {
 
     Window(
         onCloseRequest = { exitApplication(windowState, settingsManager) },
-        title = "Kube Manager",
+        title = "Yellow Fork - Kube Manager ${System.getProperty("buildVersion") ?: "dev"}",
         state = windowState,
         icon = iconPainter
     ) {
