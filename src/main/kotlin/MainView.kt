@@ -1,12 +1,32 @@
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +58,75 @@ import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
 import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
+import io.fabric8.kubernetes.client.KubernetesClient
+
+@OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
+@Composable
+fun NamespaceFilter(
+    selectedNamespaceFilter: String,
+    isNamespaceDropdownExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    isFilterEnabled: Boolean,
+    allNamespaces: List<String>,
+    onNamespaceSelected: (String) -> Unit
+) {
+    ExposedDropdownMenuBox(
+        expanded = isNamespaceDropdownExpanded,
+        onExpandedChange = { if (isFilterEnabled) onExpandedChange(it) },
+        modifier = Modifier.Companion.fillMaxWidth().padding(bottom = 4.dp)
+    ) {
+        TextField(
+            value = selectedNamespaceFilter,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
+            modifier = Modifier.Companion
+                .menuAnchor(MenuAnchorType.Companion.PrimaryNotEditable, enabled = true)
+                .fillMaxWidth(),
+            enabled = isFilterEnabled,
+            colors = ExposedDropdownMenuDefaults.textFieldColors()
+        )
+        ExposedDropdownMenu(
+            expanded = isNamespaceDropdownExpanded,
+            onDismissRequest = { onExpandedChange(false) }
+        ) {
+            allNamespaces.forEach { nsName ->
+                DropdownMenuItem(
+                    text = { Text(nsName) },
+                    onClick = {
+                        if (selectedNamespaceFilter != nsName) {
+                            onNamespaceSelected(nsName)
+                            onExpandedChange(false)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusBar(
+    connectionStatus: String,
+    isLoading: Boolean
+) {
+    Row(
+        modifier = Modifier.Companion.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.Companion.CenterVertically
+    ) {
+        Text(
+            text = connectionStatus,
+            modifier = Modifier.Companion.weight(1f),
+            style = MaterialTheme.typography.labelSmall
+        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.Companion.size(16.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    }
+}
 
 fun getHeadersForType(resourceType: String): List<String> {
     return when (resourceType) {
@@ -466,6 +555,208 @@ fun <T : HasMetadata> KubeTableRow(
                 overflow = TextOverflow.Ellipsis
             )
 
+        }
+    }
+}
+
+@Composable
+fun LogsView(
+    paramsForLogs: Triple<String, String, String>?,
+    activeClient: KubernetesClient?,
+    onClose: () -> Unit
+) {
+    if (paramsForLogs != null) {
+        LogViewerPanel(
+            namespace = paramsForLogs.first,
+            podName = paramsForLogs.second,
+            containerName = paramsForLogs.third,
+            client = activeClient,
+            onClose = onClose
+        )
+    } else {
+        Text(
+            "Loading logs...",
+            //modifier = Modifier.align(Alignment.Center)
+        )
+        LaunchedEffect(Unit) { onClose() }
+    }
+}
+
+@Composable
+fun DetailsView(
+    resource: HasMetadata?,
+    resourceType: String?,
+    onClose: () -> Unit,
+    onShowLogsRequest: (String, String, String) -> Unit
+) {
+    ResourceDetailPanel(
+        resource = resource,
+        resourceType = resourceType,
+        onClose = onClose,
+        onShowLogsRequest = onShowLogsRequest
+    )
+}
+
+@Composable
+fun TableView(
+    isLoading: Boolean,
+    connectionStatus: String,
+    errorMessage: String?,
+    resourceLoadError: String?,
+    activeClient: KubernetesClient?,
+    currentResourceType: String?,
+    selectedContext: String?,
+    resourceLists: Map<String, List<HasMetadata>>,
+    onResourceClick: (HasMetadata, String) -> Unit
+) {
+    val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
+
+    when {
+        isLoading -> LoadingView(connectionStatus)
+        currentErrorMessageForPanel != null -> ErrorView(currentErrorMessageForPanel)
+        activeClient != null && currentResourceType != null -> {
+            ResourceTableView(
+                currentResourceType = currentResourceType,
+                resourceLists = resourceLists,
+                onResourceClick = onResourceClick
+            )
+        }
+        activeClient != null -> DefaultConnectedView(selectedContext)
+        else -> DefaultDisconnectedView()
+    }
+}
+
+@Composable
+private fun ResourceTable(
+    headers: List<String>,
+    items: List<HasMetadata>,
+    resourceType: String,
+    onRowClick: (HasMetadata) -> Unit
+) {
+    Column(modifier = Modifier.Companion.fillMaxSize()) {
+        val columnWidths = calculateColumnWidths(
+            headers = headers,
+            items = items,
+            resourceType = resourceType
+        )
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.Companion.horizontalScroll(rememberScrollState())) {
+                Column {
+                    KubeTableHeaderRow(headers = headers, columnWidths = columnWidths)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                        items(items) { item ->
+                            KubeTableRow(
+                                item = item,
+                                headers = headers,
+                                resourceType = resourceType,
+                                columnWidths = columnWidths,
+                                onRowClick = onRowClick
+                            )
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingView(connectionStatus: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        //modifier = Modifier.align(Alignment.Center)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.Companion.height(20.dp))
+            Text(text = connectionStatus)
+        }
+    }
+}
+
+@Composable
+private fun ErrorView(errorMessage: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = errorMessage,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun DefaultConnectedView(selectedContext: String?) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            "Connected to $selectedContext.\nChoose a resource type.",
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun DefaultDisconnectedView() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Choose a context.",
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun ResourceTableView(
+    currentResourceType: String,
+    resourceLists: Map<String, List<HasMetadata>>,
+    onResourceClick: (HasMetadata, String) -> Unit
+) {
+    val itemsToShow = remember(currentResourceType, resourceLists) {
+        resourceLists[currentResourceType] ?: emptyList()
+    }
+
+    val headers = remember(currentResourceType) {
+        getHeadersForType(currentResourceType)
+    }
+
+    if (itemsToShow.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("No type resources '$currentResourceType'")
+        }
+    } else if (headers.isNotEmpty()) {
+        ResourceTable(
+            headers = headers,
+            items = itemsToShow,
+            resourceType = currentResourceType,
+            onRowClick = { clickedItem -> onResourceClick(clickedItem, currentResourceType) }
+        )
+    } else {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No columns for '$currentResourceType'")
         }
     }
 }

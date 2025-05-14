@@ -1,5 +1,4 @@
 import java.awt.*
-import java.awt.geom.*
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File

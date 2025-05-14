@@ -62,8 +62,8 @@ fun ResourceDetailPanel(
             verticalAlignment = Alignment.Companion.CenterVertically
         ) {
             Button(onClick = onClose) {
-                Icon(ICON_LEFT, contentDescription = "Back");
-                Spacer(Modifier.Companion.width(4.dp));
+                Icon(ICON_LEFT, contentDescription = "Back")
+                Spacer(Modifier.Companion.width(4.dp))
                 Text("Back")
             }
             Spacer(Modifier.Companion.weight(1f))
@@ -82,7 +82,7 @@ fun ResourceDetailPanel(
         // --- Уміст деталей ---
         Box(modifier = Modifier.Companion.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.Companion.padding(top = 8.dp)) {
-                // --- Виклик відповідного DetailsView ---
+                // --- Виклик відповідного .DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в .PodDetailsView
                     "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName ->

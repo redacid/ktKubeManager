@@ -10,20 +10,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+//import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import ua.`in`.ios.theme1.*
 import kotlin.system.exitProcess
 
-
-
 // Створюємо клас для пункту меню
-data class MenuItem(
-    val text: String,
-    val icon: ImageVector,
-    val onClick: () -> Unit
-)
+//data class MenuItem(
+//    val text: String,
+//    val icon: ImageVector,
+//    val onClick: () -> Unit
+//)
 
 fun exitApplication(windowState: WindowState, settingsManager: SettingsManager
 ) {
@@ -61,6 +59,7 @@ private fun saveApplicationState(windowState: WindowState, settingsManager: Sett
 
 private fun closeConnections() {
     try {
+        // TODO
         // Close any active kubernetes connections
         // For example:
         // kubernetesClient?.close()
@@ -70,6 +69,7 @@ private fun closeConnections() {
 }
 private fun cleanup() {
     try {
+        // TODO
         // Clean up any temporary files or resources
         // For example:
         // tempDir.deleteRecursively()
@@ -82,7 +82,6 @@ private fun cleanup() {
 @Preview
 fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 ) {
-    var showMenu by remember { mutableStateOf(false) }
     var showAddClusterDialog by remember { mutableStateOf(false) }
     var showAddProfileDialog by remember { mutableStateOf(false) }
     var showEditProfilesDialog by remember { mutableStateOf(false) }
@@ -121,7 +120,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
     MenuBar {
         Menu(
             text = "File",
-            onClick = { showMenu = !showMenu }
+            //onClick = { showMenu = !showMenu }
         ) {
             DropdownMenuItem(
                 text = { Text("Add AWS Profile") },
@@ -165,7 +164,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 
         Menu(
             text = "View",
-            onClick = { showMenu = !showMenu }
+            //onClick = { showMenu = !showMenu }
         ) {
 //            DropdownMenuItem(
 //                text = { Text("Refresh") },
@@ -228,7 +227,7 @@ fun MenuBar(content: @Composable () -> Unit) {
 @Composable
 fun Menu(
     text: String,
-    onClick: () -> Unit,
+    //onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
