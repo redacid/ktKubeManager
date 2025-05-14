@@ -412,7 +412,8 @@ fun getCellData(resource: Any, colIndex: Int, resourceType: String): String {
 
 @Composable
 fun KubeTableHeaderRow(
-    headers: List<String>, columnWidths: List<Int> // Add column widths parameter
+    headers: List<String>,
+    columnWidths: List<Int> // Add column widths parameter
 ) {
     Row(
         modifier = Modifier.Companion.background(MaterialTheme.colorScheme.surfaceVariant).fillMaxWidth()
@@ -435,7 +436,10 @@ fun KubeTableHeaderRow(
 
 @Composable
 fun <T : HasMetadata> KubeTableRow(
-    item: T, headers: List<String>, resourceType: String, columnWidths: List<Int>, // Add column widths parameter
+    item: T,
+    headers: List<String>,
+    resourceType: String,
+    columnWidths: List<Int>,
     onRowClick: (T) -> Unit
 ) {
     Row(

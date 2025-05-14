@@ -8,7 +8,7 @@ APP_NAME := kubemanager
 
 PRJ_REPO := git@github.com:redacid/ktKubeManager.git
 PRJ_REPO_HTTP := https://github.com/redacid/ktKubeManager.git
-RELEASE_VERSION ?= 1.0.3
+RELEASE_VERSION ?= 0.0.0
 CLOBBER := --clobber
 
 # colors

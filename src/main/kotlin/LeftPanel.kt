@@ -46,9 +46,12 @@ fun ResourceTreeNode(
     val isExpanded = expandedNodes[nodeId] ?: false
 
     Row(
-        modifier = Modifier.Companion.fillMaxWidth().padding(start = (level * 16).dp)
+        modifier = Modifier.Companion
+            .fillMaxWidth()
+            .padding(start = (level * 16).dp)
             .clickable { onNodeClick(nodeId, isLeaf) }
-            .padding(vertical = 4.dp), verticalAlignment = Alignment.Companion.CenterVertically) {
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Companion.CenterVertically) {
         val icon = when {
             !isLeaf && children?.isNotEmpty() == true -> if (isExpanded) ICON_DOWN else ICON_RIGHT
             !isLeaf -> ICON_NF

@@ -79,8 +79,8 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import ua.`in`.ios.theme1.*
 
+const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
 var recomposeScope: RecomposeScope? = null
-
 data class ClusterContext(
     val name: String,
     val source: String, // "kubeconfig" або "saved"
@@ -89,8 +89,7 @@ data class ClusterContext(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App(windowState: WindowState, settingsManager: SettingsManager
-) {
+fun App(windowState: WindowState, settingsManager: SettingsManager) {
     recomposeScope = currentRecomposeScope
     var contexts by remember { mutableStateOf<List<ClusterContext>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) } // Для помилок завантаження/підключення
@@ -311,7 +310,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             }
 
             contexts = (kubeConfigContexts + savedContexts)
-
             errorMessage = if (contexts.isEmpty()) "Contexts not found" else null
             connectionStatus = if (contexts.isEmpty()) "Contexts not found" else "Choose a context"
 
@@ -331,9 +329,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             val nsResult = loadNamespacesFabric8(activeClient) // Викликаємо завантаження
             nsResult.onSuccess { loadedNs ->
                 // Додаємо опцію "All" і сортуємо
-                allNamespaces =
-                    (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(compareBy { it != ALL_NAMESPACES_OPTION } // "<All>" завжди зверху
-                    )
+                allNamespaces = (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(compareBy { it != ALL_NAMESPACES_OPTION } )// "<All>" завжди зверху
                 connectionStatus = "Connected to: $selectedContext" // Повертаємо статус
                 logger.info("Loaded ${allNamespaces.size - 1} namespaces for filter.")
             }.onFailure {
@@ -348,7 +344,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             selectedNamespaceFilter = ALL_NAMESPACES_OPTION
         }
     }
-
     if (showErrorDialog.value) {
         ErrorDialog(
             showDialog = showErrorDialog.value,
@@ -356,7 +351,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
             onDismiss = { showErrorDialog.value = false }
         )
     }
-
+    //Спроба оновлювати дані на екрані, але оновлюється тільки formatAge
     LaunchedEffect(Unit) {
         while (true) {
             delay(5000) // затримка 5 секунд
@@ -425,7 +420,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                             detailedResourceType = null
                                                             showLogViewer.value = false
                                                             logViewerParams.value = null
-
                                                             val connectionResult = when {
                                                                 // Використовуємо різні методи підключення в залежності від джерела
                                                                 context.source == "saved" && context.config != null -> {
@@ -437,24 +431,19 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                                     connectWithRetries(context.name)
                                                                 }
                                                             }
-
                                                             isLoading = false
 
                                                             connectionResult.onSuccess { (newClient, serverVersion) ->
                                                                 activeClient = newClient
                                                                 selectedContext = context.name
-                                                                connectionStatus =
-                                                                    "Connected to: ${context.name} (v$serverVersion)"
+                                                                connectionStatus = "Connected to: ${context.name} (v$serverVersion)"
                                                                 errorMessage = null
                                                                 logger.info("UI State updated on Success for ${context.name}")
                                                             }.onFailure { error ->
-                                                                connectionStatus =
-                                                                    "Connection Error to '${context.name}'"
-                                                                errorMessage =
-                                                                    error.localizedMessage ?: "Unknown error"
+                                                                connectionStatus = "Connection Error to '${context.name}'"
+                                                                errorMessage = error.localizedMessage ?: "Unknown error"
                                                                 logger.info("Setting up error dialog for: ${context.name}. Error: ${error.message}")
-                                                                dialogErrorMessage.value =
-                                                                    "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
+                                                                dialogErrorMessage.value = "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
                                                                 showErrorDialog.value = true
                                                                 activeClient = null
                                                                 selectedContext = null
@@ -482,7 +471,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                     else MaterialTheme.colorScheme.onSurface
                                                 )
                                                 if (context.source == "saved") {
-
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
@@ -602,23 +590,18 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                         }
-
                                                         Spacer(modifier = Modifier.width(4.dp))
-
                                                         Text(
                                                             text = context.config?.region ?: "unknown region",
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
                                                     }
-
-
                                                 }
                                             }
                                         }
                                     }
                                 }
-
                             }
                         } // Кінець Box списку
                         Spacer(modifier = Modifier.Companion.height(16.dp)); Text(
@@ -647,7 +630,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                             selectedResourceType = nodeId
                                             resourceLoadError = null
                                             clearResourceLists()
-                                            connectionStatus = "Loading $nodeId..."; isLoading = true
+                                            connectionStatus = "Loading $nodeId...";
+                                            isLoading = true
                                             coroutineScope.launch {
                                                 val currentFilter =
                                                     selectedNamespaceFilter // We take the current filter value
@@ -670,7 +654,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                     } else {
                                         expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
                                     }
-                                })
+                                }
+                            )
                         }
                     } // Кінець лівої панелі
                     HorizontalDivider(
@@ -700,14 +685,17 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                         // Заголовок для таблиці та логів (для деталей він усередині .ResourceDetailPanel)
                         val headerTitle = when {
                             currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
-                            currentView == "table" && currentResourceType != null && activeClient != null && resourceLoadError == null && errorMessage == null -> "$currentResourceType у $selectedContext"
+                            currentView == "table" &&
+                                    currentResourceType != null &&
+                                    activeClient != null &&
+                                    resourceLoadError == null &&
+                                    errorMessage == null -> "$currentResourceType in $selectedContext"
                             else -> null
                         }
 
                         // --- ДОДАНО ФІЛЬТР НЕЙМСПЕЙСІВ (якщо є клієнт і це не деталі/логи) ---
                         if (currentView == "table" && activeClient != null) {
-                            val isFilterEnabled =
-                                NSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                            val isFilterEnabled = NSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
                             NamespaceFilter(
                                 selectedNamespaceFilter = selectedNamespaceFilter,
                                 isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
@@ -753,7 +741,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                         } else if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
                             Spacer(modifier = Modifier.Companion.height(48.dp)) // Висота імітує заголовок
                         }
-
                         // --- Основний уміст правої панелі ---
                         Box(
                             modifier = Modifier.Companion.weight(1f)
@@ -780,7 +767,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                         LaunchedEffect(Unit) { showLogViewer.value = false } // Скидаємо прапорець
                                     }
                                 }
-
                                 "details" -> {
                                     ResourceDetailPanel(
                                         resource = resourceToShowDetails,
@@ -794,7 +780,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                                             showLogViewer.value = true // Показуємо лог вьювер
                                         })
                                 }
-
                                 "table" -> {
                                     // --- Таблиця або Статус/Помилка ---
                                     val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
@@ -984,8 +969,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager
                     connectionStatus = connectionStatus,
                     isLoading = isLoading
                 )
-
-
             } // Кінець Column
         } // Кінець Surface M3
     }}
@@ -1004,7 +987,6 @@ fun AppTextStyle(
         content()
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
 @Composable
@@ -1074,5 +1056,5 @@ private fun StatusBar(
     }
 }
 
-const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
+
 

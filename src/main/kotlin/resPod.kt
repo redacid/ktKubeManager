@@ -764,7 +764,7 @@ fun LogViewerPanel(
         }
     }
 
-    // UI code
+
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),

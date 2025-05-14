@@ -62,9 +62,9 @@ fun ResourceDetailPanel(
             verticalAlignment = Alignment.Companion.CenterVertically
         ) {
             Button(onClick = onClose) {
-                Icon(ICON_LEFT, contentDescription = "Back"); Spacer(
-                Modifier.Companion.width(4.dp)
-            ); Text("Back")
+                Icon(ICON_LEFT, contentDescription = "Back");
+                Spacer(Modifier.Companion.width(4.dp));
+                Text("Back")
             }
             Spacer(Modifier.Companion.weight(1f))
             val name = if (resource is HasMetadata) resource.metadata?.name else "Details"
@@ -85,9 +85,7 @@ fun ResourceDetailPanel(
                 // --- Виклик відповідного DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в .PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(
-                        pod = resource,
-                        onShowLogsRequest = { containerName ->
+                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName ->
                             (resource as? HasMetadata)?.metadata?.let { meta ->
                                 onShowLogsRequest(
                                     meta.namespace,
@@ -96,7 +94,6 @@ fun ResourceDetailPanel(
                                 )
                             } ?: logger.error("Metadata is null for Pod.")
                         }) else Text("Invalid Pod data")
-
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -104,49 +101,22 @@ fun ResourceDetailPanel(
                     "Secrets" -> if (resource is Secret) SecretDetailsView(secret = resource) else Text("Invalid Secret data")
                     "ConfigMaps" -> if (resource is ConfigMap) ConfigMapDetailsView(cm = resource) else Text("Invalid ConfigMap data")
                     "PersistentVolumes" -> if (resource is PersistentVolume) PVDetailsView(pv = resource) else Text("Invalid PV data")
-                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text(
-                        "Invalid PVC data"
-                    )
-
+                    "PersistentVolumeClaims" -> if (resource is PersistentVolumeClaim) PVCDetailsView(pvc = resource) else Text("Invalid PVC data")
                     "Ingresses" -> if (resource is Ingress) IngressDetailsView(ing = resource) else Text("Invalid Ingress data")
                     "Endpoints" -> if (resource is Endpoints) EndpointsDetailsView(endpoint = resource) else Text("Invalid Endpoint data")
                     "StatefulSets" -> if (resource is StatefulSet) StatefulSetDetailsView(sts = resource) else Text("Invalid StatefulSet data")
                     "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
-                    "Jobs" -> if (resource is Job) JobDetailsView(job = resource) else Text(
-                        "Invalid Job data"
-                    )
-
+                    "Jobs" -> if (resource is Job) JobDetailsView(job = resource) else Text("Invalid Job data")
                     "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text(
-                        "Invalid ReplicaSet data"
-                    )
-
-                    "NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(networkPolicy = resource) else Text(
-                        "Invalid NetworkPolicy data"
-                    )
-
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
+                    "NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(networkPolicy = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
-                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text(
-                        "Invalid RoleBinding data"
-                    )
-
-                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text(
-                        "Invalid ClusterRole data"
-                    )
-
-                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(
-                        clusterRoleBinding = resource
-                    ) else Text("Invalid ClusterRoleBinding data")
-
-                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text(
-                        "Invalid ServiceAccount data"
-                    )
-
+                    "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
+                    "ClusterRoles" -> if (resource is ClusterRole) ClusterRoleDetailsView(clusterRole = resource) else Text("Invalid ClusterRole data")
+                    "ClusterRoleBindings" -> if (resource is ClusterRoleBinding) ClusterRoleBindingDetailsView(clusterRoleBinding = resource) else Text("Invalid ClusterRoleBinding data")
+                    "ServiceAccounts" -> if (resource is ServiceAccount) ServiceAccountDetailsView(serviceAccount = resource) else Text("Invalid ServiceAccount data")
                     "Events" -> if (resource is Event) EventDetailsView(event = resource) else Text("Invalid Event data")
-                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text(
-                        "Invalid StorageClass data"
-                    )
-
+                    "StorageClasses" -> if (resource is StorageClass) StorageClassDetailsView(storageClass = resource) else Text("Invalid StorageClass data")
                     "CRDs" -> if (resource is CustomResourceDefinition) CrdDetailsView(crd = resource) else Text("Invalid CRD data")
 
                     // TODO: Додати кейси для всіх інших типів ресурсів (NetworkPolicies, Events, CustomResourceDefinitions, etc.)
@@ -170,7 +140,6 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
     DetailRow("Namespace", resource.metadata?.namespace) // Буде null для кластерних ресурсів
     DetailRow("Created", formatAge(resource.metadata?.creationTimestamp))
     DetailRow("UID", resource.metadata?.uid)
-    // Можна додати Labels / Annotations за бажанням
     DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
     DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
 }
