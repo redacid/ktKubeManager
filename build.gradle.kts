@@ -26,7 +26,7 @@ fun getGitHash(): String {
 }
 
 val buildNumber = getGitHash()
-version = "1.0.3"
+version = env.RELEASE_VERSION.value ?: "0.0.0"
 val buildVersion = "$version-$buildNumber"
 group = "ua.in.ios.kubemanager"
 
