@@ -233,5 +233,5 @@ val resourceLeafNodes: Set<String> = setOf(
 )
 
 val NSResources: Set<String> =
-    resourceLeafNodes - setOf("Nodes", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
+    resourceLeafNodes - setOf("Nodes", "Events", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
 val logger = LoggerFactory.getLogger("KKM")!!

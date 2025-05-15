@@ -964,7 +964,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                     "details" -> {
                                         LaunchedEffect(resourceToShowDetails, typeForDetails) {
                                             while (true) {
-                                                logger.info("Reloading details for $resourceToShowDetails $typeForDetails...")
+                                                logger.info("Reloading details for $typeForDetails...")
                                                 if (resourceToShowDetails != null && typeForDetails != null) {
                                                     val metadata = (resourceToShowDetails as? HasMetadata)?.metadata
                                                     if (metadata != null) {
