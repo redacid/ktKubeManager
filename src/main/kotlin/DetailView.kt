@@ -46,12 +46,15 @@ import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 
+
+
+
 @Composable
 fun ResourceDetailPanel(
     resource: Any?,
     resourceType: String?,
     onClose: () -> Unit,
-    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit // Додано callback
+    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit
 ) {
     if (resource == null || resourceType == null) return
 

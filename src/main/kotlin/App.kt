@@ -68,11 +68,14 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.time.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import ua.`in`.ios.theme1.*
+import java.time.Duration
 
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
+val AUTOREFRESH_DELAY: Duration = Duration.ofSeconds(2)
 var recomposeScope: RecomposeScope? = null
 data class ClusterContext(
     val name: String,
@@ -150,6 +153,139 @@ private fun createResourceListsMap(
     )
 }
 var activeClient by mutableStateOf<KubernetesClient?>(null)
+
+suspend fun fetchResourceDetails(
+    client: KubernetesClient?,
+    resourceType: String,
+    metadata: io.fabric8.kubernetes.api.model.ObjectMeta
+): Result<HasMetadata> {
+    if (client == null) return Result.failure(IllegalStateException("Kubernetes client is not initialized"))
+
+    return try {
+        val resource = withContext(Dispatchers.IO) {
+            when (resourceType) {
+                "Pods" -> client.pods()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Nodes" -> client.nodes()
+                    .withName(metadata.name)
+                    .get()
+                "Deployments" -> client.apps()
+                    .deployments()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Services" -> client.services()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ConfigMaps" -> client.configMaps()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Secrets" -> client.secrets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "PersistentVolumes" -> client.persistentVolumes()
+                    .withName(metadata.name)
+                    .get()
+                "PersistentVolumeClaims" -> client.persistentVolumeClaims()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "StatefulSets" -> client.apps()
+                    .statefulSets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "DaemonSets" -> client.apps()
+                    .daemonSets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ReplicaSets" -> client.apps()
+                    .replicaSets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Ingresses" -> client.network()
+                    .v1()
+                    .ingresses()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "NetworkPolicies" -> client.network()
+                    .networkPolicies()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Jobs" -> client.batch()
+                    .v1()
+                    .jobs()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "CronJobs" -> client.batch()
+                    .v1()
+                    .cronjobs()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ServiceAccounts" -> client.serviceAccounts()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Roles" -> client.rbac()
+                    .roles()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "RoleBindings" -> client.rbac()
+                    .roleBindings()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ClusterRoles" -> client.rbac()
+                    .clusterRoles()
+                    .withName(metadata.name)
+                    .get()
+                "ClusterRoleBindings" -> client.rbac()
+                    .clusterRoleBindings()
+                    .withName(metadata.name)
+                    .get()
+                "Events" -> client.v1()
+                    .events()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "StorageClasses" -> client.storage()
+                    .v1()
+                    .storageClasses()
+                    .withName(metadata.name)
+                    .get()
+                "CRDs" -> client.apiextensions()
+                    .v1()
+                    .customResourceDefinitions()
+                    .withName(metadata.name)
+                    .get()
+                else -> null
+            }
+        }
+
+        if (resource != null) {
+            Result.success(resource)
+        } else {
+            Result.failure(IllegalArgumentException("Unsupported resource type: $resourceType"))
+        }
+    } catch (e: Exception) {
+        logger.error("Error fetching resource details for $resourceType/${metadata.name}: ${e.message}")
+        Result.failure(e)
+    }
+}
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager) {
@@ -198,6 +334,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
+
+
 
     suspend fun handleResourceLoad(
         nodeId: String,
@@ -417,7 +555,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     //Спроба оновлювати дані на екрані, але оновлюється тільки formatAge
     LaunchedEffect(Unit) {
         while (true) {
-            delay(5000) // затримка 5 секунд
+            delay(AUTOREFRESH_DELAY) // затримка 5 секунд
             recomposeScope?.invalidate()
         }
     }
@@ -491,7 +629,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                                         logger.info("Connecting to saved cluster: ${context.name}")
                                                                         connectToSavedCluster(context.config)
                                                                     }
-
                                                                     else -> {
                                                                         logger.info("Connecting to kubeconfig context: ${context.name}")
                                                                         connectWithRetries(context.name)
@@ -502,18 +639,14 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                                 connectionResult.onSuccess { (newClient, serverVersion) ->
                                                                     activeClient = newClient
                                                                     selectedContext = context.name
-                                                                    connectionStatus =
-                                                                        "Connected to: ${context.name} (v$serverVersion)"
+                                                                    connectionStatus = "Connected to: ${context.name} (v$serverVersion)"
                                                                     errorMessage = null
                                                                     logger.info("UI State updated on Success for ${context.name}")
                                                                 }.onFailure { error ->
-                                                                    connectionStatus =
-                                                                        "Connection Error to '${context.name}'"
-                                                                    errorMessage =
-                                                                        error.localizedMessage ?: "Unknown error"
+                                                                    connectionStatus = "Connection Error to '${context.name}'"
+                                                                    errorMessage = error.localizedMessage ?: "Unknown error"
                                                                     logger.info("Setting up error dialog for: ${context.name}. Error: ${error.message}")
-                                                                    dialogErrorMessage.value =
-                                                                        "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
+                                                                    dialogErrorMessage.value = "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
                                                                     showErrorDialog.value = true
                                                                     activeClient = null
                                                                     selectedContext = null
@@ -544,7 +677,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically
                                                         ) {
-                                                            TooltipBox(
+                                                            TooltipBox( // Підказка при наведенні на збережений контекст
                                                                 positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                                                                 tooltip = {
                                                                     Surface(
@@ -710,8 +843,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                     {
                                                        loadOk, errorMsg ->
                                                         if (loadOk) {
-                                                            connectionStatus =
-                                                                "Loaded $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                            connectionStatus = "Loaded $nodeId ${if (namespaceToUse != null && 
+                                                                namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
                                                         } else {
                                                             resourceLoadError = "Error $nodeId: $errorMsg"
                                                             connectionStatus = "Error $nodeId"
@@ -720,8 +853,9 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                     }
                                                 }
                                             } else if (activeClient == null) {
-                                                logger.warn("No connection."); connectionStatus =
-                                                    "Connect to the cluster,pls!"; selectedResourceType = null
+                                                logger.warn("No connection.")
+                                                connectionStatus = "Connect to the cluster,pls!"
+                                                selectedResourceType = null
                                             }
                                         } else {
                                             expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
@@ -811,7 +945,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                     modifier = Modifier.Companion.padding(bottom = 8.dp)
                                 )
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            } else if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
+                            } else
+                                if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
                                 Spacer(modifier = Modifier.Companion.height(48.dp)) // Висота імітує заголовок
                             }
                             // --- Right panel ---
@@ -825,59 +960,114 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                         activeClient = activeClient,
                                         onClose = { showLogViewer.value = false; logViewerParams.value = null }
                                     )
-                                    "details" -> DetailsView(
-                                        resource = resourceToShowDetails as HasMetadata?,
-                                        resourceType = typeForDetails,
-                                        onClose = { detailedResource = null; detailedResourceType = null },
-                                        onShowLogsRequest = { ns, pod, container ->
-                                            logViewerParams.value = Triple(ns, pod, container)
-                                            detailedResource = null
-                                            detailedResourceType = null
-                                            showLogViewer.value = true
+
+                                    "details" -> {
+                                        LaunchedEffect(resourceToShowDetails, typeForDetails) {
+                                            while (true) {
+                                                logger.info("Reloading details for $resourceToShowDetails $typeForDetails...")
+                                                if (resourceToShowDetails != null && typeForDetails != null) {
+                                                    val metadata = (resourceToShowDetails as? HasMetadata)?.metadata
+                                                    if (metadata != null) {
+                                                        // Оновлюємо загальний список
+                                                        handleResourceLoad(
+                                                            typeForDetails,
+                                                            metadata.namespace
+                                                        ) { loadOk, errorMsg ->
+                                                            if (!loadOk) {
+                                                                resourceLoadError = "Update error $typeForDetails: $errorMsg"
+                                                            }
+                                                        }
+
+                                                        // Оновлюємо деталі ресурсу
+                                                        fetchResourceDetails(activeClient, typeForDetails, metadata).fold(
+                                                            onSuccess = { updatedResource ->
+                                                                detailedResource = updatedResource
+                                                            },
+                                                            onFailure = { error ->
+                                                                logger.error("Failed to update resource details: ${error.message}")
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                                delay(AUTOREFRESH_DELAY)
+                                            }
                                         }
-                                    )
-                                    "table" -> TableView(
-                                        isLoading = isLoading,
-                                        connectionStatus = connectionStatus,
-                                        errorMessage = errorMessage,
-                                        resourceLoadError = resourceLoadError,
-                                        activeClient = activeClient,
-                                        currentResourceType = currentResourceType,
-                                        selectedContext = selectedContext,
-                                        resourceLists = createResourceListsMap(
-                                            namespacesList = namespacesList,
-                                            nodesList = nodesList,
-                                            eventsList = eventsList,
-                                            podsList = podsList,
-                                            deploymentsList = deploymentsList,
-                                            statefulSetsList = statefulSetsList,
-                                            daemonSetsList = daemonSetsList,
-                                            replicaSetsList = replicaSetsList,
-                                            jobsList = jobsList,
-                                            cronJobsList = cronJobsList,
-                                            servicesList = servicesList,
-                                            ingressesList = ingressesList,
-                                            endpointsList = endpointsList,
-                                            networkPoliciesList = networkPoliciesList,
-                                            pvsList = pvsList,
-                                            pvcsList = pvcsList,
-                                            storageClassesList = storageClassesList,
-                                            configMapsList = configMapsList,
-                                            secretsList = secretsList,
-                                            serviceAccountsList = serviceAccountsList,
-                                            rolesList = rolesList,
-                                            roleBindingsList = roleBindingsList,
-                                            clusterRolesList = clusterRolesList,
-                                            clusterRoleBindingsList = clusterRoleBindingsList,
-                                            crdsList = crdsList
-                                        ),
-                                        onResourceClick = { clickedItem, resourceType ->
-                                            detailedResource = clickedItem
-                                            detailedResourceType = resourceType
-                                            showLogViewer.value = false
-                                            logViewerParams.value = null
+
+                                        DetailsView(
+                                            resource = resourceToShowDetails as HasMetadata?,
+                                            resourceType = typeForDetails,
+                                            onClose = { detailedResource = null; detailedResourceType = null },
+                                            onShowLogsRequest = { ns, pod, container ->
+                                                logViewerParams.value = Triple(ns, pod, container)
+                                                detailedResource = null
+                                                detailedResourceType = null
+                                                showLogViewer.value = true
+                                            }
+                                        )
+                                    }
+
+                                    "table" -> {
+                                        // Autorefresh
+                                        LaunchedEffect(currentResourceType, selectedNamespaceFilter) {
+                                            while (true) {
+                                                if (activeClient != null && currentResourceType != null) {
+                                                    val namespaceToUse = if (NSResources.contains(currentResourceType)) selectedNamespaceFilter else null
+                                                    handleResourceLoad(currentResourceType, namespaceToUse) { loadOk, errorMsg ->
+                                                        if (loadOk) {
+                                                            connectionStatus = "Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                        } else {
+                                                            resourceLoadError = "Error $currentResourceType: $errorMsg"
+                                                            connectionStatus = "Error $currentResourceType"
+                                                        }
+                                                    }
+                                                }
+                                                delay(AUTOREFRESH_DELAY)
+                                            }
                                         }
-                                    )
+                                        // END Autorefresh
+                                        TableView(
+                                            isLoading = isLoading,
+                                            connectionStatus = connectionStatus,
+                                            errorMessage = errorMessage,
+                                            resourceLoadError = resourceLoadError,
+                                            activeClient = activeClient,
+                                            currentResourceType = currentResourceType,
+                                            selectedContext = selectedContext,
+                                            resourceLists = createResourceListsMap(
+                                                namespacesList = namespacesList,
+                                                nodesList = nodesList,
+                                                eventsList = eventsList,
+                                                podsList = podsList,
+                                                deploymentsList = deploymentsList,
+                                                statefulSetsList = statefulSetsList,
+                                                daemonSetsList = daemonSetsList,
+                                                replicaSetsList = replicaSetsList,
+                                                jobsList = jobsList,
+                                                cronJobsList = cronJobsList,
+                                                servicesList = servicesList,
+                                                ingressesList = ingressesList,
+                                                endpointsList = endpointsList,
+                                                networkPoliciesList = networkPoliciesList,
+                                                pvsList = pvsList,
+                                                pvcsList = pvcsList,
+                                                storageClassesList = storageClassesList,
+                                                configMapsList = configMapsList,
+                                                secretsList = secretsList,
+                                                serviceAccountsList = serviceAccountsList,
+                                                rolesList = rolesList,
+                                                roleBindingsList = roleBindingsList,
+                                                clusterRolesList = clusterRolesList,
+                                                clusterRoleBindingsList = clusterRoleBindingsList,
+                                                crdsList = crdsList
+                                            ),
+                                            onResourceClick = { clickedItem, resourceType ->
+                                                detailedResource = clickedItem
+                                                detailedResourceType = resourceType
+                                                showLogViewer.value = false
+                                                logViewerParams.value = null
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         } // End right panel
