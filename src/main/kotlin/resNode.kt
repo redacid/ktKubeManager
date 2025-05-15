@@ -394,7 +394,7 @@ fun NodeDetailsView(node: Node) {
 
         if (showConditions.value) {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 300.dp)
+                modifier = Modifier.heightIn(max = 3300.dp)
             ) {
                 items(node.status?.conditions ?: emptyList()) { condition ->
                     val statusColor = when (condition.status) {
@@ -516,7 +516,7 @@ fun NodeDetailsView(node: Node) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(modifier = Modifier.heightIn(max = 400.dp).padding(12.dp)) {
+                    Column(modifier = Modifier.heightIn(max = 3400.dp).padding(12.dp)) {
                         Text(
                             text = "Images cached on this node:",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
