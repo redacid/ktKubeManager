@@ -171,6 +171,9 @@ suspend fun fetchResourceDetails(
                 "Nodes" -> client.nodes()
                     .withName(metadata.name)
                     .get()
+                "Namespaces" -> client.namespaces()
+                    .withName(metadata.name)
+                    .get()
                 "Deployments" -> client.apps()
                     .deployments()
                     .inNamespace(metadata.namespace)
@@ -811,9 +814,11 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                     }
                                 }
                             } // End contexts list
-                            Spacer(modifier = Modifier.Companion.height(16.dp)); Text(
+                            Spacer(modifier = Modifier.Companion.height(16.dp));
+                            Text(
                             "Cluster Resources:", style = MaterialTheme.typography.titleMedium
-                        ); Spacer(modifier = Modifier.Companion.height(8.dp))
+                        );
+                            Spacer(modifier = Modifier.Companion.height(8.dp))
                             Box(
                                 modifier = Modifier.Companion.weight(2f)
                                     .border(
@@ -830,6 +835,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                     onNodeClick = { nodeId, isLeaf ->
                                         logger.info("Click on a TreeNode: $nodeId, It's a leaflet: $isLeaf")
                                         if (isLeaf) {
+                                            coroutineScope.launch {
                                             selectedResource = nodeId
                                             if (activeClient != null && !isLoading) {
                                                 // Скидаємо показ деталей/логів при виборі нового типу ресурсу
@@ -843,14 +849,18 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                 connectionStatus = "Loading $nodeId..."
                                                 isLoading = true
                                                 coroutineScope.launch {
-                                                    val currentFilter = selectedNamespaceFilter // We take the current filter value
-                                                    val namespaceToUse = if (NSResources.contains(nodeId)) currentFilter else null
+                                                    val currentFilter =
+                                                        selectedNamespaceFilter // We take the current filter value
+                                                    val namespaceToUse =
+                                                        if (NSResources.contains(nodeId)) currentFilter else null
                                                     handleResourceLoad(nodeId, namespaceToUse)
-                                                    {
-                                                       loadOk, errorMsg ->
+                                                    { loadOk, errorMsg ->
                                                         if (loadOk) {
-                                                            connectionStatus = "Loaded $nodeId ${if (namespaceToUse != null && 
-                                                                namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                            connectionStatus = "Loaded $nodeId ${
+                                                                if (namespaceToUse != null &&
+                                                                    namespaceToUse != ALL_NAMESPACES_OPTION
+                                                                ) " (ns: $namespaceToUse)" else ""
+                                                            }"
                                                         } else {
                                                             resourceLoadError = "Error $nodeId: $errorMsg"
                                                             connectionStatus = "Error $nodeId"
@@ -863,6 +873,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                 connectionStatus = "Connect to the cluster,pls!"
                                                 selectedResourceType = null
                                             }
+                                        }
                                         } else {
                                             expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
                                         }
