@@ -30,6 +30,48 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
+val resourceTreeData: Map<String, List<String>> = mapOf(
+    "" to listOf("Cluster", "Workloads", "Network", "Storage", "Configuration", "Access Control", "CustomResources"),
+    "Cluster" to listOf("Namespaces", "Nodes", "Events"),
+    "Workloads" to listOf("Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs"),
+    "Network" to listOf("Services", "Ingresses", "Endpoints", "NetworkPolicies"),
+    "Storage" to listOf("PersistentVolumes", "PersistentVolumeClaims", "StorageClasses"),
+    "Configuration" to listOf("ConfigMaps", "Secrets"),
+    "Access Control" to listOf("ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"),
+    "CustomResources" to listOf("CRDs")
+)
+val resourceLeafNodes: Set<String> = setOf(
+    "Namespaces",
+    "Nodes",
+    "Events",
+    "Pods",
+    "Deployments",
+    "StatefulSets",
+    "DaemonSets",
+    "ReplicaSets",
+    "Jobs",
+    "CronJobs",
+    "Services",
+    "Ingresses",
+    "Endpoints",
+    "NetworkPolicies",
+    "PersistentVolumes",
+    "PersistentVolumeClaims",
+    "StorageClasses",
+    "ConfigMaps",
+    "Secrets",
+    "ServiceAccounts",
+    "Roles",
+    "RoleBindings",
+    "ClusterRoles",
+    "ClusterRoleBindings",
+    "CRDs"
+)
+
+val NSResources: Set<String> =
+    resourceLeafNodes - setOf("Nodes", "Namespaces", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
+val logger = LoggerFactory.getLogger("KKM")!!
+
 @Composable
 fun ErrorDialog(
     showDialog: Boolean,
@@ -194,44 +236,3 @@ suspend fun <T> fetchK8sResource(
     }
 }
 
-val resourceTreeData: Map<String, List<String>> = mapOf(
-    "" to listOf("Cluster", "Workloads", "Network", "Storage", "Configuration", "Access Control", "CustomResources"),
-    "Cluster" to listOf("Namespaces", "Nodes", "Events"),
-    "Workloads" to listOf("Pods", "Deployments", "StatefulSets", "DaemonSets", "ReplicaSets", "Jobs", "CronJobs"),
-    "Network" to listOf("Services", "Ingresses", "Endpoints", "NetworkPolicies"),
-    "Storage" to listOf("PersistentVolumes", "PersistentVolumeClaims", "StorageClasses"),
-    "Configuration" to listOf("ConfigMaps", "Secrets"),
-    "Access Control" to listOf("ServiceAccounts", "Roles", "RoleBindings", "ClusterRoles", "ClusterRoleBindings"),
-    "CustomResources" to listOf("CRDs")
-)
-val resourceLeafNodes: Set<String> = setOf(
-    "Namespaces",
-    "Nodes",
-    "Events",
-    "Pods",
-    "Deployments",
-    "StatefulSets",
-    "DaemonSets",
-    "ReplicaSets",
-    "Jobs",
-    "CronJobs",
-    "Services",
-    "Ingresses",
-    "Endpoints",
-    "NetworkPolicies",
-    "PersistentVolumes",
-    "PersistentVolumeClaims",
-    "StorageClasses",
-    "ConfigMaps",
-    "Secrets",
-    "ServiceAccounts",
-    "Roles",
-    "RoleBindings",
-    "ClusterRoles",
-    "ClusterRoleBindings",
-    "CRDs"
-)
-
-val NSResources: Set<String> =
-    resourceLeafNodes - setOf("Nodes", "Namespaces", "Events", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
-val logger = LoggerFactory.getLogger("KKM")!!

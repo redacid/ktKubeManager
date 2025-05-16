@@ -544,6 +544,12 @@ fun <T : HasMetadata> KubeTableRow(
                     .width(width.dp)
                     .background(
                         when (getCellData(item, colIndex, resourceType)) {
+                            "Running" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f,red = 0/255.0f ,green = 255/255.0f ,blue = 0/255.0f)
+                            "Ready" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f,red = 0/255.0f ,green = 255/255.0f ,blue = 0/255.0f)
+                            "Normal" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f,red = 0/255.0f ,green = 255/255.0f ,blue = 0/255.0f)
+                            "Succeeded" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f,red = 0/255.0f ,green = 255/255.0f ,blue = 0/255.0f)
+                            "Bound" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f,red = 0/255.0f ,green = 255/255.0f ,blue = 0/255.0f)
+                            "Pending" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f,red = 125/255.0f ,green = 125/255.0f ,blue = 0/255.0f)
                             "Warning" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f,red = 255/255.0f ,green = 0/255.0f ,blue = 0/255.0f)
                             "Error" -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f,red = 255/255.0f ,green = 0/255.0f ,blue = 0/255.0f)
                             else -> MaterialTheme.colorScheme.surface

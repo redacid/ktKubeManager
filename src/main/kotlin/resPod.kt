@@ -140,6 +140,10 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         DetailRow("Created", formatAge(pod.metadata?.creationTimestamp))
         DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
         DetailRow("QoS Class", pod.status?.qosClass)
+        pod.metadata?.ownerReferences?.forEach { owner ->
+            DetailRow("Controlled By", "${owner.kind}/${owner.name}")
+        }
+
 
         // Special card for readiness/status information
         val phase = pod.status?.phase
@@ -161,11 +165,11 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                     Row(verticalAlignment = Alignment.Companion.CenterVertically) {
                         Icon(
                             imageVector = when (phase.lowercase()) {
-                                "running" -> FeatherIcons.Check
-                                "pending" -> FeatherIcons.Clock
-                                "succeeded" -> FeatherIcons.CheckCircle
-                                "failed" -> FeatherIcons.AlertCircle
-                                else -> FeatherIcons.HelpCircle
+                                "running" -> ICON_RUN
+                                "pending" -> ICON_CLOCK
+                                "succeeded" -> ICON_CHECK
+                                "failed" -> ICON_WARNING
+                                else -> ICON_HELP
                             },
                             contentDescription = "Status",
                             tint = when (phase.lowercase()) {
@@ -571,7 +575,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
     }
 }
 
-// === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА (M3) ===
+// === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА ===
 @Composable
 fun ContainerSelectionDialog(
     containers: List<String>, onDismiss: () -> Unit, onContainerSelected: (String) -> Unit
