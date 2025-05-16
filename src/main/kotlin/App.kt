@@ -334,8 +334,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
-
-
+    var selectedResource by remember { mutableStateOf<String?>(null) }
 
     suspend fun handleResourceLoad(
         nodeId: String,
@@ -623,6 +622,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                                 detailedResourceType = null
                                                                 showLogViewer.value = false
                                                                 logViewerParams.value = null
+                                                                selectedResource = null
                                                                 val connectionResult = when {
                                                                     // Використовуємо різні методи підключення в залежності від джерела
                                                                     context.source == "saved" && context.config != null -> {
@@ -809,7 +809,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                             } // End contexts list
                             Spacer(modifier = Modifier.Companion.height(16.dp)); Text(
                             "Cluster Resources:", style = MaterialTheme.typography.titleMedium
-                        ); Spacer(modifier = Modifier.Companion.height(8.dp)) // M3 Text
+                        ); Spacer(modifier = Modifier.Companion.height(8.dp))
                             Box(
                                 modifier = Modifier.Companion.weight(2f)
                                     .border(
@@ -822,9 +822,11 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                 ResourceTreeView(
                                     rootIds = resourceTreeData[""] ?: emptyList(),
                                     expandedNodes = expandedNodes,
+                                    selectedResource = selectedResource,
                                     onNodeClick = { nodeId, isLeaf ->
                                         logger.info("Click on a TreeNode: $nodeId, It's a leaflet: $isLeaf")
                                         if (isLeaf) {
+                                            selectedResource = nodeId
                                             if (activeClient != null && !isLoading) {
                                                 // Скидаємо показ деталей/логів при виборі нового типу ресурсу
                                                 detailedResource = null
