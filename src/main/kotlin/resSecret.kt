@@ -306,9 +306,9 @@ fun SecretDetailsView(secret: Secret) {
                         Text(
                             text = "$key:",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            modifier = Modifier.width(150.dp)
+                            //modifier = Modifier.width(450.dp)
                         )
-
+                        Spacer(modifier = Modifier.Companion.width(4.dp))
                         // Value (encoded or decoded)
                         // Значення (закодоване або декодоване)
                         Text(
