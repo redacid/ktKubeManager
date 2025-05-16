@@ -14,6 +14,7 @@ https://m2.material.io/components/data-tables#anatomy
 
 https://feathericons.com/
 https://simpleicons.org/
+https://composeicons.com/
 
 https://github.com/aleksandar-stefanovic/compose-material-data-table
 
