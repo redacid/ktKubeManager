@@ -1,6 +1,5 @@
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,22 +15,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
@@ -75,17 +68,230 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.time.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import ua.`in`.ios.theme1.*
+import java.time.Duration
 
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
+val AUTOREFRESH_DELAY: Duration = Duration.ofSeconds(2)
 var recomposeScope: RecomposeScope? = null
 data class ClusterContext(
     val name: String,
     val source: String, // "kubeconfig" або "saved"
     val config: ClusterConfig? = null
 )
+
+@Composable
+private fun AppTextStyle(
+    style: TextStyle = MaterialTheme.typography.labelMedium,
+    content: @Composable () -> Unit
+) {
+    CompositionLocalProvider(
+        LocalContentColor provides MaterialTheme.colorScheme.onSurface,
+        LocalTextStyle provides style
+    )
+    {
+        content()
+    }
+}
+
+private fun createResourceListsMap(
+    namespacesList: List<Namespace>,
+    nodesList: List<Node>,
+    eventsList: List<Event>,
+    podsList: List<Pod>,
+    deploymentsList: List<Deployment>,
+    statefulSetsList: List<StatefulSet>,
+    daemonSetsList: List<DaemonSet>,
+    replicaSetsList: List<ReplicaSet>,
+    jobsList: List<Job>,
+    cronJobsList: List<CronJob>,
+    servicesList: List<Service>,
+    ingressesList: List<Ingress>,
+    endpointsList: List<Endpoints>,
+    networkPoliciesList: List<NetworkPolicy>,
+    pvsList: List<PersistentVolume>,
+    pvcsList: List<PersistentVolumeClaim>,
+    storageClassesList: List<StorageClass>,
+    configMapsList: List<ConfigMap>,
+    secretsList: List<Secret>,
+    serviceAccountsList: List<ServiceAccount>,
+    rolesList: List<Role>,
+    roleBindingsList: List<RoleBinding>,
+    clusterRolesList: List<ClusterRole>,
+    clusterRoleBindingsList: List<ClusterRoleBinding>,
+    crdsList: List<CustomResourceDefinition>
+): Map<String, List<HasMetadata>> {
+    return mapOf(
+        "Namespaces" to namespacesList,
+        "Nodes" to nodesList,
+        "Events" to eventsList,
+        "Pods" to podsList,
+        "Deployments" to deploymentsList,
+        "StatefulSets" to statefulSetsList,
+        "DaemonSets" to daemonSetsList,
+        "ReplicaSets" to replicaSetsList,
+        "Jobs" to jobsList,
+        "CronJobs" to cronJobsList,
+        "Services" to servicesList,
+        "Ingresses" to ingressesList,
+        "Endpoints" to endpointsList,
+        "NetworkPolicies" to networkPoliciesList,
+        "PersistentVolumes" to pvsList,
+        "PersistentVolumeClaims" to pvcsList,
+        "StorageClasses" to storageClassesList,
+        "ConfigMaps" to configMapsList,
+        "Secrets" to secretsList,
+        "ServiceAccounts" to serviceAccountsList,
+        "Roles" to rolesList,
+        "RoleBindings" to roleBindingsList,
+        "ClusterRoles" to clusterRolesList,
+        "ClusterRoleBindings" to clusterRoleBindingsList,
+        "CRDs" to crdsList
+    )
+}
+var activeClient by mutableStateOf<KubernetesClient?>(null)
+
+suspend fun fetchResourceDetails(
+    client: KubernetesClient?,
+    resourceType: String,
+    metadata: io.fabric8.kubernetes.api.model.ObjectMeta
+): Result<HasMetadata> {
+    if (client == null) return Result.failure(IllegalStateException("Kubernetes client is not initialized"))
+
+    return try {
+        val resource = withContext(Dispatchers.IO) {
+            when (resourceType) {
+                "Pods" -> client.pods()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Nodes" -> client.nodes()
+                    .withName(metadata.name)
+                    .get()
+                "Namespaces" -> client.namespaces()
+                    .withName(metadata.name)
+                    .get()
+                "Deployments" -> client.apps()
+                    .deployments()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Services" -> client.services()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ConfigMaps" -> client.configMaps()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Secrets" -> client.secrets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "PersistentVolumes" -> client.persistentVolumes()
+                    .withName(metadata.name)
+                    .get()
+                "PersistentVolumeClaims" -> client.persistentVolumeClaims()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "StatefulSets" -> client.apps()
+                    .statefulSets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "DaemonSets" -> client.apps()
+                    .daemonSets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ReplicaSets" -> client.apps()
+                    .replicaSets()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Ingresses" -> client.network()
+                    .v1()
+                    .ingresses()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "NetworkPolicies" -> client.network()
+                    .networkPolicies()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Endpoints" -> client.endpoints()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Jobs" -> client.batch()
+                    .v1()
+                    .jobs()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "CronJobs" -> client.batch()
+                    .v1()
+                    .cronjobs()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ServiceAccounts" -> client.serviceAccounts()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "Roles" -> client.rbac()
+                    .roles()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "RoleBindings" -> client.rbac()
+                    .roleBindings()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "ClusterRoles" -> client.rbac()
+                    .clusterRoles()
+                    .withName(metadata.name)
+                    .get()
+                "ClusterRoleBindings" -> client.rbac()
+                    .clusterRoleBindings()
+                    .withName(metadata.name)
+                    .get()
+                "Events" -> client.v1()
+                    .events()
+                    .inNamespace(metadata.namespace)
+                    .withName(metadata.name)
+                    .get()
+                "StorageClasses" -> client.storage()
+                    .v1()
+                    .storageClasses()
+                    .withName(metadata.name)
+                    .get()
+                "CRDs" -> client.apiextensions()
+                    .v1()
+                    .customResourceDefinitions()
+                    .withName(metadata.name)
+                    .get()
+                else -> null
+            }
+        }
+
+        if (resource != null) {
+            Result.success(resource)
+        } else {
+            Result.failure(IllegalArgumentException("Unsupported resource type: $resourceType"))
+        }
+    } catch (e: Exception) {
+        logger.error("Error fetching resource details for $resourceType/${metadata.name}: ${e.message}")
+        Result.failure(e)
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,7 +302,6 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     var selectedContext by remember { mutableStateOf<String?>(null) }
     var selectedResourceType by remember { mutableStateOf<String?>(null) }
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>() }
-    var activeClient by remember { mutableStateOf<KubernetesClient?>(null) } // Fabric8 Client
     var connectionStatus by remember { mutableStateOf("Configuration Loading...") }
     var isLoading by remember { mutableStateOf(false) } // Загальний індикатор
     var resourceLoadError by remember { mutableStateOf<String?>(null) } // Помилка завантаження ресурсів
@@ -127,8 +332,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     var crdsList by remember { mutableStateOf<List<CustomResourceDefinition>>(emptyList()) }
     var detailedResource by remember { mutableStateOf<Any?>(null) }
     var detailedResourceType by remember { mutableStateOf<String?>(null) }
-    val showLogViewer = remember { mutableStateOf(false) } // Прапорець видимості
-    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) } // Параметри: ns, pod, container
+    val showLogViewer = remember { mutableStateOf(false) }
+    val logViewerParams = remember { mutableStateOf<Triple<String, String, String>?>(null) }
     val showErrorDialog = remember { mutableStateOf(false) }
     val dialogErrorMessage = remember { mutableStateOf("") }
     var allNamespaces by remember { mutableStateOf(listOf(ALL_NAMESPACES_OPTION)) }
@@ -136,6 +341,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     var isNamespaceDropdownExpanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
+    var selectedResource by remember { mutableStateOf<String?>(null) }
 
     suspend fun handleResourceLoad(
         nodeId: String,
@@ -151,15 +357,15 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                 .onFailure { errorMsg = it.message }
 
             "Nodes" -> loadNodesFabric8(activeClient)
-                .onSuccess {nodesList = it; loadOk = true}
+                .onSuccess { nodesList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
-            
+
             "Events" -> loadEventsFabric8(activeClient, namespaceToUse)
-                .onSuccess {eventsList = it; loadOk = true}
+                .onSuccess { eventsList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             "Pods" -> loadPodsFabric8(activeClient, namespaceToUse)
-                .onSuccess {podsList = it; loadOk = true}
+                .onSuccess { podsList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             "Deployments" -> loadDeploymentsFabric8(activeClient, namespaceToUse)
@@ -203,7 +409,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                 .onFailure { errorMsg = it.message }
 
             "PersistentVolumes" -> loadPVsFabric8(activeClient)
-                .onSuccess {pvsList = it; loadOk = true}
+                .onSuccess { pvsList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             "PersistentVolumeClaims" -> loadPVCsFabric8(activeClient, namespaceToUse)
@@ -211,7 +417,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                 .onFailure { errorMsg = it.message }
 
             "StorageClasses" -> loadStorageClassesFabric8(activeClient)
-                .onSuccess {storageClassesList = it; loadOk = true}
+                .onSuccess { storageClassesList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             "ConfigMaps" -> loadConfigMapsFabric8(activeClient, namespaceToUse)
@@ -235,15 +441,15 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                 .onFailure { errorMsg = it.message }
 
             "ClusterRoles" -> loadClusterRolesFabric8(activeClient)
-                .onSuccess {clusterRolesList = it; loadOk = true}
+                .onSuccess { clusterRolesList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             "ClusterRoleBindings" -> loadClusterRoleBindingsFabric8(activeClient)
-                .onSuccess {clusterRoleBindingsList = it; loadOk = true}
+                .onSuccess { clusterRoleBindingsList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             "CRDs" -> loadCrdsFabric8(activeClient)
-                .onSuccess {crdsList = it; loadOk = true}
+                .onSuccess { crdsList = it; loadOk = true }
                 .onFailure { errorMsg = it.message }
 
             else -> {
@@ -329,7 +535,8 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
             val nsResult = loadNamespacesFabric8(activeClient) // Викликаємо завантаження
             nsResult.onSuccess { loadedNs ->
                 // Додаємо опцію "All" і сортуємо
-                allNamespaces = (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(compareBy { it != ALL_NAMESPACES_OPTION } )// "<All>" завжди зверху
+                allNamespaces =
+                    (listOf(ALL_NAMESPACES_OPTION) + loadedNs.mapNotNull { it.metadata?.name }).sortedWith(compareBy { it != ALL_NAMESPACES_OPTION })// "<All>" завжди зверху
                 connectionStatus = "Connected to: $selectedContext" // Повертаємо статус
                 logger.info("Loaded ${allNamespaces.size - 1} namespaces for filter.")
             }.onFailure {
@@ -354,707 +561,551 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     //Спроба оновлювати дані на екрані, але оновлюється тільки formatAge
     LaunchedEffect(Unit) {
         while (true) {
-            delay(5000) // затримка 5 секунд
+            delay(AUTOREFRESH_DELAY) // затримка 5 секунд
             recomposeScope?.invalidate()
         }
     }
 
     AppTheme(darkTheme = isDarkTheme.value)
-    { AppTextStyle {
+    {
+        AppTextStyle {
 
-    Surface(
-            modifier = Modifier.Companion.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
+            Surface(
+                modifier = Modifier.Companion.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
             }
             Column(modifier = Modifier.Companion.fillMaxSize()) {
                 Column {
+                    //Main Menu
                     Row(modifier = Modifier.Companion.fillMaxWidth()) {
-                        MainMenu(windowState = windowState, settingsManager = settingsManager
+                        MainMenu(
+                            windowState = windowState, settingsManager = settingsManager
                         )
                     }
-                Row(modifier = Modifier.Companion.weight(1f)) {
-                    // --- Ліва панель ---
-                    Column(modifier = Modifier.Companion.fillMaxHeight().width(300.dp).padding(16.dp)) {
-                        Text(
-                            "Kubernetes Contexts:", style = MaterialTheme.typography.titleMedium
-                        ); Spacer(modifier = Modifier.Companion.height(8.dp))
-                        Box(
-                            modifier = Modifier.Companion
-                                .weight(1f)
-                                .border(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clip(RoundedCornerShape(8.dp))
-                        ) {
-                            if (isLoading && contexts.isEmpty()) {
-                                CircularProgressIndicator(modifier = Modifier.Companion.align(Alignment.Companion.Center))
-                            }
-                            else if (!isLoading && contexts.isEmpty()) {
-                                Text(
-                                    errorMessage ?: "Contexts not found",
-                                    modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                )
-                            }
-                            else {
-                                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(contexts) { context ->
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth()
-                                                .clickable(enabled = !isLoading) {
-                                                    if (selectedContext != context.name) {
-                                                        logger.info("Click on context: ${context.name}. Launching .connectWithRetries...")
-                                                        coroutineScope.launch {
-                                                            isLoading = true
-                                                            connectionStatus = "Connect to '${context.name}'..."
-                                                            activeClient?.close()
-                                                            activeClient = null
-                                                            selectedResourceType = null
-                                                            clearResourceLists()
-                                                            resourceLoadError = null
-                                                            errorMessage = null
-                                                            detailedResource = null
-                                                            detailedResourceType = null
-                                                            showLogViewer.value = false
-                                                            logViewerParams.value = null
-                                                            val connectionResult = when {
-                                                                // Використовуємо різні методи підключення в залежності від джерела
-                                                                context.source == "saved" && context.config != null -> {
-                                                                    logger.info("Connecting to saved cluster: ${context.name}")
-                                                                    connectToSavedCluster(context.config)
-                                                                }
-                                                                else -> {
-                                                                    logger.info("Connecting to kubeconfig context: ${context.name}")
-                                                                    connectWithRetries(context.name)
-                                                                }
-                                                            }
-                                                            isLoading = false
-
-                                                            connectionResult.onSuccess { (newClient, serverVersion) ->
-                                                                activeClient = newClient
-                                                                selectedContext = context.name
-                                                                connectionStatus = "Connected to: ${context.name} (v$serverVersion)"
-                                                                errorMessage = null
-                                                                logger.info("UI State updated on Success for ${context.name}")
-                                                            }.onFailure { error ->
-                                                                connectionStatus = "Connection Error to '${context.name}'"
-                                                                errorMessage = error.localizedMessage ?: "Unknown error"
-                                                                logger.info("Setting up error dialog for: ${context.name}. Error: ${error.message}")
-                                                                dialogErrorMessage.value = "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
-                                                                showErrorDialog.value = true
+                    // End Main Menu
+                    Row(modifier = Modifier.Companion.weight(1f)) {
+                        // --- Left panel ---
+                        Column(modifier = Modifier.Companion.fillMaxHeight().width(300.dp).padding(16.dp)) {
+                            Text(
+                                "Kubernetes Contexts:", style = MaterialTheme.typography.titleMedium
+                            ); Spacer(modifier = Modifier.Companion.height(8.dp))
+                            Box(
+                                modifier = Modifier.Companion
+                                    .weight(1f)
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clip(RoundedCornerShape(8.dp))
+                            ) {
+                                if (isLoading && contexts.isEmpty()) {
+                                    CircularProgressIndicator(modifier = Modifier.Companion.align(Alignment.Companion.Center))
+                                } else if (!isLoading && contexts.isEmpty()) {
+                                    Text(
+                                        errorMessage ?: "Contexts not found",
+                                        modifier = Modifier.Companion.align(Alignment.Companion.Center)
+                                    )
+                                } else {
+                                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                        items(contexts) { context ->
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.fillMaxWidth()
+                                                    .clickable(enabled = !isLoading) {
+                                                        if (selectedContext != context.name) {
+                                                            logger.info("Click on context: ${context.name}. Launching .connectWithRetries...")
+                                                            coroutineScope.launch {
+                                                                isLoading = true
+                                                                connectionStatus = "Connect to '${context.name}'..."
+                                                                activeClient?.close()
                                                                 activeClient = null
-                                                                selectedContext = null
+                                                                selectedResourceType = null
+                                                                clearResourceLists()
+                                                                resourceLoadError = null
+                                                                errorMessage = null
+                                                                detailedResource = null
+                                                                detailedResourceType = null
+                                                                showLogViewer.value = false
+                                                                logViewerParams.value = null
+                                                                selectedResource = null
+                                                                val connectionResult = when {
+                                                                    // Використовуємо різні методи підключення в залежності від джерела
+                                                                    context.source == "saved" && context.config != null -> {
+                                                                        logger.info("Connecting to saved cluster: ${context.name}")
+                                                                        connectToSavedCluster(context.config)
+                                                                    }
+                                                                    else -> {
+                                                                        logger.info("Connecting to kubeconfig context: ${context.name}")
+                                                                        connectWithRetries(context.name)
+                                                                    }
+                                                                }
+                                                                isLoading = false
+
+                                                                connectionResult.onSuccess { (newClient, serverVersion) ->
+                                                                    activeClient = newClient
+                                                                    selectedContext = context.name
+                                                                    connectionStatus = "Connected to: ${context.name} (v$serverVersion)"
+                                                                    errorMessage = null
+                                                                    logger.info("UI State updated on Success for ${context.name}")
+                                                                }.onFailure { error ->
+                                                                    connectionStatus = "Connection Error to '${context.name}'"
+                                                                    errorMessage = error.localizedMessage ?: "Unknown error"
+                                                                    logger.info("Setting up error dialog for: ${context.name}. Error: ${error.message}")
+                                                                    dialogErrorMessage.value = "Failed to connect to '${context.name}' after $MAX_CONNECT_RETRIES attempts:\n${error.message}"
+                                                                    showErrorDialog.value = true
+                                                                    activeClient = null
+                                                                    selectedContext = null
+                                                                }
+                                                                logger.info("Attempting to connect to '${context.name}' Completed (the result is processed).")
                                                             }
-                                                            logger.info("Attempting to connect to '${context.name}' Completed (the result is processed).")
                                                         }
-                                                    }
-                                                }.padding(horizontal = 8.dp, vertical = 6.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (context.source == "saved") ICON_CLOUD else ICON_CONTEXT,
-                                                contentDescription = if (context.source == "saved") "Saved EKS Cluster" else "Kubernetes Context",
-                                                tint = if (context.name == selectedContext) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(24.dp).padding(end = 8.dp)
-                                            )
-                                            Column(
-                                                modifier = Modifier.weight(1f)
+                                                    }.padding(horizontal = 8.dp, vertical = 6.dp)
                                             ) {
-                                                Text(
-                                                    text = formatContextNameForDisplay(context),
-                                                    fontSize = 14.sp,
-                                                    color = if (context.name == selectedContext)
-                                                        MaterialTheme.colorScheme.primary
-                                                    else MaterialTheme.colorScheme.onSurface
+                                                Icon(
+                                                    imageVector = if (context.source == "saved") ICON_CLOUD else ICON_CONTEXT,
+                                                    contentDescription = if (context.source == "saved") "Saved EKS Cluster" else "Kubernetes Context",
+                                                    tint = if (context.name == selectedContext) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.size(24.dp).padding(end = 8.dp)
                                                 )
-                                                if (context.source == "saved") {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        TooltipBox(
-                                                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                                            tooltip = {
-                                                                Surface(
-                                                                    modifier = Modifier
-                                                                        .padding(8.dp)
-                                                                        .widthIn(max = 600.dp)
-                                                                        .heightIn(max = 300.dp)
-                                                                        .border(
-                                                                            width = 1.dp,
-                                                                            color = MaterialTheme.colorScheme.outline,
-                                                                            shape = RoundedCornerShape(4.dp)
-                                                                        ),
-                                                                    shape = RoundedCornerShape(4.dp),
-                                                                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                                Column(
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Text(
+                                                        text = formatContextNameForDisplay(context),
+                                                        fontSize = 14.sp,
+                                                        color = if (context.name == selectedContext)
+                                                            MaterialTheme.colorScheme.primary
+                                                        else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    if (context.source == "saved") {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            TooltipBox( // Підказка при наведенні на збережений контекст
+                                                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                                                tooltip = {
+                                                                    Surface(
+                                                                        modifier = Modifier
+                                                                            .padding(8.dp)
+                                                                            .widthIn(max = 600.dp)
+                                                                            .heightIn(max = 300.dp)
+                                                                            .border(
+                                                                                width = 1.dp,
+                                                                                color = MaterialTheme.colorScheme.outline,
+                                                                                shape = RoundedCornerShape(4.dp)
+                                                                            ),
+                                                                        shape = RoundedCornerShape(4.dp),
+                                                                        color = MaterialTheme.colorScheme.surfaceContainerHighest
 
-                                                                ) {
-                                                                    Column(modifier = Modifier.padding(10.dp)) {
-                                                                        // Тип джерела
-                                                                        Text(
-                                                                            text = "Source: ${context.source.uppercase()}",
-                                                                            style = MaterialTheme.typography.bodySmall,
-                                                                            color = MaterialTheme.colorScheme.secondary
-                                                                        )
-                                                                        // AWS деталі
-                                                                        context.config?.let { config ->
-                                                                            HorizontalDivider(
-                                                                                modifier = Modifier.padding(vertical = 4.dp)
+                                                                    ) {
+                                                                        Column(modifier = Modifier.padding(10.dp)) {
+                                                                            // Тип джерела
+                                                                            Text(
+                                                                                text = "Source: ${context.source.uppercase()}",
+                                                                                style = MaterialTheme.typography.bodySmall,
+                                                                                color = MaterialTheme.colorScheme.secondary
                                                                             )
-                                                                            // AWS Profile
-                                                                            Row {
-                                                                                Text(
-                                                                                    text = "Profile: ",
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                            // AWS деталі
+                                                                            context.config?.let { config ->
+                                                                                HorizontalDivider(
+                                                                                    modifier = Modifier.padding(vertical = 4.dp)
                                                                                 )
-                                                                                Text(
-                                                                                    text = config.profileName,
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    fontWeight = FontWeight.Medium
-                                                                                )
-                                                                            }
-
-                                                                            // AWS Region
-                                                                            Row {
-                                                                                Text(
-                                                                                    text = "Region: ",
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                                )
-                                                                                Text(
-                                                                                    text = config.region,
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    fontWeight = FontWeight.Medium
-                                                                                )
-                                                                            }
-
-                                                                            // Cluster Name
-                                                                            Row {
-                                                                                Text(
-                                                                                    text = "Cluster: ",
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                                )
-                                                                                Text(
-                                                                                    text = config.clusterName,
-                                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                                    fontWeight = FontWeight.Medium
-                                                                                )
-                                                                            }
-
-                                                                            // Endpoint
-                                                                            if (config.endpoint.isNotBlank()) {
+                                                                                // AWS Profile
                                                                                 Row {
                                                                                     Text(
-                                                                                        text = "Endpoint: ",
+                                                                                        text = "Profile: ",
                                                                                         style = MaterialTheme.typography.bodySmall,
                                                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                                     )
                                                                                     Text(
-                                                                                        text = config.endpoint,
+                                                                                        text = config.profileName,
                                                                                         style = MaterialTheme.typography.bodySmall,
                                                                                         fontWeight = FontWeight.Medium
                                                                                     )
                                                                                 }
-                                                                            }
 
-                                                                            // Role ARN (якщо є)
-                                                                            config.roleArn?.let { role ->
+                                                                                // AWS Region
                                                                                 Row {
                                                                                     Text(
-                                                                                        text = "Role ARN: ",
+                                                                                        text = "Region: ",
                                                                                         style = MaterialTheme.typography.bodySmall,
                                                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                                     )
                                                                                     Text(
-                                                                                        text = role,
+                                                                                        text = config.region,
                                                                                         style = MaterialTheme.typography.bodySmall,
                                                                                         fontWeight = FontWeight.Medium
                                                                                     )
+                                                                                }
+
+                                                                                // Cluster Name
+                                                                                Row {
+                                                                                    Text(
+                                                                                        text = "Cluster: ",
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                    )
+                                                                                    Text(
+                                                                                        text = config.clusterName,
+                                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                                        fontWeight = FontWeight.Medium
+                                                                                    )
+                                                                                }
+
+                                                                                // Endpoint
+                                                                                if (config.endpoint.isNotBlank()) {
+                                                                                    Row {
+                                                                                        Text(
+                                                                                            text = "Endpoint: ",
+                                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                        )
+                                                                                        Text(
+                                                                                            text = config.endpoint,
+                                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                                            fontWeight = FontWeight.Medium
+                                                                                        )
+                                                                                    }
+                                                                                }
+
+                                                                                // Role ARN (якщо є)
+                                                                                config.roleArn?.let { role ->
+                                                                                    Row {
+                                                                                        Text(
+                                                                                            text = "Role ARN: ",
+                                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                                        )
+                                                                                        Text(
+                                                                                            text = role,
+                                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                                            fontWeight = FontWeight.Medium
+                                                                                        )
+                                                                                    }
                                                                                 }
                                                                             }
                                                                         }
                                                                     }
-                                                                }
-                                                            },
-                                                            state = rememberTooltipState(),
+                                                                },
+                                                                state = rememberTooltipState(),
 
-                                                        )
-                                                        {
+                                                                )
+                                                            {
+                                                                Text(
+                                                                    text = context.config?.profileName ?: "default",
+                                                                    fontSize = 12.sp,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                            Spacer(modifier = Modifier.width(4.dp))
                                                             Text(
-                                                                text = context.config?.profileName ?: "default",
+                                                                text = context.config?.region ?: "unknown region",
                                                                 fontSize = 12.sp,
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                         }
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text(
-                                                            text = context.config?.region ?: "unknown region",
-                                                            fontSize = 12.sp,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } // End contexts list
+                            Spacer(modifier = Modifier.Companion.height(16.dp));
+                            Text(
+                            "Cluster Resources:", style = MaterialTheme.typography.titleMedium
+                        );
+                            Spacer(modifier = Modifier.Companion.height(8.dp))
+                            Box(
+                                modifier = Modifier.Companion.weight(2f)
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clip(RoundedCornerShape(8.dp))
+                            ) {
+                                ResourceTreeView(
+                                    rootIds = resourceTreeData[""] ?: emptyList(),
+                                    expandedNodes = expandedNodes,
+                                    selectedResource = selectedResource,
+                                    onNodeClick = { nodeId, isLeaf ->
+                                        logger.info("Click on a TreeNode: $nodeId, It's a leaflet: $isLeaf")
+                                        if (isLeaf) {
+                                            coroutineScope.launch {
+                                            selectedResource = nodeId
+                                            if (activeClient != null && !isLoading) {
+                                                // Скидаємо показ деталей/логів при виборі нового типу ресурсу
+                                                detailedResource = null
+                                                detailedResourceType = null
+                                                showLogViewer.value = false
+                                                logViewerParams.value = null
+                                                selectedResourceType = nodeId
+                                                resourceLoadError = null
+                                                clearResourceLists()
+                                                connectionStatus = "Loading $nodeId..."
+                                                isLoading = true
+                                                coroutineScope.launch {
+                                                    val currentFilter =
+                                                        selectedNamespaceFilter // We take the current filter value
+                                                    val namespaceToUse =
+                                                        if (NSResources.contains(nodeId)) currentFilter else null
+                                                    handleResourceLoad(nodeId, namespaceToUse)
+                                                    { loadOk, errorMsg ->
+                                                        if (loadOk) {
+                                                            connectionStatus = "Loaded $nodeId ${
+                                                                if (namespaceToUse != null &&
+                                                                    namespaceToUse != ALL_NAMESPACES_OPTION
+                                                                ) " (ns: $namespaceToUse)" else ""
+                                                            }"
+                                                        } else {
+                                                            resourceLoadError = "Error $nodeId: $errorMsg"
+                                                            connectionStatus = "Error $nodeId"
+                                                        }
+                                                        isLoading = false
+                                                    }
+                                                }
+                                            } else if (activeClient == null) {
+                                                logger.warn("No connection.")
+                                                connectionStatus = "Connect to the cluster,pls!"
+                                                selectedResourceType = null
+                                            }
+                                        }
+                                        } else {
+                                            expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
+                                        }
+                                    }
+                                )
+                            }
+                        } // End of left panel
+                        HorizontalDivider(
+                            modifier = Modifier.Companion.fillMaxHeight().width(1.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        ) // Divider
+                        // --- Right panel (Table OR Detail OR Logs) ---
+                        Column(
+                            modifier = Modifier.Companion.fillMaxHeight().weight(1f)
+                                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                        ) {
+                            val resourceToShowDetails = detailedResource
+                            val typeForDetails = detailedResourceType
+                            val paramsForLogs = logViewerParams.value
+                            val showLogs = showLogViewer.value
+                            val currentView = remember(showLogs, resourceToShowDetails, paramsForLogs) {
+                                when {
+                                    showLogs && paramsForLogs != null -> "logs"
+                                    resourceToShowDetails != null -> "details"
+                                    else -> "table"
+                                }
+                            }
+                            val currentResourceType = selectedResourceType
+                            val headerTitle = when {
+                                currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
+                                currentView == "table" &&
+                                        currentResourceType != null &&
+                                        activeClient != null &&
+                                        resourceLoadError == null &&
+                                        errorMessage == null -> "$currentResourceType in $selectedContext"
+
+                                else -> null
+                            }
+                            // --- NS filter ---
+                            if (currentView == "table" && activeClient != null) {
+                                val isFilterEnabled =
+                                    NSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                                NamespaceFilter(
+                                    selectedNamespaceFilter = selectedNamespaceFilter,
+                                    isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
+                                    onExpandedChange = { isNamespaceDropdownExpanded = it },
+                                    isFilterEnabled = isFilterEnabled,
+                                    allNamespaces = allNamespaces,
+                                    onNamespaceSelected = { nsName ->
+                                        if (selectedNamespaceFilter != nsName) {
+                                            selectedNamespaceFilter = nsName
+                                            if (selectedResourceType != null) {
+                                                resourceLoadError = null
+                                                clearResourceLists()
+                                                connectionStatus = "Loading $selectedResourceType (filter)..."
+                                                isLoading = true
+                                                coroutineScope.launch {
+                                                    val namespaceToUse =
+                                                        if (NSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                    handleResourceLoad(
+                                                        selectedResourceType!!,
+                                                        namespaceToUse
+                                                    ) { loadOk, errorMsg ->
+                                                        if (loadOk) {
+                                                            connectionStatus =
+                                                                "Loaded $selectedResourceType (filter applied)"
+                                                        } else {
+                                                            resourceLoadError =
+                                                                "Error loading $selectedResourceType: $errorMsg"
+                                                        }
+                                                        isLoading = false
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                Spacer(Modifier.Companion.height(4.dp))
+                            }
+                            // --- end of NS filter ---
+                            if (headerTitle != null && currentView != "details") {
+                                Text(
+                                    text = headerTitle,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.Companion.padding(bottom = 8.dp)
+                                )
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            } else
+                                if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
+                                Spacer(modifier = Modifier.Companion.height(48.dp)) // Висота імітує заголовок
+                            }
+                            // --- Right panel ---
+                            Box(
+                                modifier = Modifier.Companion.weight(1f)
+                                    .padding(top = if (headerTitle != null && currentView != "details") 8.dp else 0.dp)
+                            ) {
+                                when (currentView) {
+                                    "logs" -> LogsView(
+                                        paramsForLogs = paramsForLogs,
+                                        activeClient = activeClient,
+                                        onClose = { showLogViewer.value = false; logViewerParams.value = null }
+                                    )
+
+                                    "details" -> {
+                                        LaunchedEffect(resourceToShowDetails, typeForDetails) {
+                                            while (true) {
+                                                logger.info("Reloading details for $typeForDetails...")
+                                                if (resourceToShowDetails != null && typeForDetails != null) {
+                                                    val metadata = (resourceToShowDetails as? HasMetadata)?.metadata
+                                                    if (metadata != null) {
+                                                        // Оновлюємо загальний список
+                                                        handleResourceLoad(
+                                                            typeForDetails,
+                                                            metadata.namespace
+                                                        ) { loadOk, errorMsg ->
+                                                            if (!loadOk) {
+                                                                resourceLoadError = "Update error $typeForDetails: $errorMsg"
+                                                            }
+                                                        }
+
+                                                        // Оновлюємо деталі ресурсу
+                                                        fetchResourceDetails(activeClient, typeForDetails, metadata).fold(
+                                                            onSuccess = { updatedResource ->
+                                                                detailedResource = updatedResource
+                                                            },
+                                                            onFailure = { error ->
+                                                                logger.error("Failed to update resource details: ${error.message}")
+                                                            }
                                                         )
                                                     }
                                                 }
+                                                delay(AUTOREFRESH_DELAY)
                                             }
                                         }
-                                    }
-                                }
-                            }
-                        } // Кінець Box списку
-                        Spacer(modifier = Modifier.Companion.height(16.dp)); Text(
-                        "Cluster Resources:", style = MaterialTheme.typography.titleMedium
-                    ); Spacer(modifier = Modifier.Companion.height(8.dp)) // M3 Text
-                        Box(
-                            modifier = Modifier.Companion.weight(2f)
-                                .border(1.dp,
-                                    MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clip(RoundedCornerShape(8.dp))
-                        ) { // M3 колір
-                            ResourceTreeView(
-                                rootIds = resourceTreeData[""] ?: emptyList(),
-                                expandedNodes = expandedNodes,
-                                onNodeClick = { nodeId, isLeaf ->
-                                    logger.info("Click on a node: $nodeId, It's a leaflet: $isLeaf")
-                                    if (isLeaf) {
-                                        if (activeClient != null && !isLoading) {
-                                            // Скидаємо показ деталей/логів при виборі нового типу ресурсу
-                                            detailedResource = null
-                                            detailedResourceType = null
-                                            showLogViewer.value = false
-                                            logViewerParams.value = null
-                                            selectedResourceType = nodeId
-                                            resourceLoadError = null
-                                            clearResourceLists()
-                                            connectionStatus = "Loading $nodeId...";
-                                            isLoading = true
-                                            coroutineScope.launch {
-                                                val currentFilter =
-                                                    selectedNamespaceFilter // We take the current filter value
-                                                val namespaceToUse =
-                                                    if (NSResources.contains(nodeId)) currentFilter else null
-                                                handleResourceLoad(nodeId, /*activeClient,*/ namespaceToUse) { loadOk, errorMsg ->
-                                                    if (loadOk) {
-                                                        connectionStatus = "Loaded $nodeId ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
-                                                    } else {
-                                                        resourceLoadError = "Error $nodeId: $errorMsg"
-                                                        connectionStatus = "Error $nodeId"
-                                                    }
-                                                    isLoading = false
-                                                }
+
+                                        DetailsView(
+                                            resource = resourceToShowDetails as HasMetadata?,
+                                            resourceType = typeForDetails,
+                                            onClose = { detailedResource = null; detailedResourceType = null },
+                                            onShowLogsRequest = { ns, pod, container ->
+                                                logViewerParams.value = Triple(ns, pod, container)
+                                                detailedResource = null
+                                                detailedResourceType = null
+                                                showLogViewer.value = true
                                             }
-                                        } else if (activeClient == null) {
-                                            logger.warn("No connection."); connectionStatus =
-                                                "Connect to the cluster,pls!"; selectedResourceType = null
-                                        }
-                                    } else {
-                                        expandedNodes[nodeId] = !(expandedNodes[nodeId] ?: false)
-                                    }
-                                }
-                            )
-                        }
-                    } // Кінець лівої панелі
-                    HorizontalDivider(
-                        modifier = Modifier.Companion.fillMaxHeight().width(1.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    ) // M3 Divider
-                    // --- Права панель (АБО Таблиця АБО Деталі АБО Логи) ---
-                    Column(
-                        modifier = Modifier.Companion.fillMaxHeight().weight(1f)
-                            .padding(start = 16.dp, end = 16.dp, top = 16.dp)
-                    ) {
-                        val resourceToShowDetails = detailedResource
-                        val typeForDetails = detailedResourceType
-                        val paramsForLogs = logViewerParams.value
-                        val showLogs = showLogViewer.value // Читаємо значення стану
-
-                        // Визначаємо поточний режим відображення
-                        val currentView = remember(showLogs, resourceToShowDetails, paramsForLogs) {
-                            when {
-                                showLogs && paramsForLogs != null -> "logs"
-                                resourceToShowDetails != null -> "details"
-                                else -> "table"
-                            }
-                        }
-
-                        val currentResourceType = selectedResourceType
-                        // Заголовок для таблиці та логів (для деталей він усередині .ResourceDetailPanel)
-                        val headerTitle = when {
-                            currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
-                            currentView == "table" &&
-                                    currentResourceType != null &&
-                                    activeClient != null &&
-                                    resourceLoadError == null &&
-                                    errorMessage == null -> "$currentResourceType in $selectedContext"
-                            else -> null
-                        }
-
-                        // --- ДОДАНО ФІЛЬТР НЕЙМСПЕЙСІВ (якщо є клієнт і це не деталі/логи) ---
-                        if (currentView == "table" && activeClient != null) {
-                            val isFilterEnabled = NSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
-                            NamespaceFilter(
-                                selectedNamespaceFilter = selectedNamespaceFilter,
-                                isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
-                                onExpandedChange = { isNamespaceDropdownExpanded = it },
-                                isFilterEnabled = isFilterEnabled,
-                                allNamespaces = allNamespaces,
-                                onNamespaceSelected = { nsName ->
-                                    if (selectedNamespaceFilter != nsName) {
-                                        selectedNamespaceFilter = nsName
-                                        if (selectedResourceType != null) {
-                                            resourceLoadError = null
-                                            clearResourceLists()
-                                            connectionStatus = "Loading $selectedResourceType (filter)..."
-                                            isLoading = true
-                                            coroutineScope.launch {
-                                                val namespaceToUse =
-                                                if (NSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
-                                                handleResourceLoad(selectedResourceType!!, /*activeClient,*/ namespaceToUse) { loadOk, errorMsg ->
-                                                    if (loadOk) {
-                                                        connectionStatus = "Loaded $selectedResourceType (filter applied)"
-                                                    } else {
-                                                        resourceLoadError = "Error loading $selectedResourceType: $errorMsg"
-                                                    }
-                                                    isLoading = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Spacer(Modifier.Companion.height(4.dp))
-                        }
-                        // --- КІНЕЦЬ ФІЛЬТРА ---
-
-                        if (headerTitle != null && currentView != "details") {
-                            Text(
-                                text = headerTitle,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.Companion.padding(bottom = 8.dp)
-                            ) // M3 Text
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) // M3 Divider
-                        } else if (currentView == "table" || currentView == "logs") { // Додаємо відступ, якщо це не панель деталей
-                            Spacer(modifier = Modifier.Companion.height(48.dp)) // Висота імітує заголовок
-                        }
-                        // --- Основний уміст правої панелі ---
-                        Box(
-                            modifier = Modifier.Companion.weight(1f)
-                                .padding(top = if (headerTitle != null && currentView != "details") 8.dp else 0.dp)
-                        ) {
-                            when (currentView) {
-                                "logs" -> {
-                                    if (paramsForLogs != null) {
-                                        LogViewerPanel(
-                                            namespace = paramsForLogs.first,
-                                            podName = paramsForLogs.second,
-                                            containerName = paramsForLogs.third,
-                                            client = activeClient, // Передаємо активний клієнт
-                                            onClose = {
-                                                showLogViewer.value = false; logViewerParams.value = null
-                                            } // Закриття панелі логів
                                         )
-                                    } else {
-                                        // Стан коли прапорець showLogViewer ще true, але параметри вже скинуті
-                                        Text(
-                                            "Loading logs...",
-                                            modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                        )
-                                        LaunchedEffect(Unit) { showLogViewer.value = false } // Скидаємо прапорець
                                     }
-                                }
-                                "details" -> {
-                                    ResourceDetailPanel(
-                                        resource = resourceToShowDetails,
-                                        resourceType = typeForDetails,
-                                        onClose = { detailedResource = null; detailedResourceType = null },
-                                        // Передаємо лямбду для запуску лог вікна
-                                        onShowLogsRequest = { ns, pod, container ->
-                                            logViewerParams.value = Triple(ns, pod, container)
-                                            detailedResource = null // Закриваємо деталі
-                                            detailedResourceType = null
-                                            showLogViewer.value = true // Показуємо лог вьювер
-                                        })
-                                }
-                                "table" -> {
-                                    // --- Таблиця або Статус/Помилка ---
-                                    val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
-                                    val currentClientForPanel = activeClient
-                                    when {
-                                        isLoading -> {
-                                            Column(
-                                                horizontalAlignment = Alignment.Companion.CenterHorizontally,
-                                                modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier.Companion.fillMaxSize(),
-                                                    contentAlignment = Alignment.Companion.Center,
-                                                ) {
-                                                CircularProgressIndicator();
-                                                Spacer(modifier = Modifier.Companion.height(20.dp));
-                                                    Text(
-                                                        text = connectionStatus
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        currentErrorMessageForPanel != null -> {
-                                            Text(
-                                                text = currentErrorMessageForPanel,
-                                                color = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                            )
-                                        }
-                                        currentClientForPanel != null && currentResourceType != null -> {
-                                            // Отримуємо список та заголовки
-                                            val itemsToShow: List<HasMetadata> = remember(
-                                                currentResourceType,
-                                                namespacesList,
-                                                nodesList,
-                                                eventsList,
-                                                podsList,
-                                                deploymentsList,
-                                                statefulSetsList,
-                                                daemonSetsList,
-                                                replicaSetsList,
-                                                jobsList,
-                                                cronJobsList,
-                                                servicesList,
-                                                ingressesList,
-                                                endpointsList,
-                                                networkPoliciesList,
-                                                pvsList,
-                                                pvcsList,
-                                                storageClassesList,
-                                                configMapsList,
-                                                secretsList,
-                                                serviceAccountsList,
-                                                rolesList,
-                                                roleBindingsList,
-                                                clusterRolesList,
-                                                clusterRoleBindingsList,
-                                                crdsList
-                                            ) {
-                                                when (currentResourceType) {
-                                                    "Namespaces" -> namespacesList
-                                                    "Nodes" -> nodesList
-                                                    "Events" -> eventsList
-                                                    "Pods" -> podsList
-                                                    "Deployments" -> deploymentsList
-                                                    "StatefulSets" -> statefulSetsList
-                                                    "DaemonSets" -> daemonSetsList
-                                                    "ReplicaSets" -> replicaSetsList
-                                                    "Jobs" -> jobsList
-                                                    "CronJobs" -> cronJobsList
-                                                    "Services" -> servicesList
-                                                    "Ingresses" -> ingressesList
-                                                    "Endpoints" -> endpointsList
-                                                    "NetworkPolicies" -> networkPoliciesList
-                                                    "PersistentVolumes" -> pvsList
-                                                    "PersistentVolumeClaims" -> pvcsList
-                                                    "StorageClasses" -> storageClassesList
-                                                    "ConfigMaps" -> configMapsList
-                                                    "Secrets" -> secretsList
-                                                    "ServiceAccounts" -> serviceAccountsList
-                                                    "Roles" -> rolesList
-                                                    "RoleBindings" -> roleBindingsList
-                                                    "ClusterRoles" -> clusterRolesList
-                                                    "ClusterRoleBindings" -> clusterRoleBindingsList
-                                                    "CRDs" -> crdsList
-                                                    else -> emptyList()
-                                                }
-                                            }
-                                            val headers =
-                                                remember(currentResourceType) { getHeadersForType(currentResourceType) }
 
-                                            if (itemsToShow.isEmpty() && !isLoading) {
-                                                Box(
-                                                    modifier = Modifier.Companion.fillMaxSize(),
-                                                    contentAlignment = Alignment.Companion.Center,
-                                                ) { Text("No type resources '$currentResourceType'") }
-                                            } else if (headers.isNotEmpty()) {
-                                                // --- Ручна таблиця з LazyColumn (M3 компоненти) ---
-                                                Column(modifier = Modifier.Companion.fillMaxSize()) {
-                                                    // Calculate column widths based on headers and data
-                                                    val columnWidths = calculateColumnWidths(
-                                                        headers = headers,
-                                                        items = itemsToShow,
-                                                        resourceType = currentResourceType
-                                                    )
-
-                                                    // Use the calculated widths
-                                                    Box(modifier = Modifier.Companion.fillMaxWidth()) {
-                                                        Row(
-                                                            modifier = Modifier.Companion.horizontalScroll(
-                                                                rememberScrollState()
-                                                            )
-                                                        ) {
-                                                            Column {
-                                                                KubeTableHeaderRow(
-                                                                    headers = headers, columnWidths = columnWidths
-                                                                )
-                                                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                                                                LazyColumn(
-                                                                    modifier = Modifier.Companion.weight(
-                                                                        1f,
-                                                                        fill = false
-                                                                    )
-                                                                ) {
-                                                                    items(itemsToShow) { item ->
-                                                                        KubeTableRow(
-                                                                            item = item,
-                                                                            headers = headers,
-                                                                            resourceType = currentResourceType,
-                                                                            columnWidths = columnWidths,
-                                                                            onRowClick = { clickedItem ->
-                                                                                detailedResource = clickedItem
-                                                                                detailedResourceType =
-                                                                                    currentResourceType
-                                                                                showLogViewer.value = false
-                                                                                logViewerParams.value = null
-                                                                            })
-                                                                        HorizontalDivider(
-                                                                            color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                                                alpha = 0.5f
-                                                                            )
-                                                                        )
-                                                                    }
-                                                                }
-                                                            }
+                                    "table" -> {
+                                        // Autorefresh
+                                        LaunchedEffect(currentResourceType, selectedNamespaceFilter) {
+                                            while (true) {
+                                                if (activeClient != null && currentResourceType != null) {
+                                                    val namespaceToUse = if (NSResources.contains(currentResourceType)) selectedNamespaceFilter else null
+                                                    handleResourceLoad(currentResourceType, namespaceToUse) { loadOk, errorMsg ->
+                                                        if (loadOk) {
+                                                            connectionStatus = "Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                        } else {
+                                                            resourceLoadError = "Error $currentResourceType: $errorMsg"
+                                                            connectionStatus = "Error $currentResourceType"
                                                         }
                                                     }
                                                 }
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier.Companion.fillMaxSize(),
-                                                    contentAlignment = Alignment.Companion.Center
-                                                ) { Text("No columns for '$currentResourceType'") }
-                                            } // M3 Text
+                                                delay(AUTOREFRESH_DELAY)
+                                            }
                                         }
-                                        // --- Стани за замовчуванням (M3 Text) ---
-                                        activeClient != null -> {
-                                            Box(
-                                                modifier = Modifier.Companion.fillMaxSize(),
-                                                contentAlignment = Alignment.Companion.Center
-                                            ) { Text(
-                                                "Connected to $selectedContext.\nChoose a resource type.",
-                                                modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                            )}
-                                        }
-
-                                        else -> {
-                                            Box(
-                                                modifier = Modifier.Companion.fillMaxSize(),
-                                                contentAlignment = Alignment.Companion.Center
-                                            ) {
-                                            Text(
-                                                text = "Choose a context.",
-                                                modifier = Modifier.Companion.align(Alignment.Companion.Center)
-                                            )}
-                                        }
+                                        // END Autorefresh
+                                        TableView(
+                                            isLoading = isLoading,
+                                            connectionStatus = connectionStatus,
+                                            errorMessage = errorMessage,
+                                            resourceLoadError = resourceLoadError,
+                                            activeClient = activeClient,
+                                            currentResourceType = currentResourceType,
+                                            selectedContext = selectedContext,
+                                            resourceLists = createResourceListsMap(
+                                                namespacesList = namespacesList,
+                                                nodesList = nodesList,
+                                                eventsList = eventsList,
+                                                podsList = podsList,
+                                                deploymentsList = deploymentsList,
+                                                statefulSetsList = statefulSetsList,
+                                                daemonSetsList = daemonSetsList,
+                                                replicaSetsList = replicaSetsList,
+                                                jobsList = jobsList,
+                                                cronJobsList = cronJobsList,
+                                                servicesList = servicesList,
+                                                ingressesList = ingressesList,
+                                                endpointsList = endpointsList,
+                                                networkPoliciesList = networkPoliciesList,
+                                                pvsList = pvsList,
+                                                pvcsList = pvcsList,
+                                                storageClassesList = storageClassesList,
+                                                configMapsList = configMapsList,
+                                                secretsList = secretsList,
+                                                serviceAccountsList = serviceAccountsList,
+                                                rolesList = rolesList,
+                                                roleBindingsList = roleBindingsList,
+                                                clusterRolesList = clusterRolesList,
+                                                clusterRoleBindingsList = clusterRoleBindingsList,
+                                                crdsList = crdsList
+                                            ),
+                                            onResourceClick = { clickedItem, resourceType ->
+                                                detailedResource = clickedItem
+                                                detailedResourceType = resourceType
+                                                showLogViewer.value = false
+                                                logViewerParams.value = null
+                                            }
+                                        )
                                     }
-                                } // Кінець table case
-                            } // Кінець when(currentView)
-                        } // Кінець Box вмісту
-                    } // Кінець Column правої панелі
-                } // Кінець Row
-                // --- Статус-бар ---
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                StatusBar(
-                    connectionStatus = connectionStatus,
-                    isLoading = isLoading
-                )
-            } // Кінець Column
-        } // Кінець Surface M3
-    }}
-}
-
-@Composable
-fun AppTextStyle(
-    style: TextStyle = MaterialTheme.typography.labelMedium,
-    content: @Composable () -> Unit
-) {
-    CompositionLocalProvider(
-        LocalContentColor provides MaterialTheme.colorScheme.onSurface,
-        LocalTextStyle provides style
-    )
- {
-        content()
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
-@Composable
-private fun NamespaceFilter(
-    selectedNamespaceFilter: String,
-    isNamespaceDropdownExpanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    isFilterEnabled: Boolean,
-    allNamespaces: List<String>,
-    onNamespaceSelected: (String) -> Unit
-) {
-    ExposedDropdownMenuBox(
-        expanded = isNamespaceDropdownExpanded,
-        onExpandedChange = { if (isFilterEnabled) onExpandedChange(it) },
-        modifier = Modifier.Companion.fillMaxWidth().padding(bottom = 4.dp)
-    ) {
-        TextField(
-            value = selectedNamespaceFilter,
-            onValueChange = {},
-            readOnly = true,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isNamespaceDropdownExpanded) },
-            modifier = Modifier.Companion
-                .menuAnchor(MenuAnchorType.Companion.PrimaryNotEditable, enabled = true)
-                .fillMaxWidth(),
-            enabled = isFilterEnabled,
-            colors = ExposedDropdownMenuDefaults.textFieldColors()
-        )
-        ExposedDropdownMenu(
-            expanded = isNamespaceDropdownExpanded,
-            onDismissRequest = { onExpandedChange(false) }
-        ) {
-            allNamespaces.forEach { nsName ->
-                DropdownMenuItem(
-                    text = { Text(nsName) },
-                    onClick = {
-                        if (selectedNamespaceFilter != nsName) {
-                            onNamespaceSelected(nsName)
-                            onExpandedChange(false)
-                        }
+                                }
+                            }
+                        } // End right panel
                     }
-                )
+                    // --- Status bar ---
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    StatusBar(
+                        connectionStatus = connectionStatus,
+                        isLoading = isLoading
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun StatusBar(
-    connectionStatus: String,
-    isLoading: Boolean
-) {
-    Row(
-        modifier = Modifier.Companion.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.Companion.CenterVertically
-    ) {
-        Text(
-            text = connectionStatus,
-            modifier = Modifier.Companion.weight(1f),
-            style = MaterialTheme.typography.labelSmall
-        )
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.Companion.size(16.dp),
-                strokeWidth = 2.dp
-            )
-        }
-    }
-}
+
+
+
+
+
 
 
 

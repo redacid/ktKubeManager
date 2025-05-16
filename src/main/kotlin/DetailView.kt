@@ -46,12 +46,15 @@ import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 
+
+
+
 @Composable
 fun ResourceDetailPanel(
     resource: Any?,
     resourceType: String?,
     onClose: () -> Unit,
-    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit // Додано callback
+    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit
 ) {
     if (resource == null || resourceType == null) return
 
@@ -62,8 +65,8 @@ fun ResourceDetailPanel(
             verticalAlignment = Alignment.Companion.CenterVertically
         ) {
             Button(onClick = onClose) {
-                Icon(ICON_LEFT, contentDescription = "Back");
-                Spacer(Modifier.Companion.width(4.dp));
+                Icon(ICON_LEFT, contentDescription = "Back")
+                Spacer(Modifier.Companion.width(4.dp))
                 Text("Back")
             }
             Spacer(Modifier.Companion.weight(1f))
@@ -82,7 +85,7 @@ fun ResourceDetailPanel(
         // --- Уміст деталей ---
         Box(modifier = Modifier.Companion.weight(1f).verticalScroll(rememberScrollState())) {
             Column(modifier = Modifier.Companion.padding(top = 8.dp)) {
-                // --- Виклик відповідного DetailsView ---
+                // --- Виклик відповідного .DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в .PodDetailsView
                     "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName ->

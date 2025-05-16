@@ -318,7 +318,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
 
         if (volumesState.value) {
             LazyColumn(
-                modifier = Modifier.Companion.heightIn(max = 300.dp)
+                modifier = Modifier.Companion.heightIn(max = 3300.dp)
             ) {
                 items(ds.spec?.template?.spec?.volumes ?: emptyList()) { volume ->
                     Card(

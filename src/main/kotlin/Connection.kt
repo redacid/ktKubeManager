@@ -395,10 +395,10 @@ fun findArgumentValue(args: List<String>, argName: String): String? {
     }
 }
 
-private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
-    return envList?.find { it.name == key }?.value
-}
+//private fun findEnvValue(envList: List<ExecEnvVar>?, key: String): String? {
+//    return envList?.find { it.name == key }?.value
+//}
 
-private val ClusterConfig.awsProfile: String?
-    get() = profileName.ifBlank { null }
+//private val ClusterConfig.awsProfile: String?
+//    get() = profileName.ifBlank { null }
 

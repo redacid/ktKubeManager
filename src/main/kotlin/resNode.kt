@@ -153,21 +153,21 @@ fun NodeDetailsView(node: Node) {
         // Taints section
         Row(
             modifier = Modifier.fillMaxWidth()
-                .clickable { showTaints.value = !showTaints.value }
+                //.clickable { showTaints.value = !showTaints.value }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (showTaints.value) ICON_DOWN else ICON_RIGHT,
-                contentDescription = "Expand Taints"
-            )
+//            Icon(
+//                imageVector = if (showTaints.value) ICON_DOWN else ICON_RIGHT,
+//                contentDescription = "Expand Taints"
+//            )
             Text(
                 text = "Taints (${node.spec?.taints?.size ?: 0})",
                 style = MaterialTheme.typography.titleSmall
             )
         }
 
-        if (showTaints.value) {
+       // if (showTaints.value) {
             if (node.spec?.taints.isNullOrEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -257,7 +257,7 @@ fun NodeDetailsView(node: Node) {
                     }
                 }
             }
-        }
+      //  }
 
         Spacer(Modifier.height(16.dp))
 
@@ -394,7 +394,7 @@ fun NodeDetailsView(node: Node) {
 
         if (showConditions.value) {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 300.dp)
+                modifier = Modifier.heightIn(max = 3300.dp)
             ) {
                 items(node.status?.conditions ?: emptyList()) { condition ->
                     val statusColor = when (condition.status) {
@@ -516,7 +516,7 @@ fun NodeDetailsView(node: Node) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(modifier = Modifier.heightIn(max = 400.dp).padding(12.dp)) {
+                    Column(modifier = Modifier.heightIn(max = 3400.dp).padding(12.dp)) {
                         Text(
                             text = "Images cached on this node:",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),

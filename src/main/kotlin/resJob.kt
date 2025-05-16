@@ -141,7 +141,7 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
 
         if (containerState.value) {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 400.dp)
+                modifier = Modifier.heightIn(max = 3400.dp)
             ) {
                 items(job.spec?.template?.spec?.containers ?: emptyList()) { container ->
                     Card(
@@ -696,7 +696,7 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
 // Допоміжна функція для обчислення тривалості поза композебл функцією
 fun calculateJobDuration(startTimeStr: String?, completionTimeStr: String?): String {
     if (startTimeStr == null || completionTimeStr == null) {
-        return "Не вдалося розрахувати"
+        return "Error while calculating job duration"
     }
 
     return try {
@@ -716,6 +716,6 @@ fun calculateJobDuration(startTimeStr: String?, completionTimeStr: String?): Str
             else -> "${seconds}s"
         }
     } catch (e: Exception) {
-        "Не вдалося розрахувати"
+        "Error while calculating job duration: "+ e
     }
 }

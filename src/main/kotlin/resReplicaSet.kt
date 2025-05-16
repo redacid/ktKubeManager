@@ -226,7 +226,7 @@ fun ReplicaSetDetailsView(replicaSet: ReplicaSet) {
 
         if (containerState.value) {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 400.dp)
+                modifier = Modifier.heightIn(max = 3400.dp)
             ) {
                 items(replicaSet.spec?.template?.spec?.containers ?: emptyList()) { container ->
                     Card(

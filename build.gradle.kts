@@ -178,7 +178,7 @@ compose.desktop {
             description = "Kubernetes Manager"
 
             macOS {
-                iconFile.set(project.file("kubernetes_manager_icon.png"))
+                iconFile.set(project.file("kubernetes_manager_icon.icns"))
                 bundleID = "ua.in.ios.kubemanager"
 //                signing {
 //                    sign.set(true)
@@ -191,7 +191,7 @@ compose.desktop {
 //                }
             }
             windows {
-                iconFile.set(project.file("kubernetes_manager_icon.png"))
+                iconFile.set(project.file("kubernetes_manager_icon.ico"))
                 exePackageVersion = packageVersion
                 msiPackageVersion = packageVersion
                 vendor = "Serhii Rudenko sr@ios.in.ua"

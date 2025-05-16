@@ -83,15 +83,17 @@ fun formatAccessModes(modes: List<String>?): String {
     return modes?.joinToString(",") ?: "<none>"
 }
 
+//TODO format hour, min, sec
 fun formatJobDuration(status: JobStatus?): String {
     val start = status?.startTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     val end = status?.completionTime?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
     return when {
-        start == null -> "<pending>"; 
+        start == null -> "<pending>"
         end == null -> Duration.between(
             start, 
             OffsetDateTime.now(start.offset)
-        ).seconds.toString() + "s (running)"; else -> Duration.between(start, end).seconds.toString() + "s"
+        ).seconds.toString() + "s (running)";
+        else -> Duration.between(start, end).seconds.toString() + "s"
     }
 }
 

@@ -27,6 +27,7 @@ import compose.icons.feathericons.Lock
 import compose.icons.feathericons.Maximize2
 import compose.icons.feathericons.Minimize2
 import compose.icons.feathericons.Moon
+import compose.icons.feathericons.Play
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Search
@@ -54,6 +55,7 @@ var ICON_LEFT = FeatherIcons.ArrowLeft
 var ICON_LOGS = FeatherIcons.List
 var ICON_HELP = FeatherIcons.HelpCircle
 var ICON_INFO = FeatherIcons.Info
+var ICON_RUN = FeatherIcons.Play
 var ICON_SUCCESS = FeatherIcons.CheckCircle
 var ICON_ERROR = FeatherIcons.XCircle
 var ICON_WARNING = FeatherIcons.AlertCircle

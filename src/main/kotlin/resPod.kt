@@ -140,6 +140,10 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         DetailRow("Created", formatAge(pod.metadata?.creationTimestamp))
         DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
         DetailRow("QoS Class", pod.status?.qosClass)
+        pod.metadata?.ownerReferences?.forEach { owner ->
+            DetailRow("Controlled By", "${owner.kind}/${owner.name}")
+        }
+
 
         // Special card for readiness/status information
         val phase = pod.status?.phase
@@ -161,11 +165,11 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                     Row(verticalAlignment = Alignment.Companion.CenterVertically) {
                         Icon(
                             imageVector = when (phase.lowercase()) {
-                                "running" -> FeatherIcons.Check
-                                "pending" -> FeatherIcons.Clock
-                                "succeeded" -> FeatherIcons.CheckCircle
-                                "failed" -> FeatherIcons.AlertCircle
-                                else -> FeatherIcons.HelpCircle
+                                "running" -> ICON_RUN
+                                "pending" -> ICON_CLOCK
+                                "succeeded" -> ICON_CHECK
+                                "failed" -> ICON_WARNING
+                                else -> ICON_HELP
                             },
                             contentDescription = "Status",
                             tint = when (phase.lowercase()) {
@@ -416,7 +420,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.Companion.heightIn(max = 300.dp)
+                    modifier = Modifier.Companion.heightIn(max = 3300.dp)
                 ) {
                     items(pod.spec?.volumes ?: emptyList()) { volume ->
                         Card(
@@ -426,7 +430,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                             Column(modifier = Modifier.Companion.padding(12.dp)) {
                                 Text(
                                     text = volume.name ?: "Unnamed Volume",
-                                    //fontWeight = FontWeight.Companion.Bold
+                                    fontWeight = FontWeight.Companion.Bold
                                 )
 
                                 Spacer(Modifier.Companion.height(4.dp))
@@ -547,11 +551,12 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                         Text("No annotations found", modifier = Modifier.Companion.padding(vertical = 4.dp))
                     } else {
                         pod.metadata?.annotations?.entries?.sortedBy { it.key }?.forEach { (key, value) ->
-                            Column(
+                            Row(
                                 modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp)
                             ) {
                                 Text(
                                     text = key,
+                                    fontWeight = FontWeight.Companion.Bold,
                                     style = MaterialTheme.typography.bodyMedium.copy(/*fontWeight = FontWeight.Companion.SemiBold*/),
                                 )
                                 Text(
@@ -570,7 +575,7 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
     }
 }
 
-// === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА (M3) ===
+// === ДІАЛОГ ВИБОРУ КОНТЕЙНЕРА ===
 @Composable
 fun ContainerSelectionDialog(
     containers: List<String>, onDismiss: () -> Unit, onContainerSelected: (String) -> Unit

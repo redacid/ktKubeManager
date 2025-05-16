@@ -1,5 +1,4 @@
 import java.awt.*
-import java.awt.geom.*
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -108,7 +107,7 @@ fun generateAllIcons() {
     val mainIconSize = 64
 
     // Спочатку генеруємо головну іконку високої якості
-    drawGitBranchForkIcon(mainIconPath, mainIconSize)
+    //drawGitBranchForkIcon(mainIconPath, mainIconSize)
 
     // Додаткові розміри
     val sizes = listOf(16, 32)

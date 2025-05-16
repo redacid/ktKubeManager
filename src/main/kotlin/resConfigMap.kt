@@ -1,6 +1,7 @@
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -57,8 +58,9 @@ fun ConfigMapDetailsView(cm: ConfigMap) {
                     Text(
                         text = "$key:",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Companion.Bold),
-                        modifier = Modifier.Companion.width(150.dp)
+                        //modifier = Modifier.Companion.width(450.dp)
                     )
+                    Spacer(modifier = Modifier.Companion.width(4.dp))
                     Text(
                         text = cmValue,
                         style = MaterialTheme.typography.bodyMedium,

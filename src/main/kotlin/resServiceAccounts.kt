@@ -421,15 +421,15 @@ fun ServiceAccountDetailsView(serviceAccount: ServiceAccount) {
                                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                     ),
-                                    modifier = Modifier.Companion.height(28.dp)
+                                    modifier = Modifier.Companion.height(38.dp)
                                 ) {
                                     Icon(
                                         imageVector = FeatherIcons.Copy,
                                         contentDescription = "Copy YAML",
-                                        modifier = Modifier.Companion.size(14.dp)
+                                        modifier = Modifier.Companion.size(24.dp)
                                     )
-                                    Spacer(Modifier.Companion.width(4.dp))
-                                    Text("Copy", fontSize = 12.sp)
+                                    //Spacer(Modifier.Companion.width(4.dp))
+                                    //Text("Copy", fontSize = 12.sp)
                                 }
                             }
                         }
