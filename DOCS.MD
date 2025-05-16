@@ -23,3 +23,5 @@ https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28
 https://www.figma.com/
 
 https://github.com/terrakok/kmp-awesome#-compose-ui
+
+https://github.com/SnipMeDev/KodeView

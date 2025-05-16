@@ -107,7 +107,7 @@ fun generateAllIcons() {
     val mainIconSize = 64
 
     // Спочатку генеруємо головну іконку високої якості
-    drawGitBranchForkIcon(mainIconPath, mainIconSize)
+    //drawGitBranchForkIcon(mainIconPath, mainIconSize)
 
     // Додаткові розміри
     val sizes = listOf(16, 32)
