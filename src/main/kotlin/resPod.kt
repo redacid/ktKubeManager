@@ -72,7 +72,10 @@ suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) =
 
 @Preview
 @Composable
-fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) {
+fun PodDetailsView(pod: Pod,
+                   onShowLogsRequest: (containerName: String) -> Unit,
+                   onOwnerClick: ((kind: String, name: String, namespace: String?) -> Unit)? = null
+) {
     val showContainerDialog = remember { mutableStateOf(false) }
     val containers = remember(pod) { pod.spec?.containers ?: emptyList() }
     val showContainerStatuses = remember { mutableStateOf(true) }
@@ -140,8 +143,24 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         DetailRow("Created", formatAge(pod.metadata?.creationTimestamp))
         DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
         DetailRow("QoS Class", pod.status?.qosClass)
-        pod.metadata?.ownerReferences?.forEach { owner ->
-            DetailRow("Controlled By", "${owner.kind}/${owner.name}")
+        pod.metadata?.ownerReferences?.firstOrNull()?.let { owner ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clickable {
+                        onOwnerClick?.invoke(
+                            owner.kind,
+                            owner.name,
+                            pod.metadata?.namespace
+                        )
+                    },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                pod.metadata?.ownerReferences?.forEach { owner ->
+                    DetailRow("Controlled By", "${owner.kind}/${owner.name}")
+                }
+            }
         }
 
 

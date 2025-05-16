@@ -27,6 +27,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -59,7 +60,8 @@ import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.KubernetesClient
-
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 @OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
 @Composable
 fun NamespaceFilter(
@@ -593,15 +595,62 @@ fun DetailsView(
     resource: HasMetadata?,
     resourceType: String?,
     onClose: () -> Unit,
-    onShowLogsRequest: (String, String, String) -> Unit
+    onShowLogsRequest: (String, String, String) -> Unit,
+    onResourceClick: ((HasMetadata, String) -> Unit)? = null
 ) {
-    ResourceDetailPanel(
-        resource = resource,
-        resourceType = resourceType,
-        onClose = onClose,
-        onShowLogsRequest = onShowLogsRequest
-    )
+    val coroutineScope = rememberCoroutineScope()
+
+    when (resource) {
+        is Pod -> PodDetailsView(
+            pod = resource,
+            onShowLogsRequest = { containerName ->
+                onShowLogsRequest(
+                    resource.metadata?.namespace ?: "",
+                    resource.metadata?.name ?: "",
+                    containerName
+                )
+            },
+            onOwnerClick = { kind, name, namespace ->
+                // Створюємо ObjectMeta для отримання деталей
+                val metadata = io.fabric8.kubernetes.api.model.ObjectMeta()
+                metadata.name = name
+                metadata.namespace = namespace
+
+                // Конвертуємо kind в resourceType
+                val parentResourceType = when (kind) {
+                    "ReplicaSet" -> "ReplicaSets"
+                    "Deployment" -> "Deployments"
+                    "StatefulSet" -> "StatefulSets"
+                    "DaemonSet" -> "DaemonSets"
+                    "Job" -> "Jobs"
+                    else -> null
+                }
+
+                if (parentResourceType != null) {
+                    // Запускаємо корутину для отримання деталей
+                    coroutineScope.launch {
+                        fetchResourceDetails(activeClient, parentResourceType, metadata)
+                            .onSuccess { parentResource ->
+                                onResourceClick?.invoke(parentResource, parentResourceType)
+                            }
+                    }
+                }
+            }
+        )
+        is ReplicaSet -> ReplicaSetDetailsView(replicaSet = resource)
+        is Deployment -> DeploymentDetailsView(dep = resource)
+        is StatefulSet -> StatefulSetDetailsView(sts = resource)
+        is DaemonSet -> DaemonSetDetailsView(ds = resource)
+        is Job -> JobDetailsView(job = resource)
+        else -> ResourceDetailPanel(
+            resource = resource,
+            resourceType = resourceType,
+            onClose = onClose,
+            onShowLogsRequest = onShowLogsRequest
+        )
+    }
 }
+
 
 @Composable
 fun TableView(

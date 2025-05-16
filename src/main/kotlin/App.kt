@@ -1019,6 +1019,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                 detailedResource = null
                                                 detailedResourceType = null
                                                 showLogViewer.value = true
+                                            },
+                                            onResourceClick = { resource, type ->
+                                                detailedResource = resource
+                                                detailedResourceType = type
+                                                showLogViewer.value = false
+                                                logViewerParams.value = null
                                             }
                                         )
                                     }
