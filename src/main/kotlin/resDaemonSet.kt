@@ -1,5 +1,6 @@
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Box
 import compose.icons.feathericons.Database
@@ -108,7 +110,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
 
         if (containerState.value) {
             LazyColumn(
-                modifier = Modifier.Companion.heightIn(max = 400.dp)
+                modifier = Modifier.Companion.heightIn(max = 3300.dp)
             ) {
                 items(ds.spec?.template?.spec?.containers ?: emptyList()) { container ->
                     Card(
@@ -124,8 +126,9 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                 modifier = Modifier.Companion.fillMaxWidth()
                             ) {
                                 Icon(
-                                    imageVector = FeatherIcons.Box,
+                                    imageVector = ICON_BOX,
                                     contentDescription = "Container",
+                                    tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.Companion.size(20.dp)
                                 )
                                 Spacer(Modifier.Companion.width(8.dp))
@@ -151,7 +154,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                         modifier = Modifier.Companion.padding(top = 4.dp)
                                     ) {
                                         Icon(
-                                            imageVector = FeatherIcons.Server,
+                                            imageVector = ICON_SERVER,
                                             contentDescription = "Ports",
                                             modifier = Modifier.Companion.size(16.dp)
                                         )
@@ -171,7 +174,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                         modifier = Modifier.Companion.padding(top = 4.dp)
                                     ) {
                                         Icon(
-                                            imageVector = FeatherIcons.Terminal,
+                                            imageVector = ICON_TERMINAL,
                                             contentDescription = "Command",
                                             modifier = Modifier.Companion.size(16.dp)
                                         )
@@ -225,8 +228,9 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                                     Text(
                                                         text = "${env.name}:",
                                                         fontWeight = FontWeight.Companion.SemiBold,
-                                                        modifier = Modifier.Companion.width(180.dp)
+                                                        modifier = Modifier.Companion.width(IntrinsicSize.Max)
                                                     )
+                                                    Spacer(Modifier.Companion.width(4.dp))
                                                     SelectionContainer {
                                                         Text(
                                                             text = env.value ?: "(from source)",
@@ -283,7 +287,7 @@ fun DaemonSetDetailsView(ds: DaemonSet) {
                                                     Text(
                                                         text = mount.name,
                                                         fontWeight = FontWeight.Companion.SemiBold,
-                                                        modifier = Modifier.Companion.width(100.dp)
+                                                        modifier = Modifier.Companion.width(IntrinsicSize.Max)
                                                     )
                                                     Text(" → ")
                                                     SelectionContainer {

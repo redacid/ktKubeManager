@@ -298,7 +298,7 @@ suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClie
 
                         // Отримуємо ExecConfig
                         val execConfig: ExecConfig? = userAuth?.exec
-
+                        // TODO Тре розібраися чи воно взагалі порібно
                         // 9. Перевіряємо, чи це EKS exec
                         if (execConfig != null && (execConfig.command == "aws" || execConfig.command.endsWith("/aws"))) {
                             logger.info("Detected EKS configuration with exec command: '${execConfig.command}'. Trying to use a custom TokenProvider.")

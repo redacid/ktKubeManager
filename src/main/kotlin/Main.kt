@@ -6,7 +6,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
-import ua.`in`.ios.theme1.*
+import ua.`in`.ios.theme.*
 import kotlin.collections.firstOrNull
 
 fun main() = application {

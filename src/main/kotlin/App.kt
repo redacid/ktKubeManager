@@ -66,12 +66,11 @@ import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import ua.`in`.ios.theme1.*
+import ua.`in`.ios.theme.*
 import java.time.Duration
 
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
@@ -852,7 +851,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                     val currentFilter =
                                                         selectedNamespaceFilter // We take the current filter value
                                                     val namespaceToUse =
-                                                        if (NSResources.contains(nodeId)) currentFilter else null
+                                                        if (NoNSResources.contains(nodeId)) currentFilter else null
                                                     handleResourceLoad(nodeId, namespaceToUse)
                                                     { loadOk, errorMsg ->
                                                         if (loadOk) {
@@ -917,7 +916,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                             // --- NS filter ---
                             if (currentView == "table" && activeClient != null) {
                                 val isFilterEnabled =
-                                    NSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                                    NoNSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
                                 NamespaceFilter(
                                     selectedNamespaceFilter = selectedNamespaceFilter,
                                     isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
@@ -934,7 +933,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                 isLoading = true
                                                 coroutineScope.launch {
                                                     val namespaceToUse =
-                                                        if (NSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                        if (NoNSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
                                                     handleResourceLoad(
                                                         selectedResourceType!!,
                                                         namespaceToUse
@@ -1036,7 +1035,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                         LaunchedEffect(currentResourceType, selectedNamespaceFilter) {
                                             while (true) {
                                                 if (activeClient != null && currentResourceType != null) {
-                                                    val namespaceToUse = if (NSResources.contains(currentResourceType)) selectedNamespaceFilter else null
+                                                    val namespaceToUse = if (NoNSResources.contains(currentResourceType)) selectedNamespaceFilter else null
                                                     handleResourceLoad(currentResourceType, namespaceToUse) { loadOk, errorMsg ->
                                                         if (loadOk) {
                                                             connectionStatus = "Table Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"

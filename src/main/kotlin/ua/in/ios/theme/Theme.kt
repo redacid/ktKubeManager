@@ -1,4 +1,4 @@
-package ua.`in`.ios.theme1
+package ua.`in`.ios.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.LocalTextStyle
@@ -43,8 +43,9 @@ fun AppTheme(
 
     val dynamicThemeState = rememberDynamicMaterialThemeState(
         isDark = isDarkTheme,
-        style = PaletteStyle.TonalSpot,
+        style = PaletteStyle.Vibrant ,
         seedColor = SeedColor,
+        //extendedFidelity = true
     )
 
     DynamicMaterialTheme(

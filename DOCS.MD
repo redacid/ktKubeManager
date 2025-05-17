@@ -26,3 +26,32 @@ https://www.figma.com/
 https://github.com/terrakok/kmp-awesome#-compose-ui
 
 https://github.com/SnipMeDev/KodeView
+
+
+Add new resource:
+Create new res<Name>.kt
+    fun <Name>DetailsView
+    suspend fun load<Name>Fabric8
+
+Common.kt
+    val resourceTreeData
+    val resourceLeafNodes
+    if non NS resource val NoNSResources
+
+App.kt
+    fun App
+        add var <NAME>
+        suspend fun handleResourceLoad
+        fun clearResourceLists
+        add to TableView
+DetailView.kt
+    add to ResourceDetailPanel
+
+MainView.kt
+    add in getHeadersForType
+    add in getCellData
+    
+
+    
+
+    

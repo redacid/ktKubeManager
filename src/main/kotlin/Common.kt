@@ -3,10 +3,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
@@ -56,7 +54,7 @@ val resourceLeafNodes: Set<String> = setOf(
     "CRDs"
 )
 
-val NSResources: Set<String> =
+val NoNSResources: Set<String> =
     resourceLeafNodes - setOf("Nodes", "Namespaces", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
 //val logger = LoggerFactory.getLogger("YF")!!
 
@@ -86,50 +84,6 @@ fun ErrorDialog(
     }
 }
 
-// Calculate optimal column widths based on content
-@Composable
-fun calculateColumnWidths(
-    headers: List<String>,
-    items: List<HasMetadata>,
-    resourceType: String,
-    minColumnWidth: Int = 60,
-    maxColumnWidth: Int = 500,
-    padding: Int = 16
-): List<Int> {
-    // Text measurer to calculate text dimensions
-    val textMeasurer = rememberTextMeasurer()
-    val headerStyle = MaterialTheme.typography.titleSmall
-    val cellStyle = MaterialTheme.typography.bodyMedium
-
-    return remember(headers, items, resourceType) {
-        // Initialize with minimum widths
-        val widths = MutableList(headers.size) { minColumnWidth }
-
-        // Measure header widths
-        headers.forEachIndexed { index, header ->
-            val textWidth = measureTextWidth(textMeasurer, header, headerStyle)
-            widths[index] = maxOf(
-                widths[index], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
-            )
-        }
-
-        // Measure data widths (sample up to 100 items for performance)
-        val sampleItems = if (items.size > 100) items.take(100) else items
-        sampleItems.forEach { item ->
-            headers.forEachIndexed { colIndex, _ ->
-                val cellData = getCellData(item, colIndex, resourceType)
-                val textWidth = measureTextWidth(textMeasurer, cellData, cellStyle)
-                widths[colIndex] = maxOf(
-                    widths[colIndex], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
-                )
-            }
-        }
-
-        widths
-    }
-}
-
-// Helper function to measure text width
 fun measureTextWidth(
     textMeasurer: TextMeasurer, text: String, style: TextStyle
 ): Int {
