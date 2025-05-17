@@ -156,8 +156,9 @@ fun ServiceDetailsView(svc: Service) {
             }
         }
 
-        HorizontalDivider(modifier = Modifier.Companion.padding(vertical = 8.dp))
-
+        // TODO Add get endpoints
+//        HorizontalDivider(modifier = Modifier.Companion.padding(vertical = 8.dp))
+//
 //        // Endpoints section
 //        Row(
 //            modifier = Modifier
