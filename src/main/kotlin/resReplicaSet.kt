@@ -168,7 +168,7 @@ fun ReplicaSetDetailsView(replicaSet: ReplicaSet,
 
             ) {
                 replicaSet.metadata?.ownerReferences?.forEach { owner ->
-                    Text("Controlled By ${owner.kind}/${owner.name}")
+                    Text("Controlled By ${owner.kind} / ${owner.name}")
                 }
             }
         }
