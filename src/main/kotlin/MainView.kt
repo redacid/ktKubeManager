@@ -601,22 +601,14 @@ fun DetailsView(
     val coroutineScope = rememberCoroutineScope()
 
     when (resource) {
-        is Pod -> PodDetailsView(
-            pod = resource,
-            onShowLogsRequest = { containerName ->
-                onShowLogsRequest(
-                    resource.metadata?.namespace ?: "",
-                    resource.metadata?.name ?: "",
-                    containerName
-                )
-            },
+        is Pod -> ResourceDetailPanel(
+            resource = resource,
+            resourceType = resourceType,
+            onClose = onClose,
             onOwnerClick = { kind, name, namespace ->
-                // Створюємо ObjectMeta для отримання деталей
                 val metadata = io.fabric8.kubernetes.api.model.ObjectMeta()
                 metadata.name = name
                 metadata.namespace = namespace
-
-                // Конвертуємо kind в resourceType
                 val parentResourceType = when (kind) {
                     "ReplicaSet" -> "ReplicaSets"
                     "Deployment" -> "Deployments"
@@ -625,7 +617,6 @@ fun DetailsView(
                     "Job" -> "Jobs"
                     else -> null
                 }
-
                 if (parentResourceType != null) {
                     // Запускаємо корутину для отримання деталей
                     coroutineScope.launch {
@@ -635,14 +626,43 @@ fun DetailsView(
                             }
                     }
                 }
-            }
+            },
+            onShowLogsRequest = onShowLogsRequest
         )
-        is ReplicaSet -> ReplicaSetDetailsView(replicaSet = resource)
-        is Deployment -> DeploymentDetailsView(dep = resource)
-        is StatefulSet -> StatefulSetDetailsView(sts = resource)
-        is DaemonSet -> DaemonSetDetailsView(ds = resource)
-        is Job -> JobDetailsView(job = resource)
-        else -> ResourceDetailPanel(
+        is ReplicaSet -> ResourceDetailPanel(
+            resource = resource,
+            resourceType = resourceType,
+            onClose = onClose,
+            onOwnerClick = { kind, name, namespace ->
+                val metadata = io.fabric8.kubernetes.api.model.ObjectMeta()
+                metadata.name = name
+                metadata.namespace = namespace
+                val parentResourceType = when (kind) {
+                    "ReplicaSet" -> "ReplicaSets"
+                    "Deployment" -> "Deployments"
+                    "StatefulSet" -> "StatefulSets"
+                    "DaemonSet" -> "DaemonSets"
+                    "Job" -> "Jobs"
+                    else -> null
+                }
+                if (parentResourceType != null) {
+                    // Запускаємо корутину для отримання деталей
+                    coroutineScope.launch {
+                        fetchResourceDetails(activeClient, parentResourceType, metadata)
+                            .onSuccess { parentResource ->
+                                onResourceClick?.invoke(parentResource, parentResourceType)
+                            }
+                    }
+                }
+            },
+            onShowLogsRequest = onShowLogsRequest
+        )
+//        is Deployment -> DeploymentDetailsView(dep = resource)
+//        is StatefulSet -> StatefulSetDetailsView(sts = resource)
+//        is DaemonSet -> DaemonSetDetailsView(ds = resource)
+//        is Job -> JobDetailsView(job = resource)
+        else ->
+            ResourceDetailPanel(
             resource = resource,
             resourceType = resourceType,
             onClose = onClose,

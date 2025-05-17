@@ -46,12 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.Check
-import compose.icons.feathericons.CheckCircle
-import compose.icons.feathericons.Clock
 import compose.icons.feathericons.HardDrive
-import compose.icons.feathericons.HelpCircle
 import compose.icons.feathericons.Info
 import compose.icons.feathericons.X
 import io.fabric8.kubernetes.api.model.Pod
@@ -144,25 +140,20 @@ fun PodDetailsView(pod: Pod,
         DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
         DetailRow("QoS Class", pod.status?.qosClass)
         pod.metadata?.ownerReferences?.firstOrNull()?.let { owner ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clickable {
-                        onOwnerClick?.invoke(
-                            owner.kind,
-                            owner.name,
-                            pod.metadata?.namespace
-                        )
-                    },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            Button(
+                onClick = { onOwnerClick?.invoke(
+                    owner.kind,
+                    owner.name,
+                    pod.metadata?.namespace
+                )},
+                colors = ButtonDefaults.buttonColors()
+
             ) {
                 pod.metadata?.ownerReferences?.forEach { owner ->
-                    DetailRow("Controlled By", "${owner.kind}/${owner.name}")
+                    Text("Controlled By ${owner.kind}/${owner.name}")
                 }
             }
         }
-
 
         // Special card for readiness/status information
         val phase = pod.status?.phase

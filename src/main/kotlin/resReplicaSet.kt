@@ -27,7 +27,9 @@ suspend fun loadReplicaSetsFabric8(client: KubernetesClient?, namespace: String?
     }
 
 @Composable
-fun ReplicaSetDetailsView(replicaSet: ReplicaSet) {
+fun ReplicaSetDetailsView(replicaSet: ReplicaSet,
+                          onOwnerClick: ((kind: String, name: String, namespace: String?) -> Unit)? = null
+) {
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -115,42 +117,58 @@ fun ReplicaSetDetailsView(replicaSet: ReplicaSet) {
         Spacer(Modifier.height(8.dp))
 
         // Власник
+//        replicaSet.metadata?.ownerReferences?.firstOrNull()?.let { owner ->
+//            Card(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(vertical = 4.dp),
+//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+//            ) {
+//                Row(
+//                    modifier = Modifier.padding(8.dp),
+//                    verticalAlignment = Alignment.CenterVertically
+//                ) {
+//                    Icon(
+//                        imageVector = FeatherIcons.Link,
+//                        contentDescription = "Owner",
+//                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+//                        modifier = Modifier.size(20.dp)
+//                    )
+//                    Spacer(Modifier.width(8.dp))
+//                    Column {
+//                        Text(
+//                            text = "Controlled by: ${owner.kind} ${owner.name}",
+//                            fontWeight = FontWeight.SemiBold,
+//                            color = MaterialTheme.colorScheme.onSecondaryContainer
+//                        )
+//                        Row {
+//                            Text(
+//                                text = "Controller: ${owner.controller ?: false}",
+//                                style = MaterialTheme.typography.bodySmall
+//                            )
+//                            Spacer(Modifier.width(8.dp))
+//                            Text(
+//                                text = "UID: ${owner.uid}",
+//                                style = MaterialTheme.typography.bodySmall
+//                            )
+//                        }
+//                    }
+//                }
+//            }
+//        }
+
         replicaSet.metadata?.ownerReferences?.firstOrNull()?.let { owner ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            Button(
+                onClick = { onOwnerClick?.invoke(
+                    owner.kind,
+                    owner.name,
+                    replicaSet.metadata?.namespace
+                )},
+                colors = ButtonDefaults.buttonColors()
+
             ) {
-                Row(
-                    modifier = Modifier.padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Link,
-                        contentDescription = "Owner",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "Controlled by: ${owner.kind} ${owner.name}",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Row {
-                            Text(
-                                text = "Controller: ${owner.controller ?: false}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "UID: ${owner.uid}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
+                replicaSet.metadata?.ownerReferences?.forEach { owner ->
+                    Text("Controlled By ${owner.kind}/${owner.name}")
                 }
             }
         }

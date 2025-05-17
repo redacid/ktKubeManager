@@ -1,24 +1,12 @@
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.dp
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
@@ -163,54 +151,9 @@ fun convertJsonToYaml(jsonString: String): String {
     }
 }
 
-@Composable
-fun DetailRow(label: String, value: String?) {
-    Row(modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text( // M3 Text
-            text = "$label:",
-            style = MaterialTheme.typography.titleSmall.copy(/*fontWeight = FontWeight.Companion.Bold*/), // M3 Typography
-            modifier = Modifier.Companion.width(150.dp),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text( // M3 Text
-            text = value ?: "<none>", style = MaterialTheme.typography.bodyMedium, // M3 Typography
-            modifier = Modifier.Companion.weight(1f),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-// TODO: use this in all detailView functions
-@Composable
-fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded.value = !expanded.value }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.Companion.CenterVertically
-    ) {
-        Icon(
-            imageVector = if (expanded.value) ICON_DOWN else ICON_RIGHT,
-            contentDescription = "Toggle $title"
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            //fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-    HorizontalDivider(
-        color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
 suspend fun <T> fetchK8sResource(
-    client: KubernetesClient?, resourceType: String, namespace: String?, // Додано параметр неймспейсу
-    apiCall: (KubernetesClient, String?) -> List<T>? // Лямбда тепер приймає клієнт і неймспейс
+    client: KubernetesClient?, resourceType: String, namespace: String?,
+    apiCall: (KubernetesClient, String?) -> List<T>?
 ): Result<List<T>> {
     if (client == null) return Result.failure(IllegalStateException("Kubernetes client is not initialized"))
     val targetNamespace = if (namespace == ALL_NAMESPACES_OPTION) null else namespace

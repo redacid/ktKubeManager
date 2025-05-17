@@ -1,3 +1,4 @@
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,12 +56,13 @@ fun ResourceDetailPanel(
     resource: Any?,
     resourceType: String?,
     onClose: () -> Unit,
+    onOwnerClick: ((kind: String, name: String, namespace: String?) -> Unit)? = null,
     onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit
 ) {
     if (resource == null || resourceType == null) return
 
     Column(modifier = Modifier.Companion.fillMaxSize().padding(8.dp)) {
-        // --- Верхня панель ---
+        // --- Detail Header ---
         Row(
             modifier = Modifier.Companion.fillMaxWidth().padding(bottom = 8.dp),
             verticalAlignment = Alignment.Companion.CenterVertically
@@ -80,7 +83,7 @@ fun ResourceDetailPanel(
             Spacer(Modifier.Companion.weight(1f))
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        // ---
+        // --- End Detail Header
 
         // --- Уміст деталей ---
         Box(modifier = Modifier.Companion.weight(1f).verticalScroll(rememberScrollState())) {
@@ -88,7 +91,10 @@ fun ResourceDetailPanel(
                 // --- Виклик відповідного .DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в .PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName ->
+                    "Pods" -> if (resource is Pod) PodDetailsView(
+                        pod = resource,
+                        onOwnerClick = onOwnerClick,
+                        onShowLogsRequest = { containerName ->
                             (resource as? HasMetadata)?.metadata?.let { meta ->
                                 onShowLogsRequest(
                                     meta.namespace,
@@ -96,7 +102,8 @@ fun ResourceDetailPanel(
                                     containerName
                                 )
                             } ?: logger.error("Metadata is null for Pod.")
-                        }) else Text("Invalid Pod data")
+                        })
+                    else Text("Invalid Pod data")
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -111,7 +118,7 @@ fun ResourceDetailPanel(
                     "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
                     "Jobs" -> if (resource is Job) JobDetailsView(job = resource) else Text("Invalid Job data")
                     "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource,onOwnerClick = onOwnerClick) else Text("Invalid ReplicaSet data")
                     "NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(networkPolicy = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
                     "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
@@ -145,4 +152,51 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
     DetailRow("UID", resource.metadata?.uid)
     DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
     DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
+}
+
+@Composable
+fun DetailRow(label: String, value: String?) {
+    Row(modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp)) {
+        Spacer(Modifier.Companion.width(16.dp))
+        Text( // M3 Text
+            text = "$label:",
+            style = MaterialTheme.typography.titleSmall.copy(/*fontWeight = FontWeight.Companion.Bold*/),
+            modifier = Modifier.Companion.width(150.dp),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text( // M3 Text
+            text = value ?: "<none>",
+            style = MaterialTheme.typography.bodyMedium, // M3 Typography
+            modifier = Modifier.Companion.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+// TODO: use this in all detailView functions
+@Composable
+fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded.value = !expanded.value }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.Companion.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (expanded.value) ICON_DOWN else ICON_RIGHT,
+            contentDescription = "Toggle $title"
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            //fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
