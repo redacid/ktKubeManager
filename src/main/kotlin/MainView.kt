@@ -686,7 +686,7 @@ fun TableView(
     resourceLists: Map<String, List<HasMetadata>>,
     onResourceClick: (HasMetadata, String) -> Unit
 ) {
-    val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
+    //val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
 
     when {
         isLoading -> LoadingView(connectionStatus)
@@ -846,8 +846,8 @@ fun calculateColumnWidths(
     items: List<HasMetadata>,
     resourceType: String,
     minColumnWidth: Int = 60,
-    maxColumnWidth: Int = 500,
-    padding: Int = 16
+    maxColumnWidth: Int = 400,
+    padding: Int = 23
 ): List<Int> {
     // Text measurer to calculate text dimensions
     val textMeasurer = rememberTextMeasurer()
@@ -872,6 +872,8 @@ fun calculateColumnWidths(
             headers.forEachIndexed { colIndex, _ ->
                 val cellData = getCellData(item, colIndex, resourceType)
                 val textWidth = measureTextWidth(textMeasurer, cellData, cellStyle)
+                val minColumnWidth = measureTextWidth(textMeasurer, headers[colIndex] ,headerStyle) + padding
+                //logger.warn("cell data width: $colIndex $textWidth ${headers[colIndex]} $minColumnWidth")
                 widths[colIndex] = maxOf(
                     widths[colIndex], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
                 )
