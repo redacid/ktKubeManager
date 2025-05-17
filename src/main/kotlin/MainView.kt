@@ -660,6 +660,7 @@ fun DetailsView(
 //        is Deployment -> DeploymentDetailsView(dep = resource)
 //        is StatefulSet -> StatefulSetDetailsView(sts = resource)
 //        is DaemonSet -> DaemonSetDetailsView(ds = resource)
+         // TODO Controled by for Job
 //        is Job -> JobDetailsView(job = resource)
         else ->
             ResourceDetailPanel(

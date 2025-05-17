@@ -279,7 +279,7 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                                                     Text(
                                                         text = "${env.name}:",
                                                         fontWeight = FontWeight.SemiBold,
-                                                        modifier = Modifier.width(120.dp)
+                                                        modifier = Modifier.width(320.dp)
                                                     )
                                                     SelectionContainer {
                                                         Text(
@@ -338,7 +338,7 @@ fun JobDetailsView(job: io.fabric8.kubernetes.api.model.batch.v1.Job) {
                                                     Text(
                                                         text = mount.name,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        modifier = Modifier.width(100.dp)
+                                                        modifier = Modifier.width(300.dp)
                                                     )
                                                     Text(" → ")
                                                     SelectionContainer {
