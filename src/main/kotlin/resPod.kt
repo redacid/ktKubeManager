@@ -649,7 +649,7 @@ fun LogViewerPanel(
                     lastTimestamp = System.currentTimeMillis()
 
                     // Debug log to verify that the coroutine is running
-                    logger.debug("Polling logs - iteration ${++debugCounter}")
+                    logger.info("Polling logs - iteration ${++debugCounter}")
 
                     // Створюємо watchLog без sinceTime - просто слідкуємо за новими логами
                     // Робимо окремий запит для отримання тільки нових логів

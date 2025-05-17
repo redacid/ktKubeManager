@@ -42,7 +42,7 @@ class EksTokenProvider(
     private val accessKeyId: String? = null,
     private val secretAccessKey: String? = null
 ) : OAuthTokenProvider {
-    private val logger = LoggerFactory.getLogger(EksTokenProvider::class.java)
+    //private val logger = LoggerFactory.getLogger(EksTokenProvider::class.java)
 
     private data class CachedToken(
         val token: String,
@@ -77,7 +77,7 @@ class EksTokenProvider(
         // Перевіряємо кешований токен
         cachedToken?.let { cached ->
             if (Instant.now().plusSeconds(TOKEN_REFRESH_BEFORE_SECONDS).isBefore(cached.expiresAt)) {
-                logger.debug(
+                logger.info(
                     "Using a cached token for an EKS cluster '{}' (valid until {})",
                     clusterName,
                     cached.expiresAt
@@ -99,7 +99,7 @@ class EksTokenProvider(
     private fun generateNewToken(): String {
 
         try {
-            logger.debug("Generating a new token for the EKS cluster '$clusterName'")
+            logger.info("Generating a new token for the EKS cluster '$clusterName'")
 
             val credentials = credentialsProvider.resolveCredentials()
             val now = Instant.now()
@@ -237,8 +237,6 @@ suspend fun connectToSavedCluster(config: ClusterConfig): Result<Pair<Kubernetes
         Result.failure(e)
     }
 }
-
-
 
 suspend fun connectWithRetries(contextName: String?): Result<Pair<KubernetesClient, String>> {
     val targetContext = if (contextName.isNullOrBlank()) null else contextName

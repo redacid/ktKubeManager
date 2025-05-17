@@ -48,9 +48,6 @@ import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 
-
-
-
 @Composable
 fun ResourceDetailPanel(
     resource: Any?,
@@ -158,13 +155,13 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
 fun DetailRow(label: String, value: String?) {
     Row(modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp)) {
         Spacer(Modifier.Companion.width(16.dp))
-        Text( // M3 Text
+        Text(
             text = "$label:",
             style = MaterialTheme.typography.titleSmall.copy(/*fontWeight = FontWeight.Companion.Bold*/),
             modifier = Modifier.Companion.width(150.dp),
             color = MaterialTheme.colorScheme.onSurface
         )
-        Text( // M3 Text
+        Text(
             text = value ?: "<none>",
             style = MaterialTheme.typography.bodyMedium, // M3 Typography
             modifier = Modifier.Companion.weight(1f),

@@ -689,7 +689,8 @@ fun TableView(
 
     when {
         isLoading -> LoadingView(connectionStatus)
-        currentErrorMessageForPanel != null -> ErrorView(currentErrorMessageForPanel)
+        // commented for igroring courutine errors
+        //currentErrorMessageForPanel != null -> ErrorView(currentErrorMessageForPanel)
         activeClient != null && currentResourceType != null -> {
             ResourceTableView(
                 currentResourceType = currentResourceType,

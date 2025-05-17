@@ -58,7 +58,13 @@ val resourceLeafNodes: Set<String> = setOf(
 
 val NSResources: Set<String> =
     resourceLeafNodes - setOf("Nodes", "Namespaces", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
-val logger = LoggerFactory.getLogger("KKM")!!
+//val logger = LoggerFactory.getLogger("YF")!!
+
+val logger = LoggerFactory.getLogger("YF")!!.apply {
+    (this as ch.qos.logback.classic.Logger).level = ch.qos.logback.classic.Level.WARN
+}
+
+
 
 @Composable
 fun ErrorDialog(
@@ -175,7 +181,7 @@ suspend fun <T> fetchK8sResource(
     } catch (e: KubernetesClientException) {
         logger.error("KubeExc $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
     } catch (e: Exception) {
-        logger.error("Error $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
+        logger.error("Fetch resource Error $resourceType (NS: $nsLog): ${e.message}", e); Result.failure(e)
     }
 }
 

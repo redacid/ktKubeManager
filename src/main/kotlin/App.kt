@@ -558,7 +558,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
             onDismiss = { showErrorDialog.value = false }
         )
     }
-    //Спроба оновлювати дані на екрані, але оновлюється тільки formatAge
+    //Recomposition
     LaunchedEffect(Unit) {
         while (true) {
             delay(AUTOREFRESH_DELAY) // затримка 5 секунд
@@ -856,14 +856,14 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                     handleResourceLoad(nodeId, namespaceToUse)
                                                     { loadOk, errorMsg ->
                                                         if (loadOk) {
-                                                            connectionStatus = "Loaded $nodeId ${
+                                                            connectionStatus = "Tree View Loaded $nodeId ${
                                                                 if (namespaceToUse != null &&
                                                                     namespaceToUse != ALL_NAMESPACES_OPTION
                                                                 ) " (ns: $namespaceToUse)" else ""
                                                             }"
                                                         } else {
-                                                            resourceLoadError = "Error $nodeId: $errorMsg"
-                                                            connectionStatus = "Error $nodeId"
+                                                            resourceLoadError = "Tree View Error $nodeId: $errorMsg"
+                                                            connectionStatus = "Tree View Error $nodeId"
                                                         }
                                                         isLoading = false
                                                     }
@@ -905,10 +905,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                             val headerTitle = when {
                                 currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
                                 currentView == "table" &&
-                                        currentResourceType != null &&
-                                        activeClient != null &&
-                                        resourceLoadError == null &&
-                                        errorMessage == null -> "$currentResourceType in $selectedContext"
+                                        currentResourceType != null
+                                        && activeClient != null
+                                        // Commented for fix: The coroutine scope left the composition
+                                        //&& resourceLoadError == null
+                                        && errorMessage == null
+                                            -> "$currentResourceType in $selectedContext"
 
                                 else -> null
                             }
@@ -1037,10 +1039,10 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                     val namespaceToUse = if (NSResources.contains(currentResourceType)) selectedNamespaceFilter else null
                                                     handleResourceLoad(currentResourceType, namespaceToUse) { loadOk, errorMsg ->
                                                         if (loadOk) {
-                                                            connectionStatus = "Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                            connectionStatus = "Table Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
                                                         } else {
-                                                            resourceLoadError = "Error $currentResourceType: $errorMsg"
-                                                            connectionStatus = "Error $currentResourceType"
+                                                            resourceLoadError = "Table Error $currentResourceType: $errorMsg"
+                                                            connectionStatus = "Table Error $currentResourceType"
                                                         }
                                                     }
                                                 }
