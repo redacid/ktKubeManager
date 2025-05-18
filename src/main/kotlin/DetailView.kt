@@ -331,6 +331,23 @@ fun ShowJsonDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     Button(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        onClick = {
+                            initialState = TreeState.EXPANDED
+                        }
+                    ) {
+                        Text(text = "Expand All")
+                    }
+                    Button(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        onClick = {
+                            initialState = TreeState.FIRST_ITEM_EXPANDED
+                        }
+                    ) {
+                        Text(text = "Collapse All")
+                    }
+                    Spacer(Modifier.width(30.dp))
+                    Button(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
@@ -338,6 +355,8 @@ fun ShowJsonDialog(
                     ) {
                         Text("Close")
                     }
+
+
                 }
             }
         }
