@@ -31,6 +31,12 @@ https://github.com/square/moshi
 
 https://github.com/snappdevelopment/JsonTree.git
 
+charts
+https://github.com/dautovicharis/charts
+https://github.com/patrykandpatrick/vico
+https://github.com/hi-manshu/charty
+https://github.com/ehsannarmani/ComposeCharts
+
 
 Add new resource:
 Create new res<Name>.kt
