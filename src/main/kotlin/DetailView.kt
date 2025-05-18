@@ -16,15 +16,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +64,14 @@ import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
 import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
+import com.sebastianneubauer.jsontree.JsonTree
+import com.sebastianneubauer.jsontree.TreeColors
+import com.sebastianneubauer.jsontree.TreeState
+import com.sebastianneubauer.jsontree.defaultDarkColors
+import com.sebastianneubauer.jsontree.defaultLightColors
+
+
+
 
 @Composable
 fun ResourceDetailPanel(
@@ -225,12 +236,25 @@ private val jsonMapper = ObjectMapper().apply {
 }
 
 @Composable
+private fun ColorScheme.isLight() = this == lightColorScheme()
+
+
+@Composable
 fun ShowJsonDialog(
     resource: HasMetadata,
     onDismiss: () -> Unit
 ) {
     val windowState = remember {
         WindowState(width = 1200.dp, height = 800.dp)
+    }
+
+    val jsonString = remember(resource.metadata?.uid) {
+        try {
+            jsonMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(resource)
+        } catch (e: Exception) {
+            "Помилка серіалізації JSON: ${e.message}"
+        }
     }
 
     Window(
@@ -249,39 +273,32 @@ fun ShowJsonDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(4.dp)
+                        )
                 ) {
-                    val scrollState = rememberScrollState()
-
-                    Row {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(4.dp)
-                                )
-                        ) {
+                    JsonTree(
+                        modifier = Modifier.fillMaxSize(),
+                        json = jsonString,
+                        colors = TreeColors(
+                                keyColor = MaterialTheme.colorScheme.primary,
+                                stringValueColor = MaterialTheme.colorScheme.secondary,
+                                numberValueColor = MaterialTheme.colorScheme.scrim,
+                                booleanValueColor = MaterialTheme.colorScheme.tertiary,
+                                nullValueColor = MaterialTheme.colorScheme.tertiary,
+                                indexColor = MaterialTheme.colorScheme.tertiary,
+                                symbolColor = MaterialTheme.colorScheme.tertiary,
+                                iconColor = MaterialTheme.colorScheme.tertiary
+                            ),
+                        onLoading = {
                             Text(
-                                text = try {
-                                    jsonMapper.writerWithDefaultPrettyPrinter()
-                                        .writeValueAsString(resource)
-                                } catch (e: Exception) {
-                                    "Serialization error JSON: ${e.message}"
-                                },
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .verticalScroll(scrollState),
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontFamily = FontFamily.Monospace
-                                )
+                                text = "Loading JSON...",
+                                modifier = Modifier.padding(8.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-
-                        VerticalScrollbar(
-                            modifier = Modifier.fillMaxHeight(),
-                            adapter = rememberScrollbarAdapter(scrollState)
-                        )
-                    }
+                    )
                 }
 
                 Row(
@@ -301,6 +318,9 @@ fun ShowJsonDialog(
         }
     }
 }
+
+
+
 
 @Composable
 fun JsonViewButton(resource: HasMetadata) {

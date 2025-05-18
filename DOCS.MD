@@ -27,6 +27,10 @@ https://github.com/terrakok/kmp-awesome#-compose-ui
 
 https://github.com/SnipMeDev/KodeView
 
+https://github.com/square/moshi
+
+https://github.com/snappdevelopment/JsonTree.git
+
 
 Add new resource:
 Create new res<Name>.kt
