@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -248,6 +249,8 @@ fun ShowJsonDialog(
         WindowState(width = 1200.dp, height = 800.dp)
     }
 
+    var initialState: TreeState by remember { mutableStateOf(TreeState.FIRST_ITEM_EXPANDED) }
+
     val jsonString = remember(resource.metadata?.uid) {
         try {
             jsonMapper.writerWithDefaultPrettyPrinter()
@@ -278,27 +281,49 @@ fun ShowJsonDialog(
                             RoundedCornerShape(4.dp)
                         )
                 ) {
-                    JsonTree(
-                        modifier = Modifier.fillMaxSize(),
-                        json = jsonString,
-                        colors = TreeColors(
-                                keyColor = MaterialTheme.colorScheme.primary,
-                                stringValueColor = MaterialTheme.colorScheme.secondary,
-                                numberValueColor = MaterialTheme.colorScheme.scrim,
-                                booleanValueColor = MaterialTheme.colorScheme.tertiary,
-                                nullValueColor = MaterialTheme.colorScheme.tertiary,
-                                indexColor = MaterialTheme.colorScheme.tertiary,
-                                symbolColor = MaterialTheme.colorScheme.tertiary,
-                                iconColor = MaterialTheme.colorScheme.tertiary
-                            ),
-                        onLoading = {
-                            Text(
-                                text = "Loading JSON...",
-                                modifier = Modifier.padding(8.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    )
+                    SelectionContainer(
+                        modifier = Modifier
+                    ) {
+                        JsonTree(
+                            modifier = Modifier.fillMaxSize(),
+
+                            json = jsonString,
+                            colors = if (MaterialTheme.colorScheme.isLight()) {
+                                TreeColors(
+                                    keyColor = MaterialTheme.colorScheme.primary,
+                                    stringValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    numberValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    booleanValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    nullValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    indexColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    symbolColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                TreeColors(
+                                    keyColor = MaterialTheme.colorScheme.primary,
+                                    stringValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    numberValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    booleanValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    nullValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    indexColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    symbolColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            onLoading = {
+                                Text(
+                                    text = "Loading...",
+                                    modifier = Modifier.padding(8.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            initialState = initialState,
+                            showIndices = true,
+                            showItemCount = true,
+                            expandSingleChildren = true,
+                        )
+                    }
                 }
 
                 Row(
