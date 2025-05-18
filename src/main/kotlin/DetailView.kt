@@ -32,6 +32,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -259,11 +261,14 @@ fun ShowJsonDialog(
             "Помилка серіалізації JSON: ${e.message}"
         }
     }
-
+    val iconPainter = IconsBase64.getIcon(32)?.let {
+        BitmapPainter(it.toComposeImageBitmap())
+    }
     Window(
         onCloseRequest = onDismiss,
         title = "JSON View: ${resource.metadata?.name ?: "Resource"}",
-        state = windowState
+        state = windowState,
+        icon = iconPainter
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
