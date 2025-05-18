@@ -11,6 +11,7 @@ import compose.icons.feathericons.Box
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.CheckCircle
 import compose.icons.feathericons.Clock
+import compose.icons.feathericons.Code
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Database
 import compose.icons.feathericons.Edit
@@ -85,6 +86,7 @@ var ICON_SETTINGS = FeatherIcons.Settings
 var ICON_LIGHT_THEME = FeatherIcons.Sun
 var ICON_DARK_THEME = FeatherIcons.Moon
 var ICON_BOX = FeatherIcons.Box
+var ICON_CODE = FeatherIcons.Code
 var ICON_HD = FeatherIcons.HardDrive
 var ICON_DB = FeatherIcons.Database
 var ICON_MAXIMIZE = FeatherIcons.Maximize2

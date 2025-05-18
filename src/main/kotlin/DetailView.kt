@@ -1,26 +1,40 @@
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowState
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.fabric8.kubernetes.api.model.ConfigMap
 import io.fabric8.kubernetes.api.model.Endpoints
 import io.fabric8.kubernetes.api.model.Event
@@ -70,6 +84,7 @@ fun ResourceDetailPanel(
                 Text("Back")
             }
             Spacer(Modifier.Companion.weight(1f))
+
             val name = if (resource is HasMetadata) resource.metadata?.name else "Details"
             Text(
                 text = "$resourceType: $name",
@@ -78,6 +93,11 @@ fun ResourceDetailPanel(
                 overflow = TextOverflow.Companion.Ellipsis
             )
             Spacer(Modifier.Companion.weight(1f))
+
+            if (resource is HasMetadata) {
+                JsonViewButton(resource)
+                Spacer(Modifier.width(8.dp))
+            }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         // --- End Detail Header
@@ -197,3 +217,125 @@ fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
         modifier = Modifier.fillMaxWidth()
     )
 }
+
+
+private val jsonMapper = ObjectMapper().apply {
+    registerKotlinModule()
+    writerWithDefaultPrettyPrinter()
+}
+
+@Composable
+fun ShowJsonDialog(
+    resource: HasMetadata,
+    onDismiss: () -> Unit
+) {
+    val windowState = remember {
+        WindowState(width = 1200.dp, height = 800.dp)
+    }
+
+    Window(
+        onCloseRequest = onDismiss,
+        title = "JSON View: ${resource.metadata?.name ?: "Resource"}",
+        state = windowState
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    val scrollState = rememberScrollState()
+
+                    Row {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(4.dp)
+                                )
+                        ) {
+                            Text(
+                                text = try {
+                                    jsonMapper.writerWithDefaultPrettyPrinter()
+                                        .writeValueAsString(resource)
+                                } catch (e: Exception) {
+                                    "Serialization error JSON: ${e.message}"
+                                },
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .verticalScroll(scrollState),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            )
+                        }
+
+                        VerticalScrollbar(
+                            modifier = Modifier.fillMaxHeight(),
+                            adapter = rememberScrollbarAdapter(scrollState)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Close")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun JsonViewButton(resource: HasMetadata) {
+    var showJsonDialog by remember { mutableStateOf(false) }
+
+    val resourceCopy = remember(resource.metadata?.uid) {
+        try {
+            jsonMapper.readValue(
+                jsonMapper.writeValueAsString(resource),
+                resource.javaClass
+            )
+        } catch (e: Exception) {
+            logger.error("Error creating resource copy: ${e.message}")
+            resource
+        }
+    }
+
+    Button(
+        onClick = { showJsonDialog = true },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    ) {
+        Icon(ICON_CODE, contentDescription = "View JSON")
+        Spacer(Modifier.width(4.dp))
+        Text("View JSON")
+    }
+
+    if (showJsonDialog) {
+        ShowJsonDialog(
+            resource = resourceCopy,
+            onDismiss = { showJsonDialog = false }
+        )
+    }
+}
+
+
