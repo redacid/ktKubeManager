@@ -213,11 +213,11 @@ private fun validateLocalPort(portStr: String): String? {
 fun PortForwardWindow(
     onClose: () -> Unit
 ) {
-    val dialogState = remember { DialogState(width = 1200.dp, height = 800.dp) }
+    val dialogState = remember { DialogState(width = 800.dp, height = 600.dp) }
 
     DialogWindow(
         onCloseRequest = onClose,
-        title = "Port Forwards",
+        title = "Port Forward",
         state = dialogState
     ) {
         Surface(
@@ -280,7 +280,7 @@ fun PortForwardPanel(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Немає активних сесій Port Forward")
+                    Text("No active sessions Port Forward")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "Click the 'Port Forward' in the Pod Details to create a new session",
@@ -462,6 +462,56 @@ fun PortForwardSessionItem(
                 )
             }
         }
+
+        var showErrorDialog by remember { mutableStateOf(false) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
+
+// Діалог помилки
+        if (showErrorDialog && errorMessage != null) {
+            AlertDialog(
+                onDismissRequest = { showErrorDialog = false },
+                title = { Text("Помилка відкриття браузера") },
+                text = { Text(errorMessage!!) },
+                confirmButton = {
+                    Button(onClick = { showErrorDialog = false }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+
+        // Кнопка відкриття в браузері
+        Button(
+            onClick = {
+                val desktop = java.awt.Desktop.getDesktop()
+                try {
+                    // Додаємо http:// до URL, якщо схема відсутня
+                    val urlWithScheme = if (!session.url.startsWith("http://") && !session.url.startsWith("https://")) {
+                        "http://${session.url}"
+                    } else {
+                        session.url
+                    }
+
+                    desktop.browse(java.net.URI(urlWithScheme))
+                } catch (e: Exception) {
+                    logger.error("Error when opening a browser: ${e.message}")
+                    showErrorDialog = true
+                    errorMessage = "Помилка при відкритті браузера: ${e.message}"
+                }
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Icon(
+                imageVector = ICON_LINK,
+                contentDescription = "Open in Browser"
+            )
+            Spacer(Modifier.width(4.dp))
+            Text("Open in Browser")
+        }
+
 
         // Кнопка зупинки
         Button(

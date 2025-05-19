@@ -15,6 +15,7 @@ import compose.icons.feathericons.Code
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Database
 import compose.icons.feathericons.Edit
+import compose.icons.feathericons.ExternalLink
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Filter
@@ -88,6 +89,7 @@ var ICON_DARK_THEME = FeatherIcons.Moon
 var ICON_BOX = FeatherIcons.Box
 var ICON_CODE = FeatherIcons.Code
 var ICON_HD = FeatherIcons.HardDrive
+var ICON_LINK = FeatherIcons.ExternalLink
 var ICON_DB = FeatherIcons.Database
 var ICON_MAXIMIZE = FeatherIcons.Maximize2
 var ICON_MINIIMIZE = FeatherIcons.Minimize2

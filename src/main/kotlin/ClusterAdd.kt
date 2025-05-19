@@ -149,12 +149,12 @@ fun AwsProfileAddDialog(
 
 
 private fun getAwsRegions(): List<String> {
-    println("Obtaining a list of regions ...")
+    logger.info("Obtaining a list of regions ...")
     val regions = Region.regions()
         .filter { it.isGlobalRegion || it.metadata().description() != null }
         .map { it.id() }
         .sorted()
-    println("Regions were obtained: $regions")
+    logger.info("Regions were obtained: $regions")
     return regions
 }
 

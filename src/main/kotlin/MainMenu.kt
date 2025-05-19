@@ -36,7 +36,7 @@ fun exitApplication(windowState: WindowState, settingsManager: SettingsManager
         // Exit the application
         exitProcess(0)
     } catch (e: Exception) {
-        println("Error during application exit: ${e.message}")
+        logger.error("Error during application exit: ${e.message}")
         // Force exit if cleanup failed
         exitProcess(1)
     }
@@ -60,11 +60,10 @@ private fun saveApplicationState(windowState: WindowState, settingsManager: Sett
 private fun closeConnections() {
     try {
         // TODO
-        // Close any active kubernetes connections
-        // For example:
-        // kubernetesClient?.close()
+        activeClient?.close()
+        portForwardService.stopAllPortForwards()
     } catch (e: Exception) {
-        println("Failed to close connections: ${e.message}")
+        logger.error("Failed to close connections: ${e.message}")
     }
 }
 private fun cleanup() {
@@ -74,7 +73,7 @@ private fun cleanup() {
         // For example:
         // tempDir.deleteRecursively()
     } catch (e: Exception) {
-        println("Failed to cleanup resources: ${e.message}")
+        logger.error("Failed to cleanup resources: ${e.message}")
     }
 }
 
@@ -103,7 +102,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         )
     }
 
-    if (showAddProfileDialog) {  // Додаємо відображення діалогу профілю
+    if (showAddProfileDialog) {
         AwsProfileAddDialog(
             onDismiss = { showAddProfileDialog = false },
             settingsManager = settingsManager
@@ -122,32 +121,41 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         )
     }
 
-
-    //val isDarkTheme = useTheme()
     MenuBar {
         Menu(
             text = "File",
-            //onClick = { showMenu = !showMenu }
-        ) {
-            DropdownMenuItem(
+        ) { closeMenu ->
+        DropdownMenuItem(
                 text = { Text("Add AWS Profile") },
-                onClick = { showAddProfileDialog = true },
+                onClick = {
+                    showAddProfileDialog = true
+                    closeMenu()
+                },
                 leadingIcon = { Icon(ICON_ADD_USER, "Add Profile") }
             )
             DropdownMenuItem(
                 text = { Text("Edit AWS Profiles") },  // Новий пункт меню
-                onClick = { showEditProfilesDialog = true },
+                onClick = {
+                    showEditProfilesDialog = true
+                    closeMenu()
+                },
                 leadingIcon = { Icon(ICON_EDIT, "Edit Profiles") }
             )
 
             DropdownMenuItem(
                 text = { Text("Add cluster connection") },
-                onClick = { showAddClusterDialog = true },
+                onClick = {
+                    showAddClusterDialog = true
+                    closeMenu()
+                          },
                 leadingIcon = { Icon(ICON_ADD, "Connect") }
             )
             DropdownMenuItem(
                 text = { Text("Edit cluster connections") },
-                onClick = { showEditClustersDialog = true },
+                onClick = {
+                    showEditClustersDialog = true
+                    closeMenu()
+                          },
                 leadingIcon = { Icon(ICON_EDIT, "Edit") }
             )
 
@@ -164,38 +172,35 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 
             DropdownMenuItem(
                 text = { Text("Exit") },
-                onClick = { showExitDialog = true },
+                onClick = {
+                    showExitDialog = true
+                    closeMenu()
+                          },
                 leadingIcon = { Icon(ICON_CLOSE, "Exit") }
             )
         }
         Menu(
             text = "Settings",
-        ) {
-            DropdownMenuItem(
+        ) { closeMenu ->
+        DropdownMenuItem(
                 text = { Text("Port Forwards") },
-                onClick = { showPortForwardWindow = true },
+                onClick = {
+                    showPortForwardWindow = true
+                    closeMenu()
+                          },
                 leadingIcon = { Icon(ICON_SERVER, "Port Forwards") }
             )
         }
 
         Menu(
             text = "View",
-            //onClick = { showMenu = !showMenu }
-        ) {
-//            DropdownMenuItem(
-//                text = { Text("Refresh") },
-//                onClick = { recomposeScope?.invalidate() },
-//                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
-//            )
-            //            DropdownMenuItem(
-//                text = { Text("Settings") },
-//                onClick = { /* Add settings logic */ },
-//                leadingIcon = { Icon(ICON_SETTINGS, "Settings") }
-//            )
-//            HorizontalDivider()
-            DropdownMenuItem(
+        ) { closeMenu ->
+        DropdownMenuItem(
                 text = { Text(if (ThemeManager.isDarkTheme()) "Light Theme" else "Dark Theme") },
-                onClick = { ThemeManager.toggleTheme() },
+                onClick = {
+                    ThemeManager.toggleTheme()
+                    closeMenu()
+                          },
 
                 leadingIcon = {
                     Icon(
@@ -206,21 +211,20 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
             )
         }
 
-//        Menu(
-//            text = "Help",
-//            onClick = { showMenu = !showMenu }
-//        ) {
-//            DropdownMenuItem(
-//                text = { Text("Documentation") },
-//                onClick = { /* Open documentation */ },
-//                leadingIcon = { Icon(ICON_HELP, "Documentation") }
-//            )
-//            DropdownMenuItem(
-//                text = { Text("About") },
-//                onClick = { /* Show about info */ },
-//                leadingIcon = { Icon(ICON_INFO, "About") }
-//            )
-//        }
+        Menu(
+            text = "Help",
+        ) {
+            DropdownMenuItem(
+                text = { Text("Documentation") },
+                onClick = { TODO() /* Open documentation */ },
+                leadingIcon = { Icon(ICON_HELP, "Documentation") }
+            )
+            DropdownMenuItem(
+                text = { Text("About") },
+                onClick = { TODO() /* Show about info */ },
+                leadingIcon = { Icon(ICON_INFO, "About") }
+            )
+        }
     }
 }
 @Composable
@@ -241,10 +245,10 @@ fun MenuBar(content: @Composable () -> Unit) {
 @Composable
 fun Menu(
     text: String,
-    //onClick: () -> Unit,
-    content: @Composable () -> Unit
+    content: @Composable (closeMenu: () -> Unit) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val closeMenu = { expanded = false }
 
     Box(
         modifier = Modifier.wrapContentSize(align = Alignment.TopStart)
@@ -265,7 +269,7 @@ fun Menu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            content()
+            content(closeMenu)
         }
     }
 }

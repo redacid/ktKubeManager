@@ -351,7 +351,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
 
     fun dispose() {
         portForwardService.stopAllPortForwards()
-        // інший існуючий код...
+        // TODO
     }
 
     suspend fun handleResourceLoad(
@@ -641,7 +641,10 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                                 showLogViewer.value = false
                                                                 logViewerParams.value = null
                                                                 selectedResource = null
+                                                                //Stop all Port-Forwards
+                                                                portForwardService.stopAllPortForwards()
                                                                 val connectionResult = when {
+
                                                                     // Використовуємо різні методи підключення в залежності від джерела
                                                                     context.source == "saved" && context.config != null -> {
                                                                         logger.info("Connecting to saved cluster: ${context.name}")
@@ -825,10 +828,10 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                     }
                                 }
                             } // End contexts list
-                            Spacer(modifier = Modifier.Companion.height(16.dp));
+                            Spacer(modifier = Modifier.Companion.height(16.dp))
                             Text(
                             "Cluster Resources:", style = MaterialTheme.typography.titleMedium
-                        );
+                        )
                             Spacer(modifier = Modifier.Companion.height(8.dp))
                             Box(
                                 modifier = Modifier.Companion.weight(2f)

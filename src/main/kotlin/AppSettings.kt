@@ -66,7 +66,7 @@ class SettingsManager {
                 AppSettings()
             }
         } catch (e: Exception) {
-            println("Error lading settings: ${e.message}")
+            logger.error("Error lading settings: ${e.message}")
             AppSettings()
         }
     }
@@ -76,7 +76,7 @@ class SettingsManager {
             settings = settings.update()
             saveSettings()
         } catch (e: Exception) {
-            println("Error upgrading settings: ${e.message}")
+            logger.error("Error upgrading settings: ${e.message}")
         }
     }
 
@@ -84,7 +84,7 @@ class SettingsManager {
         try {
             configFile.writeText(json.encodeToString(AppSettings.serializer(), settings))
         } catch (e: Exception) {
-            println("Error saving settings: ${e.message}")
+            logger.error("Error saving settings: ${e.message}")
         }
     }
 }

@@ -21,7 +21,7 @@ fun getGitHash(): String {
 
         process.inputStream.bufferedReader().use { it.readText().trim() }
     } catch (e: Exception) {
-        "unknown"
+        "unknown $e"
     }
 }
 
