@@ -1,6 +1,7 @@
 * Reload context list after edit
 * Add Splash screen on start
 * Node shell (bottlerocket and others)
+* ~~Port Forwarding~~
 * Metric services
   * Report Limit resources \ Real
 * Add resource types:
@@ -18,4 +19,3 @@
     * Validating Webhook Configurations
   * Network:
     * Ingress Classes
-    * Port Forwarding

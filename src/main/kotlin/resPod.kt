@@ -910,7 +910,7 @@ private fun PodActions(
                     )
                 } catch (e: Exception) {
                     // Обробка помилок - показуємо діалог
-                    errorMessage = e.message ?: "Невідома помилка при створенні port-forward"
+                    errorMessage = "${e.message}, Maybe port is busy"
                     showErrorDialog = true
                 }
             }
@@ -921,11 +921,11 @@ private fun PodActions(
     if (showErrorDialog && errorMessage != null) {
         AlertDialog(
             onDismissRequest = { showErrorDialog = false },
-            title = { Text("Помилка port-forward") },
+            title = { Text("Port-forward Error") },
             text = { Text(errorMessage!!) },
             confirmButton = {
                 Button(onClick = { showErrorDialog = false }) {
-                    Text("OK")
+                    Text("Ok")
                 }
             }
         )
