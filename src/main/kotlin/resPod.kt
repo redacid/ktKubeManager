@@ -840,6 +840,9 @@ private fun PodActions(
     kubernetesClient: KubernetesClient?
 ) {
     var showPortForwardDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+
     val containers = pod.spec?.containers ?: emptyList()
     val containerPorts = containers.flatMap { it.ports ?: emptyList() }.map { it.containerPort }
 
@@ -903,14 +906,29 @@ private fun PodActions(
                         podName = podName,
                         localPort = localPort,
                         podPort = podPort,
-                        bindAddress = bindAddress // Тепер це параметр функції
+                        bindAddress = bindAddress
                     )
                 } catch (e: Exception) {
-                    // Обробка помилок
-                    println("Помилка при створенні port-forward: ${e.message}")
+                    // Обробка помилок - показуємо діалог
+                    errorMessage = e.message ?: "Невідома помилка при створенні port-forward"
+                    showErrorDialog = true
                 }
             }
         }
     )
+
+    // Показуємо діалогове вікно з помилкою
+    if (showErrorDialog && errorMessage != null) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("Помилка port-forward") },
+            text = { Text(errorMessage!!) },
+            confirmButton = {
+                Button(onClick = { showErrorDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 }
 
