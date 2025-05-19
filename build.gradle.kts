@@ -42,6 +42,7 @@ kotlin {
 }
 
 dependencies {
+    implementation("com.sebastianneubauer.jsontree:jsontree:2.4.1")
     implementation(compose.desktop.currentOs)
     val fabric8Version = "6.13.5"
     implementation("io.fabric8:kubernetes-client-api:${fabric8Version}")

@@ -1,3 +1,6 @@
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,17 +11,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowState
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.fabric8.kubernetes.api.model.ConfigMap
 import io.fabric8.kubernetes.api.model.Endpoints
 import io.fabric8.kubernetes.api.model.Event
@@ -45,21 +60,26 @@ import io.fabric8.kubernetes.api.model.rbac.ClusterRoleBinding
 import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
-
-
-
+import com.sebastianneubauer.jsontree.JsonTree
+import com.sebastianneubauer.jsontree.TreeColors
+import com.sebastianneubauer.jsontree.TreeState
+import com.sebastianneubauer.jsontree.defaultDarkColors
+import com.sebastianneubauer.jsontree.defaultLightColors
 
 @Composable
 fun ResourceDetailPanel(
     resource: Any?,
     resourceType: String?,
     onClose: () -> Unit,
-    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit
+    onOwnerClick: ((kind: String, name: String, namespace: String?) -> Unit)? = null,
+    onShowLogsRequest: (namespace: String, podName: String, containerName: String) -> Unit,
+    //portForwardService = portForwardService,
+    //kubernetesClient = activeClient
 ) {
     if (resource == null || resourceType == null) return
 
     Column(modifier = Modifier.Companion.fillMaxSize().padding(8.dp)) {
-        // --- Верхня панель ---
+        // --- Detail Header ---
         Row(
             modifier = Modifier.Companion.fillMaxWidth().padding(bottom = 8.dp),
             verticalAlignment = Alignment.Companion.CenterVertically
@@ -70,6 +90,7 @@ fun ResourceDetailPanel(
                 Text("Back")
             }
             Spacer(Modifier.Companion.weight(1f))
+
             val name = if (resource is HasMetadata) resource.metadata?.name else "Details"
             Text(
                 text = "$resourceType: $name",
@@ -78,9 +99,14 @@ fun ResourceDetailPanel(
                 overflow = TextOverflow.Companion.Ellipsis
             )
             Spacer(Modifier.Companion.weight(1f))
+
+            if (resource is HasMetadata) {
+                JsonViewButton(resource)
+                Spacer(Modifier.width(8.dp))
+            }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        // ---
+        // --- End Detail Header
 
         // --- Уміст деталей ---
         Box(modifier = Modifier.Companion.weight(1f).verticalScroll(rememberScrollState())) {
@@ -88,7 +114,10 @@ fun ResourceDetailPanel(
                 // --- Виклик відповідного .DetailsView ---
                 when (resourceType) {
                     // ВАЖЛИВО: Передаємо onShowLogsRequest в .PodDetailsView
-                    "Pods" -> if (resource is Pod) PodDetailsView(pod = resource, onShowLogsRequest = { containerName ->
+                    "Pods" -> if (resource is Pod) PodDetailsView(
+                        pod = resource,
+                        onOwnerClick = onOwnerClick,
+                        onShowLogsRequest = { containerName ->
                             (resource as? HasMetadata)?.metadata?.let { meta ->
                                 onShowLogsRequest(
                                     meta.namespace,
@@ -96,7 +125,8 @@ fun ResourceDetailPanel(
                                     containerName
                                 )
                             } ?: logger.error("Metadata is null for Pod.")
-                        }) else Text("Invalid Pod data")
+                        })
+                    else Text("Invalid Pod data")
                     "Namespaces" -> if (resource is Namespace) NamespaceDetailsView(ns = resource) else Text("Invalid Namespace data")
                     "Nodes" -> if (resource is Node) NodeDetailsView(node = resource) else Text("Invalid Node data")
                     "Deployments" -> if (resource is Deployment) DeploymentDetailsView(dep = resource) else Text("Invalid Deployment data")
@@ -111,7 +141,7 @@ fun ResourceDetailPanel(
                     "DaemonSets" -> if (resource is DaemonSet) DaemonSetDetailsView(ds = resource) else Text("Invalid DaemonSet data")
                     "Jobs" -> if (resource is Job) JobDetailsView(job = resource) else Text("Invalid Job data")
                     "CronJobs" -> if (resource is CronJob) CronJobDetailsView(cronJob = resource) else Text("Invalid CronJob data")
-                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource) else Text("Invalid ReplicaSet data")
+                    "ReplicaSets" -> if (resource is ReplicaSet) ReplicaSetDetailsView(replicaSet = resource,onOwnerClick = onOwnerClick) else Text("Invalid ReplicaSet data")
                     "NetworkPolicies" -> if (resource is NetworkPolicy) NetworkPolicyDetailsView(networkPolicy = resource) else Text("Invalid NetworkPolicy data")
                     "Roles" -> if (resource is Role) RoleDetailsView(role = resource) else Text("Invalid Role data")
                     "RoleBindings" -> if (resource is RoleBinding) RoleBindingDetailsView(roleBinding = resource) else Text("Invalid RoleBinding data")
@@ -146,3 +176,227 @@ fun BasicMetadataDetails(resource: HasMetadata) { // Допоміжна функ
     DetailRow("Labels", resource.metadata?.labels?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
     DetailRow("Annotations", resource.metadata?.annotations?.entries?.joinToString("\n") { "${it.key}=${it.value}" })
 }
+
+@Composable
+fun DetailRow(label: String, value: String?) {
+    Row(modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp)) {
+        Spacer(Modifier.Companion.width(16.dp))
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.titleSmall.copy(/*fontWeight = FontWeight.Companion.Bold*/),
+            modifier = Modifier.Companion.width(150.dp),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = value ?: "<none>",
+            style = MaterialTheme.typography.bodyMedium, // M3 Typography
+            modifier = Modifier.Companion.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+// TODO: use this in all detailView functions
+@Composable
+fun DetailSectionHeader(title: String, expanded: MutableState<Boolean>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded.value = !expanded.value }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.Companion.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (expanded.value) ICON_DOWN else ICON_RIGHT,
+            contentDescription = "Toggle $title"
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            //fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+
+private val jsonMapper = ObjectMapper().apply {
+    registerKotlinModule()
+    writerWithDefaultPrettyPrinter()
+}
+
+@Composable
+private fun ColorScheme.isLight() = this == lightColorScheme()
+
+
+@Composable
+fun ShowJsonDialog(
+    resource: HasMetadata,
+    onDismiss: () -> Unit
+) {
+    val windowState = remember {
+        WindowState(width = 1200.dp, height = 800.dp)
+    }
+
+    var initialState: TreeState by remember { mutableStateOf(TreeState.FIRST_ITEM_EXPANDED) }
+
+    val jsonString = remember(resource.metadata?.uid) {
+        try {
+            jsonMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(resource)
+        } catch (e: Exception) {
+            "Помилка серіалізації JSON: ${e.message}"
+        }
+    }
+    val iconPainter = IconsBase64.getIcon(32)?.let {
+        BitmapPainter(it.toComposeImageBitmap())
+    }
+    Window(
+        onCloseRequest = onDismiss,
+        title = "JSON View: ${resource.metadata?.name ?: "Resource"}",
+        state = windowState,
+        icon = iconPainter
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(4.dp)
+                        )
+                ) {
+                    SelectionContainer(
+                        modifier = Modifier
+                    ) {
+                        JsonTree(
+                            modifier = Modifier.fillMaxSize(),
+
+                            json = jsonString,
+                            colors = if (MaterialTheme.colorScheme.isLight()) {
+                                TreeColors(
+                                    keyColor = MaterialTheme.colorScheme.primary,
+                                    stringValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    numberValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    booleanValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    nullValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    indexColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    symbolColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                TreeColors(
+                                    keyColor = MaterialTheme.colorScheme.primary,
+                                    stringValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    numberValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    booleanValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    nullValueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    indexColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    symbolColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            onLoading = {
+                                Text(
+                                    text = "Loading...",
+                                    modifier = Modifier.padding(8.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            initialState = initialState,
+                            showIndices = true,
+                            showItemCount = true,
+                            expandSingleChildren = true,
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        onClick = {
+                            initialState = TreeState.EXPANDED
+                        }
+                    ) {
+                        Text(text = "Expand All")
+                    }
+                    Button(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        onClick = {
+                            initialState = TreeState.FIRST_ITEM_EXPANDED
+                        }
+                    ) {
+                        Text(text = "Collapse All")
+                    }
+                    Spacer(Modifier.width(30.dp))
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Close")
+                    }
+
+
+                }
+            }
+        }
+    }
+}
+
+
+
+
+@Composable
+fun JsonViewButton(resource: HasMetadata) {
+    var showJsonDialog by remember { mutableStateOf(false) }
+
+    val resourceCopy = remember(resource.metadata?.uid) {
+        try {
+            jsonMapper.readValue(
+                jsonMapper.writeValueAsString(resource),
+                resource.javaClass
+            )
+        } catch (e: Exception) {
+            logger.error("Error creating resource copy: ${e.message}")
+            resource
+        }
+    }
+
+    Button(
+        onClick = { showJsonDialog = true },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    ) {
+        Icon(ICON_CODE, contentDescription = "View JSON")
+        Spacer(Modifier.width(4.dp))
+        Text("View JSON")
+    }
+
+    if (showJsonDialog) {
+        ShowJsonDialog(
+            resource = resourceCopy,
+            onDismiss = { showJsonDialog = false }
+        )
+    }
+}
+
+

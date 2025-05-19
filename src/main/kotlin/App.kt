@@ -66,12 +66,11 @@ import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.Config
 import io.fabric8.kubernetes.client.KubernetesClient
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import ua.`in`.ios.theme1.*
+import ua.`in`.ios.theme.*
 import java.time.Duration
 
 const val ALL_NAMESPACES_OPTION = "<All Namespaces>"
@@ -292,7 +291,7 @@ suspend fun fetchResourceDetails(
     }
 }
 
-
+val portForwardService = PortForwardService()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager) {
@@ -342,6 +341,18 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
     var selectedResource by remember { mutableStateOf<String?>(null) }
+
+    // В методі dispose або onCloseRequest додаємо зупинку всіх port-forward сесій
+
+//    override fun dispose() {
+//        portForwardService.stopAllPortForwards()
+//        // інший існуючий код...
+//    }
+
+    fun dispose() {
+        portForwardService.stopAllPortForwards()
+        // інший існуючий код...
+    }
 
     suspend fun handleResourceLoad(
         nodeId: String,
@@ -558,7 +569,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
             onDismiss = { showErrorDialog.value = false }
         )
     }
-    //Спроба оновлювати дані на екрані, але оновлюється тільки formatAge
+    //Recomposition
     LaunchedEffect(Unit) {
         while (true) {
             delay(AUTOREFRESH_DELAY) // затримка 5 секунд
@@ -852,18 +863,18 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                     val currentFilter =
                                                         selectedNamespaceFilter // We take the current filter value
                                                     val namespaceToUse =
-                                                        if (NSResources.contains(nodeId)) currentFilter else null
+                                                        if (NoNSResources.contains(nodeId)) currentFilter else null
                                                     handleResourceLoad(nodeId, namespaceToUse)
                                                     { loadOk, errorMsg ->
                                                         if (loadOk) {
-                                                            connectionStatus = "Loaded $nodeId ${
+                                                            connectionStatus = "Tree View Loaded $nodeId ${
                                                                 if (namespaceToUse != null &&
                                                                     namespaceToUse != ALL_NAMESPACES_OPTION
                                                                 ) " (ns: $namespaceToUse)" else ""
                                                             }"
                                                         } else {
-                                                            resourceLoadError = "Error $nodeId: $errorMsg"
-                                                            connectionStatus = "Error $nodeId"
+                                                            resourceLoadError = "Tree View Error $nodeId: $errorMsg"
+                                                            connectionStatus = "Tree View Error $nodeId"
                                                         }
                                                         isLoading = false
                                                     }
@@ -905,17 +916,19 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                             val headerTitle = when {
                                 currentView == "logs" -> "Logs: ${paramsForLogs?.second ?: "-"} [${paramsForLogs?.third ?: "-"}]"
                                 currentView == "table" &&
-                                        currentResourceType != null &&
-                                        activeClient != null &&
-                                        resourceLoadError == null &&
-                                        errorMessage == null -> "$currentResourceType in $selectedContext"
+                                        currentResourceType != null
+                                        && activeClient != null
+                                        // Commented for fix: The coroutine scope left the composition
+                                        //&& resourceLoadError == null
+                                        && errorMessage == null
+                                            -> "$currentResourceType in $selectedContext"
 
                                 else -> null
                             }
                             // --- NS filter ---
                             if (currentView == "table" && activeClient != null) {
                                 val isFilterEnabled =
-                                    NSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
+                                    NoNSResources.contains(selectedResourceType) // Активуємо тільки для неймспейсних ресурсів
                                 NamespaceFilter(
                                     selectedNamespaceFilter = selectedNamespaceFilter,
                                     isNamespaceDropdownExpanded = isNamespaceDropdownExpanded,
@@ -932,7 +945,7 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                 isLoading = true
                                                 coroutineScope.launch {
                                                     val namespaceToUse =
-                                                        if (NSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
+                                                        if (NoNSResources.contains(selectedResourceType)) selectedNamespaceFilter else null
                                                     handleResourceLoad(
                                                         selectedResourceType!!,
                                                         namespaceToUse
@@ -1019,6 +1032,12 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                                 detailedResource = null
                                                 detailedResourceType = null
                                                 showLogViewer.value = true
+                                            },
+                                            onResourceClick = { resource, type ->
+                                                detailedResource = resource
+                                                detailedResourceType = type
+                                                showLogViewer.value = false
+                                                logViewerParams.value = null
                                             }
                                         )
                                     }
@@ -1028,13 +1047,13 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
                                         LaunchedEffect(currentResourceType, selectedNamespaceFilter) {
                                             while (true) {
                                                 if (activeClient != null && currentResourceType != null) {
-                                                    val namespaceToUse = if (NSResources.contains(currentResourceType)) selectedNamespaceFilter else null
+                                                    val namespaceToUse = if (NoNSResources.contains(currentResourceType)) selectedNamespaceFilter else null
                                                     handleResourceLoad(currentResourceType, namespaceToUse) { loadOk, errorMsg ->
                                                         if (loadOk) {
-                                                            connectionStatus = "Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
+                                                            connectionStatus = "Table Updated $currentResourceType ${if (namespaceToUse != null && namespaceToUse != ALL_NAMESPACES_OPTION) " (ns: $namespaceToUse)" else ""}"
                                                         } else {
-                                                            resourceLoadError = "Error $currentResourceType: $errorMsg"
-                                                            connectionStatus = "Error $currentResourceType"
+                                                            resourceLoadError = "Table Error $currentResourceType: $errorMsg"
+                                                            connectionStatus = "Table Error $currentResourceType"
                                                         }
                                                     }
                                                 }

@@ -118,7 +118,7 @@ fun DeploymentDetailsView(dep: Deployment) {
                                     text = key,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.width(120.dp)
+                                    modifier = Modifier.width(320.dp)
                                 )
                             }
                             Text(": ")
@@ -248,7 +248,7 @@ fun DeploymentDetailsView(dep: Deployment) {
                                             Text(
                                                 text = key,
                                                 color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.width(120.dp)
+                                                modifier = Modifier.width(320.dp)
                                             )
                                         }
                                         Text(": ")
@@ -374,7 +374,7 @@ fun DeploymentDetailsView(dep: Deployment) {
                                                     Text(
                                                         text = env.name,
                                                         color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.width(120.dp)
+                                                        modifier = Modifier.width(320.dp)
                                                     )
                                                 }
                                                 Text(": ")
@@ -433,7 +433,7 @@ fun DeploymentDetailsView(dep: Deployment) {
                                                 Text(
                                                     mount.name,
                                                     fontWeight = FontWeight.Medium,
-                                                    modifier = Modifier.width(100.dp)
+                                                    modifier = Modifier.width(300.dp)
                                                 )
                                                 Text(" → ")
                                                 SelectionContainer {

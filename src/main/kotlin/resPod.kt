@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +36,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,12 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.Check
-import compose.icons.feathericons.CheckCircle
-import compose.icons.feathericons.Clock
 import compose.icons.feathericons.HardDrive
-import compose.icons.feathericons.HelpCircle
 import compose.icons.feathericons.Info
 import compose.icons.feathericons.X
 import io.fabric8.kubernetes.api.model.Pod
@@ -72,7 +70,10 @@ suspend fun loadPodsFabric8(client: KubernetesClient?, namespace: String?) =
 
 @Preview
 @Composable
-fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit) {
+fun PodDetailsView(pod: Pod,
+                   onShowLogsRequest: (containerName: String) -> Unit,
+                   onOwnerClick: ((kind: String, name: String, namespace: String?) -> Unit)? = null
+) {
     val showContainerDialog = remember { mutableStateOf(false) }
     val containers = remember(pod) { pod.spec?.containers ?: emptyList() }
     val showContainerStatuses = remember { mutableStateOf(true) }
@@ -97,24 +98,13 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
                 modifier = Modifier.Companion.padding(bottom = 8.dp),
                 color = MaterialTheme.colorScheme.onSurface
             )
-
-            Button(
-                onClick = {
-                    when (containers.size) {
-                        0 -> logger.warn("Pod ${pod.metadata?.name} has no containers.")
-                        1 -> onShowLogsRequest(containers.first().name)
-                        else -> showContainerDialog.value = true
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Icon(ICON_LOGS, contentDescription = "View Logs")
-                Spacer(Modifier.Companion.width(4.dp))
-                Text("View Logs")
-            }
+            PodActions(
+                pod = pod,
+                onShowLogsRequest = onShowLogsRequest,
+                showContainerDialog = showContainerDialog,
+                portForwardService = portForwardService,
+                kubernetesClient = activeClient
+            )
         }
 
         // Container logs dialog
@@ -140,10 +130,21 @@ fun PodDetailsView(pod: Pod, onShowLogsRequest: (containerName: String) -> Unit)
         DetailRow("Created", formatAge(pod.metadata?.creationTimestamp))
         DetailRow("Restarts", formatPodRestarts(pod.status?.containerStatuses))
         DetailRow("QoS Class", pod.status?.qosClass)
-        pod.metadata?.ownerReferences?.forEach { owner ->
-            DetailRow("Controlled By", "${owner.kind}/${owner.name}")
-        }
+        pod.metadata?.ownerReferences?.firstOrNull()?.let { owner ->
+            Button(
+                onClick = { onOwnerClick?.invoke(
+                    owner.kind,
+                    owner.name,
+                    pod.metadata?.namespace
+                )},
+                colors = ButtonDefaults.buttonColors()
 
+            ) {
+                pod.metadata?.ownerReferences?.forEach { owner ->
+                    Text("Controlled By ${owner.kind} / ${owner.name}")
+                }
+            }
+        }
 
         // Special card for readiness/status information
         val phase = pod.status?.phase
@@ -639,7 +640,7 @@ fun LogViewerPanel(
                     lastTimestamp = System.currentTimeMillis()
 
                     // Debug log to verify that the coroutine is running
-                    logger.debug("Polling logs - iteration ${++debugCounter}")
+                    logger.info("Polling logs - iteration ${++debugCounter}")
 
                     // Створюємо watchLog без sinceTime - просто слідкуємо за новими логами
                     // Робимо окремий запит для отримання тільки нових логів
@@ -827,6 +828,107 @@ fun LogViewerPanel(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PodActions(
+    pod: Pod,
+    onShowLogsRequest: (String) -> Unit,
+    portForwardService: PortForwardService,
+    showContainerDialog: MutableState<Boolean>,
+    kubernetesClient: KubernetesClient?
+) {
+    var showPortForwardDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+
+    val containers = pod.spec?.containers ?: emptyList()
+    val containerPorts = containers.flatMap { it.ports ?: emptyList() }.map { it.containerPort }
+
+    Row(
+        modifier = Modifier.wrapContentSize(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Кнопка Port Forward
+        Button(
+            onClick = { showPortForwardDialog = true },
+            enabled = kubernetesClient != null && containerPorts.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Icon(
+                imageVector = ICON_SERVER,
+                contentDescription = "Port Forward",
+            )
+            Spacer(Modifier.width(4.dp))
+            Text("Port Forward")
+        }
+        Button(
+            onClick = {
+                when (containers.size) {
+                    0 -> logger.warn("Pod ${pod.metadata?.name} has no containers.")
+                    1 -> onShowLogsRequest(containers.first().name)
+                    else -> showContainerDialog.value = true
+                }
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) {
+            Icon(ICON_LOGS, contentDescription = "View Logs")
+            Spacer(Modifier.Companion.width(4.dp))
+            Text("View Logs")
+        }
+    }
+
+    // Діалог для налаштування Port Forward
+    PortForwardDialog(
+        isOpen = showPortForwardDialog,
+        namespace = pod.metadata?.namespace ?: "",
+        podName = pod.metadata?.name ?: "",
+        availableContainerPorts = containerPorts.distinct().sorted(),
+        onDismiss = { showPortForwardDialog = false },
+        onConfirm = { localPort, podPort, bindAddress ->
+            // Перевіряємо наявність клієнта
+            kubernetesClient?.let { client ->
+                // Отримуємо дані з поду
+                val namespace = pod.metadata?.namespace ?: return@let
+                val podName = pod.metadata?.name ?: return@let
+
+                // Запускаємо port-forward
+                try {
+                    portForwardService.startPortForward(
+                        client = client,
+                        namespace = namespace,
+                        podName = podName,
+                        localPort = localPort,
+                        podPort = podPort,
+                        bindAddress = bindAddress
+                    )
+                } catch (e: Exception) {
+                    // Обробка помилок - показуємо діалог
+                    errorMessage = "${e.message}, Maybe port is busy"
+                    showErrorDialog = true
+                }
+            }
+        }
+    )
+
+    // Показуємо діалогове вікно з помилкою
+    if (showErrorDialog && errorMessage != null) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("Port-forward Error") },
+            text = { Text(errorMessage!!) },
+            confirmButton = {
+                Button(onClick = { showErrorDialog = false }) {
+                    Text("Ok")
+                }
+            }
+        )
     }
 }
 

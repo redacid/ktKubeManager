@@ -27,9 +27,11 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.fabric8.kubernetes.api.model.ConfigMap
@@ -59,6 +61,7 @@ import io.fabric8.kubernetes.api.model.rbac.Role
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding
 import io.fabric8.kubernetes.api.model.storage.StorageClass
 import io.fabric8.kubernetes.client.KubernetesClient
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class) // Для ExposedDropdownMenuBox
 @Composable
@@ -593,15 +596,83 @@ fun DetailsView(
     resource: HasMetadata?,
     resourceType: String?,
     onClose: () -> Unit,
-    onShowLogsRequest: (String, String, String) -> Unit
+    onShowLogsRequest: (String, String, String) -> Unit,
+    onResourceClick: ((HasMetadata, String) -> Unit)? = null
 ) {
-    ResourceDetailPanel(
-        resource = resource,
-        resourceType = resourceType,
-        onClose = onClose,
-        onShowLogsRequest = onShowLogsRequest
-    )
+    val coroutineScope = rememberCoroutineScope()
+
+    when (resource) {
+        is Pod -> ResourceDetailPanel(
+            resource = resource,
+            resourceType = resourceType,
+            onClose = onClose,
+            onOwnerClick = { kind, name, namespace ->
+                val metadata = io.fabric8.kubernetes.api.model.ObjectMeta()
+                metadata.name = name
+                metadata.namespace = namespace
+                val parentResourceType = when (kind) {
+                    "ReplicaSet" -> "ReplicaSets"
+                    "Deployment" -> "Deployments"
+                    "StatefulSet" -> "StatefulSets"
+                    "DaemonSet" -> "DaemonSets"
+                    "Job" -> "Jobs"
+                    else -> null
+                }
+                if (parentResourceType != null) {
+                    // Запускаємо корутину для отримання деталей
+                    coroutineScope.launch {
+                        fetchResourceDetails(activeClient, parentResourceType, metadata)
+                            .onSuccess { parentResource ->
+                                onResourceClick?.invoke(parentResource, parentResourceType)
+                            }
+                    }
+                }
+            },
+            onShowLogsRequest = onShowLogsRequest
+        )
+        is ReplicaSet -> ResourceDetailPanel(
+            resource = resource,
+            resourceType = resourceType,
+            onClose = onClose,
+            onOwnerClick = { kind, name, namespace ->
+                val metadata = io.fabric8.kubernetes.api.model.ObjectMeta()
+                metadata.name = name
+                metadata.namespace = namespace
+                val parentResourceType = when (kind) {
+                    "ReplicaSet" -> "ReplicaSets"
+                    "Deployment" -> "Deployments"
+                    "StatefulSet" -> "StatefulSets"
+                    "DaemonSet" -> "DaemonSets"
+                    "Job" -> "Jobs"
+                    else -> null
+                }
+                if (parentResourceType != null) {
+                    // Запускаємо корутину для отримання деталей
+                    coroutineScope.launch {
+                        fetchResourceDetails(activeClient, parentResourceType, metadata)
+                            .onSuccess { parentResource ->
+                                onResourceClick?.invoke(parentResource, parentResourceType)
+                            }
+                    }
+                }
+            },
+            onShowLogsRequest = onShowLogsRequest
+        )
+//        is Deployment -> DeploymentDetailsView(dep = resource)
+//        is StatefulSet -> StatefulSetDetailsView(sts = resource)
+//        is DaemonSet -> DaemonSetDetailsView(ds = resource)
+         // TODO Controled by for Job
+//        is Job -> JobDetailsView(job = resource)
+        else ->
+            ResourceDetailPanel(
+            resource = resource,
+            resourceType = resourceType,
+            onClose = onClose,
+            onShowLogsRequest = onShowLogsRequest
+        )
+    }
 }
+
 
 @Composable
 fun TableView(
@@ -615,11 +686,12 @@ fun TableView(
     resourceLists: Map<String, List<HasMetadata>>,
     onResourceClick: (HasMetadata, String) -> Unit
 ) {
-    val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
+    //val currentErrorMessageForPanel = resourceLoadError ?: errorMessage
 
     when {
         isLoading -> LoadingView(connectionStatus)
-        currentErrorMessageForPanel != null -> ErrorView(currentErrorMessageForPanel)
+        // commented for igroring courutine errors
+        //currentErrorMessageForPanel != null -> ErrorView(currentErrorMessageForPanel)
         activeClient != null && currentResourceType != null -> {
             ResourceTableView(
                 currentResourceType = currentResourceType,
@@ -766,3 +838,49 @@ private fun ResourceTableView(
         }
     }
 }
+
+// Calculate optimal column widths based on content
+@Composable
+fun calculateColumnWidths(
+    headers: List<String>,
+    items: List<HasMetadata>,
+    resourceType: String,
+    minColumnWidth: Int = 60,
+    maxColumnWidth: Int = 400,
+    padding: Int = 23
+): List<Int> {
+    // Text measurer to calculate text dimensions
+    val textMeasurer = rememberTextMeasurer()
+    val headerStyle = MaterialTheme.typography.titleSmall
+    val cellStyle = MaterialTheme.typography.bodyMedium
+
+    return remember(headers, items, resourceType) {
+        // Initialize with minimum widths
+        val widths = MutableList(headers.size) { minColumnWidth }
+
+        // Measure header widths
+        headers.forEachIndexed { index, header ->
+            val textWidth = measureTextWidth(textMeasurer, header, headerStyle)
+            widths[index] = maxOf(
+                widths[index], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
+            )
+        }
+
+        // Measure data widths (sample up to 100 items for performance)
+        val sampleItems = if (items.size > 100) items.take(100) else items
+        sampleItems.forEach { item ->
+            headers.forEachIndexed { colIndex, _ ->
+                val cellData = getCellData(item, colIndex, resourceType)
+                val textWidth = measureTextWidth(textMeasurer, cellData, cellStyle)
+                val minColumnWidth = measureTextWidth(textMeasurer, headers[colIndex] ,headerStyle) + padding
+                //logger.warn("cell data width: $colIndex $textWidth ${headers[colIndex]} $minColumnWidth")
+                widths[colIndex] = maxOf(
+                    widths[colIndex], (textWidth + padding).coerceIn(minColumnWidth, maxColumnWidth)
+                )
+            }
+        }
+
+        widths
+    }
+}
+

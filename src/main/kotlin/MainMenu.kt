@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 //import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
-import ua.`in`.ios.theme1.*
+import ua.`in`.ios.theme.*
 import kotlin.system.exitProcess
 
 // Створюємо клас для пункту меню
@@ -86,6 +86,8 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
     var showAddProfileDialog by remember { mutableStateOf(false) }
     var showEditProfilesDialog by remember { mutableStateOf(false) }
     var showEditClustersDialog by remember { mutableStateOf(false) }
+    var showPortForwardWindow by remember { mutableStateOf(false) }
+
 
     if (showEditClustersDialog) {
         EditClustersDialog(
@@ -112,6 +114,11 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         AwsProfilesEditDialog(
             onDismiss = { showEditProfilesDialog = false },
             settingsManager = settingsManager
+        )
+    }
+    if (showPortForwardWindow) {
+        PortForwardWindow(
+            onClose = { showPortForwardWindow = false }
         )
     }
 
@@ -161,6 +168,15 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
                 leadingIcon = { Icon(ICON_CLOSE, "Exit") }
             )
         }
+        Menu(
+            text = "Settings",
+        ) {
+            DropdownMenuItem(
+                text = { Text("Port Forwards") },
+                onClick = { showPortForwardWindow = true },
+                leadingIcon = { Icon(ICON_SERVER, "Port Forwards") }
+            )
+        }
 
         Menu(
             text = "View",
@@ -171,9 +187,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 //                onClick = { recomposeScope?.invalidate() },
 //                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
 //            )
-
-
-//            DropdownMenuItem(
+            //            DropdownMenuItem(
 //                text = { Text("Settings") },
 //                onClick = { /* Add settings logic */ },
 //                leadingIcon = { Icon(ICON_SETTINGS, "Settings") }
