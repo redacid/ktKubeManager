@@ -1,7 +1,8 @@
-# ktKubeManager
-
-/opt/kubemanager/bin/KubeManager
+# Yellow Fork KubeManager
 
 requirements:
-* NO aws-cli needed
+* NO aws-cli needed, worked with AWS SDK
+
+![](KubeManager.png)
+
 

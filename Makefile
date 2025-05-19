@@ -1,7 +1,7 @@
 -include .env
 export
 
-#JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
+JAVA_HOME := $(HOME)/.jdks/jbr-17.0.14
 #SHELL := /bin/bash
 APP_NAME := kubemanager
 #APP_NAME_MAC := KubeManager
