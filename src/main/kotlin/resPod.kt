@@ -96,24 +96,13 @@ fun PodDetailsView(pod: Pod,
                 modifier = Modifier.Companion.padding(bottom = 8.dp),
                 color = MaterialTheme.colorScheme.onSurface
             )
-
-            Button(
-                onClick = {
-                    when (containers.size) {
-                        0 -> logger.warn("Pod ${pod.metadata?.name} has no containers.")
-                        1 -> onShowLogsRequest(containers.first().name)
-                        else -> showContainerDialog.value = true
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Icon(ICON_LOGS, contentDescription = "View Logs")
-                Spacer(Modifier.Companion.width(4.dp))
-                Text("View Logs")
-            }
+            PodActions(
+                pod = pod,
+                onShowLogsRequest = onShowLogsRequest,
+                showContainerDialog = showContainerDialog,
+                portForwardService = portForwardService,
+                kubernetesClient = activeClient
+            )
         }
 
         // Container logs dialog
@@ -838,5 +827,88 @@ fun LogViewerPanel(
             }
         }
     }
+}
+
+@Composable
+private fun PodActions(
+    pod: Pod,
+    onShowLogsRequest: (String) -> Unit,
+    portForwardService: PortForwardService,
+    showContainerDialog: MutableState<Boolean>,
+    kubernetesClient: KubernetesClient?
+) {
+    var showPortForwardDialog by remember { mutableStateOf(false) }
+    val containers = pod.spec?.containers ?: emptyList()
+    val containerPorts = containers.flatMap { it.ports ?: emptyList() }.map { it.containerPort }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Кнопка Port Forward
+        Button(
+            onClick = { showPortForwardDialog = true },
+            enabled = kubernetesClient != null && containerPorts.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Icon(
+                imageVector = ICON_SERVER,
+                contentDescription = "Port Forward",
+            )
+            Spacer(Modifier.width(4.dp))
+            Text("Port Forward")
+        }
+        Button(
+            onClick = {
+                when (containers.size) {
+                    0 -> logger.warn("Pod ${pod.metadata?.name} has no containers.")
+                    1 -> onShowLogsRequest(containers.first().name)
+                    else -> showContainerDialog.value = true
+                }
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) {
+            Icon(ICON_LOGS, contentDescription = "View Logs")
+            Spacer(Modifier.Companion.width(4.dp))
+            Text("View Logs")
+        }
+    }
+
+    // Діалог для налаштування Port Forward
+    PortForwardDialog(
+        isOpen = showPortForwardDialog,
+        namespace = pod.metadata?.namespace ?: "",
+        podName = pod.metadata?.name ?: "",
+        availableContainerPorts = containerPorts.distinct().sorted(),
+        onDismiss = { showPortForwardDialog = false },
+        onConfirm = { localPort, podPort, bindAddress -> // Додали третій параметр
+            // Перевіряємо наявність клієнта
+            kubernetesClient?.let { client ->
+                // Отримуємо дані з поду
+                val namespace = pod.metadata?.namespace ?: return@let
+                val podName = pod.metadata?.name ?: return@let
+
+                // Запускаємо port-forward
+                try {
+                    portForwardService.startPortForward(
+                        client = client,
+                        namespace = namespace,
+                        podName = podName,
+                        localPort = localPort,
+                        podPort = podPort,
+                        bindAddress = bindAddress // Тепер це параметр функції
+                    )
+                } catch (e: Exception) {
+                    // Обробка помилок
+                    println("Помилка при створенні port-forward: ${e.message}")
+                }
+            }
+        }
+    )
 }
 

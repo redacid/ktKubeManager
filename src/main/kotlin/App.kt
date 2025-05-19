@@ -291,7 +291,7 @@ suspend fun fetchResourceDetails(
     }
 }
 
-
+val portForwardService = PortForwardService()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(windowState: WindowState, settingsManager: SettingsManager) {
@@ -341,6 +341,18 @@ fun App(windowState: WindowState, settingsManager: SettingsManager) {
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = useTheme()
     var selectedResource by remember { mutableStateOf<String?>(null) }
+
+    // В методі dispose або onCloseRequest додаємо зупинку всіх port-forward сесій
+
+//    override fun dispose() {
+//        portForwardService.stopAllPortForwards()
+//        // інший існуючий код...
+//    }
+
+    fun dispose() {
+        portForwardService.stopAllPortForwards()
+        // інший існуючий код...
+    }
 
     suspend fun handleResourceLoad(
         nodeId: String,

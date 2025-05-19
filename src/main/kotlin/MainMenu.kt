@@ -86,6 +86,8 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
     var showAddProfileDialog by remember { mutableStateOf(false) }
     var showEditProfilesDialog by remember { mutableStateOf(false) }
     var showEditClustersDialog by remember { mutableStateOf(false) }
+    var showPortForwardWindow by remember { mutableStateOf(false) }
+
 
     if (showEditClustersDialog) {
         EditClustersDialog(
@@ -112,6 +114,11 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         AwsProfilesEditDialog(
             onDismiss = { showEditProfilesDialog = false },
             settingsManager = settingsManager
+        )
+    }
+    if (showPortForwardWindow) {
+        PortForwardWindow(
+            onClose = { showPortForwardWindow = false }
         )
     }
 
@@ -172,6 +179,11 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 //                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
 //            )
 
+            DropdownMenuItem(
+                text = { Text("Port Forwards") },
+                onClick = { showPortForwardWindow = true },
+                leadingIcon = { Icon(ICON_SERVER, "Port Forwards") }
+            )
 
 //            DropdownMenuItem(
 //                text = { Text("Settings") },

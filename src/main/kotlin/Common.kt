@@ -55,7 +55,7 @@ val resourceLeafNodes: Set<String> = setOf(
 )
 
 val NoNSResources: Set<String> =
-    resourceLeafNodes - setOf("Nodes", "Namespaces", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
+    resourceLeafNodes - setOf("Nodes","Namespaces", "PersistentVolumes", "StorageClasses", "ClusterRoles", "ClusterRoleBindings", "CRDs")
 //val logger = LoggerFactory.getLogger("YF")!!
 
 val logger = LoggerFactory.getLogger("YF")!!.apply {
