@@ -1,7 +1,5 @@
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.PodResource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
 import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -75,6 +73,7 @@ class PortForwardService {
     ): Closeable {
         // Використання внутрішнього API Fabric8 для явного вказання адреси прив'язки
         val inetAddress = InetAddress.getByName(bindAddress)
+        logger.warn("Using explicit bind address: $bindAddress : $inetAddress")
         // Викликаємо portForward з підтримуваними параметрами
         return podResource.portForward(podPort, inetAddress, localPort)
     }
@@ -165,8 +164,12 @@ class PortForwardSession(
 ) : Closeable {
 
     // Визначаємо декілька URL для доступу
-    val ipv4Url: String = if (bindAddress == "0.0.0.0" || bindAddress == "127.0.0.1") "127.0.0.1:$localPort" else "$bindAddress:$localPort"
-    val ipv6Url: String = if (bindAddress == "0.0.0.0" || bindAddress == "::1") "[::1]:$localPort" else "[$bindAddress]:$localPort"
+    val ipv4Url: String =
+        if (bindAddress == "0.0.0.0" || bindAddress == "127.0.0.1") "127.0.0.1:$localPort"
+        else "$bindAddress:$localPort"
+    val ipv6Url: String =
+        if (bindAddress == "0.0.0.0" || bindAddress == "::1") "[::1]:$localPort"
+        else "[$bindAddress]:$localPort"
     val localUrl: String = "localhost:$localPort"
 
     // URL для відображення користувачу (використаємо localhost як найбільш універсальний)
@@ -189,7 +192,7 @@ class PortForwardSession(
             portForward.close()
         } catch (e: Exception) {
             // Обробка помилок при закритті
-            logger.warn("Помилка при закритті port-forward сесії: ${e.message}")
+            logger.warn("Error when closing Port-Forward Session: ${e.message}")
         }
     }
 

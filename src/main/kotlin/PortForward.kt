@@ -40,7 +40,7 @@ fun PortForwardDialog(
 
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Налаштування Port Forward") },
+            title = { Text("Setting Port Forward") },
             text = {
                 Column(
                     modifier = Modifier
@@ -49,13 +49,13 @@ fun PortForwardDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        "Налаштування перенаправлення портів для поду: $podName у просторі імен: $namespace"
+                        "Setting up port redirection for a pod: $podName in namespace: $namespace"
                     )
 
                     // Вибір порту контейнера
-                    Text("Порт контейнера:", fontWeight = FontWeight.Bold)
+                    Text("Container port:", fontWeight = FontWeight.Bold)
                     if (availableContainerPorts.isEmpty()) {
-                        Text("Не знайдено доступних портів у контейнері")
+                        Text("No available ports found in a container")
                     } else {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -78,27 +78,27 @@ fun PortForwardDialog(
                     }
 
                     // Введення локального порту
-                    Text("Локальний порт:", fontWeight = FontWeight.Bold)
+                    Text("Local port:", fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = localPort,
                         onValueChange = {
                             localPort = it
                             localPortError = validateLocalPort(it)
                         },
-                        label = { Text("Локальний порт (0 для автоматичного вибору)") },
+                        label = { Text("Local port (0 for automatic choice)") },
                         isError = localPortError != null,
                         supportingText = {
                             if (localPortError != null) {
                                 Text(localPortError!!)
                             } else {
-                                Text("Залиште 0 для автоматичного вибору доступного порту")
+                                Text("Leave 0 to automatically select the available port")
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     // Вибір типу адреси прив'язки
-                    Text("Тип прив'язки:", fontWeight = FontWeight.Bold)
+                    Text("Type of binding:", fontWeight = FontWeight.Bold)
                     Column {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -113,9 +113,9 @@ fun PortForwardDialog(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text("Всі інтерфейси (0.0.0.0)")
+                                Text("All interfaces (0.0.0.0)")
                                 Text(
-                                    "Доступно з будь-якого інтерфейсу (IPv4 та IPv6)",
+                                    "Available from any interface (IPv4 та IPv6)",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -135,9 +135,9 @@ fun PortForwardDialog(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text("Тільки IPv4 (127.0.0.1)")
+                                Text("IPv4 only (127.0.0.1)")
                                 Text(
-                                    "Доступно тільки з localhost через IPv4",
+                                    "Only available with Localhost through IPv4",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -157,9 +157,9 @@ fun PortForwardDialog(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text("Тільки IPv6 (::1)")
+                                Text("IPv6 only (::1)")
                                 Text(
-                                    "Доступно тільки з localhost через IPv6",
+                                    "Only available with Localhost through IPv6",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -181,12 +181,12 @@ fun PortForwardDialog(
                     },
                     enabled = localPortError == null && availableContainerPorts.isNotEmpty()
                 ) {
-                    Text("Створити")
+                    Text("Create")
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("Скасувати")
+                    Text("Cancel")
                 }
             }
         )
@@ -200,11 +200,11 @@ fun PortForwardDialog(
 private fun validateLocalPort(portStr: String): String? {
     val port = portStr.toIntOrNull()
     return when {
-        portStr.isBlank() -> "Порт не може бути порожнім"
-        port == null -> "Некоректний формат порту"
-        port < 0 -> "Порт не може бути від'ємним"
-        port > 0 && port < 1024 -> "Порти 1-1023 потребують прав адміністратора"
-        port > 65535 -> "Порт не може бути більше 65535"
+        portStr.isBlank() -> "The port cannot be empty"
+        port == null -> "Incorrect port format"
+        port < 0 -> "The port cannot be negative"
+        port > 0 && port < 1024 -> "Ports 1-1023 need administrator rights"
+        port > 65535 -> "The port cannot be more 65535"
         else -> null
     }
 }
@@ -261,7 +261,7 @@ fun PortForwardPanel(
     ) {
         // Заголовок
         Text(
-            "Активні Port Forward сесії",
+            "Active Port Forward sessions",
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
@@ -283,7 +283,7 @@ fun PortForwardPanel(
                     Text("Немає активних сесій Port Forward")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Натисніть кнопку 'Port Forward' у деталях поду, щоб створити нову сесію",
+                        "Click the 'Port Forward' in the Pod Details to create a new session",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -336,7 +336,7 @@ fun PortForwardPanel(
                     modifier = Modifier.padding(8.dp)
                 ) {
                     Text(
-                        text = "URL скопійовано: $lastCopiedUrl",
+                        text = "URL is copied: $lastCopiedUrl",
                         color = MaterialTheme.colorScheme.inverseOnSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -359,7 +359,7 @@ fun PortForwardPanel(
                     containerColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text("Зупинити всі сесії")
+                Text("Stop all sessions")
             }
         }
     }
@@ -439,7 +439,7 @@ fun PortForwardSessionItem(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Text(
-                    "Натисніть щоб скопіювати",
+                    "Click to copy",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -451,12 +451,12 @@ fun PortForwardSessionItem(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    "Локальний порт: ${session.localPort} → Порт поду: ${session.podPort}",
+                    "Local port: ${session.localPort} → Pod Port: ${session.podPort}",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    "Тривалість: $durationText",
+                    "Duration: $durationText",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -472,7 +472,7 @@ fun PortForwardSessionItem(
             ),
             modifier = Modifier.padding(start = 8.dp)
         ) {
-            Text("Зупинити")
+            Text("Stop")
         }
     }
 }
@@ -486,8 +486,8 @@ private fun formatDuration(durationMs: Long): String {
     val seconds = TimeUnit.MILLISECONDS.toSeconds(durationMs) - TimeUnit.MINUTES.toSeconds(minutes)
 
     return if (minutes > 0) {
-        "$minutes хв $seconds с"
+        "$minutes min $seconds sec"
     } else {
-        "$seconds с"
+        "$seconds sec"
     }
 }
