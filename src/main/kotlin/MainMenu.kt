@@ -168,6 +168,15 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
                 leadingIcon = { Icon(ICON_CLOSE, "Exit") }
             )
         }
+        Menu(
+            text = "Settings",
+        ) {
+            DropdownMenuItem(
+                text = { Text("Port Forwards") },
+                onClick = { showPortForwardWindow = true },
+                leadingIcon = { Icon(ICON_SERVER, "Port Forwards") }
+            )
+        }
 
         Menu(
             text = "View",
@@ -178,14 +187,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
 //                onClick = { recomposeScope?.invalidate() },
 //                leadingIcon = { Icon(ICON_REFRESH, "Refresh") }
 //            )
-
-            DropdownMenuItem(
-                text = { Text("Port Forwards") },
-                onClick = { showPortForwardWindow = true },
-                leadingIcon = { Icon(ICON_SERVER, "Port Forwards") }
-            )
-
-//            DropdownMenuItem(
+            //            DropdownMenuItem(
 //                text = { Text("Settings") },
 //                onClick = { /* Add settings logic */ },
 //                leadingIcon = { Icon(ICON_SETTINGS, "Settings") }

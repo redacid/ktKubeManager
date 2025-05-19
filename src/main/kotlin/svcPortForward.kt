@@ -1,29 +1,16 @@
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.fabric8.kubernetes.client.dsl.ExecWatch
 import io.fabric8.kubernetes.client.dsl.PodResource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
-import java.util.concurrent.CountDownLatch
 import kotlin.random.Random
 
 class PortForwardService {
 
     private val activePortForwards = mutableMapOf<String, PortForwardSession>()
-    private val coroutineScope = CoroutineScope(Dispatchers.IO)
-
     /**
      * Розпочинає сесію port-forward між локальним портом та портом поду в Kubernetes.
      * Прив'язується до IPv4 (0.0.0.0) для забезпечення доступності як з IPv4, так і з IPv6.
@@ -202,7 +189,7 @@ class PortForwardSession(
             portForward.close()
         } catch (e: Exception) {
             // Обробка помилок при закритті
-            println("Помилка при закритті port-forward сесії: ${e.message}")
+            logger.warn("Помилка при закритті port-forward сесії: ${e.message}")
         }
     }
 

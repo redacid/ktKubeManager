@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +36,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -842,7 +844,7 @@ private fun PodActions(
     val containerPorts = containers.flatMap { it.ports ?: emptyList() }.map { it.containerPort }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.wrapContentSize(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Кнопка Port Forward
@@ -886,7 +888,7 @@ private fun PodActions(
         podName = pod.metadata?.name ?: "",
         availableContainerPorts = containerPorts.distinct().sorted(),
         onDismiss = { showPortForwardDialog = false },
-        onConfirm = { localPort, podPort, bindAddress -> // Додали третій параметр
+        onConfirm = { localPort, podPort, bindAddress ->
             // Перевіряємо наявність клієнта
             kubernetesClient?.let { client ->
                 // Отримуємо дані з поду

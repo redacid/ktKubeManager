@@ -1,4 +1,3 @@
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,7 +16,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
-import io.fabric8.kubernetes.client.KubernetesClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
@@ -227,12 +225,7 @@ fun PortForwardWindow(
         ) {
             // Використовуємо існуючий компонент PortForwardPanel
             PortForwardPanel(
-                portForwardService = portForwardService,
-                kubernetesClient = activeClient,
-                onCreatePortForward = { namespace, podName ->
-                    // Цей колбек не використовується в PortForwardPanel, оскільки
-                    // створення port forward відбувається через PodActions
-                }
+                portForwardService = portForwardService
             )
         }
     }
@@ -244,8 +237,6 @@ fun PortForwardWindow(
 @Composable
 fun PortForwardPanel(
     portForwardService: PortForwardService,
-    kubernetesClient: KubernetesClient?,
-    onCreatePortForward: (namespace: String, podName: String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var activeSessions by remember { mutableStateOf(emptyList<PortForwardSession>()) }
