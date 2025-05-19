@@ -87,7 +87,6 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
     var showEditClustersDialog by remember { mutableStateOf(false) }
     var showPortForwardWindow by remember { mutableStateOf(false) }
 
-
     if (showEditClustersDialog) {
         EditClustersDialog(
             onDismiss = { showEditClustersDialog = false },
@@ -125,7 +124,7 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         Menu(
             text = "File",
         ) { closeMenu ->
-        DropdownMenuItem(
+            DropdownMenuItem(
                 text = { Text("Add AWS Profile") },
                 onClick = {
                     showAddProfileDialog = true
@@ -174,7 +173,6 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
                 text = { Text("Exit") },
                 onClick = {
                     showExitDialog = true
-                    closeMenu()
                           },
                 leadingIcon = { Icon(ICON_CLOSE, "Exit") }
             )
@@ -201,7 +199,6 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
                     ThemeManager.toggleTheme()
                     closeMenu()
                           },
-
                 leadingIcon = {
                     Icon(
                         if (ThemeManager.isDarkTheme()) ICON_LIGHT_THEME else ICON_DARK_THEME,
@@ -216,12 +213,12 @@ fun MainMenu(windowState: WindowState, settingsManager: SettingsManager
         ) {
             DropdownMenuItem(
                 text = { Text("Documentation") },
-                onClick = { TODO() /* Open documentation */ },
+                onClick = { /* TODO Open documentation */ },
                 leadingIcon = { Icon(ICON_HELP, "Documentation") }
             )
             DropdownMenuItem(
                 text = { Text("About") },
-                onClick = { TODO() /* Show about info */ },
+                onClick = { /* TODO Show about info */ },
                 leadingIcon = { Icon(ICON_INFO, "About") }
             )
         }
@@ -236,7 +233,7 @@ fun MenuBar(content: @Composable () -> Unit) {
         shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)
+            modifier = Modifier.padding(horizontal = 2.dp, vertical = 10.dp)
         ) {
             content()
         }
@@ -256,7 +253,7 @@ fun Menu(
         TextButton(
             onClick = { expanded = true },
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-            modifier = Modifier.height(32.dp)
+            modifier = Modifier.height(24.dp)
         ) {
             Text(
                 text,
@@ -264,7 +261,6 @@ fun Menu(
                 modifier = Modifier.padding(0.dp)
             )
         }
-
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
