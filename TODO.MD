@@ -1,4 +1,5 @@
 * Reload context list after edit
+* LogView for all resources
 * Add Splash screen on start
 * Node shell (bottlerocket and others)
 * ~~Port Forwarding~~
@@ -8,7 +9,7 @@
   * Workloads: 
     * Replication Controller
   * Configuration:
-  * Resource Quotas
+    * Resource Quotas
     * Limit Ranges
     * Horizontal Pod Autoscaler
     * Pod Disruption Budgets
